@@ -102,11 +102,12 @@ North-star measure (PRD 2 §23.1): **completed, safe and useful service outcomes
 
 ## 1.6 What is built today
 
-- 53 tables (`drizzle/0000_init.sql`), one migration, PostgreSQL dialect, embedded PGlite for development and tests.
-- 100+ `/api/v1` route handlers and 9 channel webhooks, every one of them through the same `handle()` guard.
-- 10 approved clinical protocols, 37 approved knowledge documents (`content/kb/**`), 5 languages of scripted safety text.
-- 22 Vitest suites, all running **offline** with no API key (`npm test`).
-- A complete institutional surface: command dashboard, three module dashboards, case workspace, language console, reports, notifications, admin console, audit journal.
+- **53 tables** (`drizzle/0000_init.sql`), one migration, PostgreSQL dialect, embedded PGlite for development and tests.
+- **104 route files**: 95 under `/api/v1`, every one through the same `handle()` guard, plus 9 signature-verified channel webhooks under `/api/hooks`.
+- **25 pages** (`src/app/**/page.tsx`): the home OS screen, three voice consoles, four dashboards, the case workspace, the language console, reports, notifications, messages, history, search, resources, settings, login and the admin console with its audit journal.
+- **10 approved clinical protocols**, **37 approved knowledge documents** (15 health, 13 agriculture, 9 education in `content/kb/**`), five languages of scripted safety text.
+- **553 tests across 22 Vitest suites**, all running **offline** with no API key (`npm test`).
+- Code layout: `src/server/**` (aliased `@server/*`) for db, core, ai, channels and reports; `src/client/**` (`@client/*`) for the interface; `src/shared/**` (`@shared/*`) for contracts used by both.
 
 ---
 
@@ -131,8 +132,8 @@ Digital public services in the DRC assume the citizen can read, write, search, u
 
 ## 2.3 Against existing chatbot and IVR platforms
 
-| Category | Typical product | What it does well | Where it fails the DRC rural case | CVOS answer |
-|----------|-----------------|-------------------|-----------------------------------|-------------|
+| Category | What it does well | Where it fails the DRC rural case | CVOS answer |
+|----------|-------------------|-----------------------------------|-------------|
 | Generic LLM assistants (consumer chat apps) | broad knowledge, fluent French/English | zero grounding, no escalation, no record, no protocol, invents dosages, needs data and literacy | deterministic protocol engine + citation enforcement + human queue + offline channels |
 | Enterprise chatbot builders (dialogue-flow class) | intent trees, WhatsApp/SMS connectors | rigid intents break on code-switched speech; no clinical governance; no case ownership; per-message licensing hostile to a free public service | LLM used only for *understanding and explanation*; state machine and severity are code; ACU metering paid by the funding tenant |
 | Telco IVR / call-centre platforms | reliable voice, national reach | menu-only, no natural speech, no learning loop, no analytics beyond call metrics; content changes need vendor tickets | natural speech with DTMF fallback (`FR-CH-02`); every call becomes structured, queryable data |
@@ -275,6 +276,77 @@ Platform configuration under privileged access control: ACU conversion table, cl
 | **Linguists on retainer** (2 per language) | verify corpus samples, lexicon, UI strings, TTS quality | `/langues`, `PATCH /api/v1/language/samples/{id}`, `src/shared/i18n/index.ts` | Implemented |
 | **Independent evaluator** | pilot go/no-go, red-team, clinical audit | `evaluation_runs`, `tests/**` | Partial |
 
+## 3.5 End-to-end user journeys
+
+Each journey is the real path through the code, stage by stage. They are the acceptance narratives the pilot will be judged on.
+
+### J1 — Maman Nsimba calls the short code at 22:00 about a feverish child (IVR, Kikongo)
+
+1. The call arrives at `POST /api/hooks/ivr/twilio`; the Twilio signature is validated (`validateTwilioSignature`).
+2. `startOrResume({channel:"ivr", kind:"ivr_caller", identifier: callerId})` resolves or creates the anonymous citizen and the session; the caller id is stored only as a peppered hash.
+3. She hears the greeting in the next language of the rotation, then the language menu; she presses `3` — Kikongo is remembered for every future call and every other channel (`rememberIdentifierLanguage`).
+4. One open question: *"Dites-nous ce dont vous avez besoin"*. She speaks. `<Record>` captures the utterance; `/recording` fetches it.
+5. `runTurn()` runs the deterministic emergency pass **first**: her phrase contains *"ke nwa ve"* (cannot drink) → `detectEmergencyTerms` matches → the scripted emergency message in Kikongo is returned to the call **immediately**, while the full pipeline continues in the background.
+6. In the background: transcription → language analysis → the health agent → `child_fever_u5` → the red flag `cannot_drink` ends the tree → severity 4 → risk band `emergency` → `careDestinationType = emergency_referral`.
+7. `EMERGENCY_INSTRUCTIONS.kg` plus the nearest known facility from `service_directory` (or `FACILITY_UNKNOWN_NOTE.kg` if none is verified) is spoken in ≤ 25 s chunks with *"Je continue ?"*.
+8. A case opens with status `open_emergency`, a 15-minute clock, an acknowledgement task and an alert to the territory's CHW queue; `health_triage_records`, `risk_assessments` and the event trail are written.
+9. If nobody acknowledges within 15 minutes, `detectSlaBreaches()` marks the breach, escalates a level, restarts the clock and notifies the supervisor.
+10. A follow-up is scheduled at +2 h; the corpus sample is queued for native-speaker review because her language is not French.
+
+### J2 — Papa Kalombo sends two photos of maize on WhatsApp (Tshiluba and French)
+
+1. `POST /api/hooks/whatsapp`, `X-Hub-Signature-256` verified, message id deduplicated by `withIdempotency`.
+2. Media downloaded through the Graph API and stored with a checksum; `reviewEvidence()` checks dimensions, information density and truncation — one photo is too dark and is excluded before any vision call is spent.
+3. One structured multimodal call returns the farm context, three candidates with evidence for and against, tiered actions and the follow-up capture request.
+4. Top-1 is *chenille légionnaire* at 0.68 → above the threshold, so it is worded as the most probable match, still "to be confirmed in the field".
+5. `matchNotifiable()` matches the notifiable list → `isNotifiable = true` → the extension officer for the territory receives an alert and `agri.notifiable.detected` is emitted.
+6. `guardChemicalAdvice()` finds no authorised registry entry for the product the model suggested → the sentence is removed and replaced by the referral text.
+7. The reply is sent as text plus a voice note in Tshiluba; buttons offer *"Envoyer une autre photo"* and *"Parler à un agent"*.
+8. The report row feeds `detectClusters()`: with four other similar reports in the territory in fourteen days, a cluster opens as `unverified` and the officer is alerted — the platform does not call it an outbreak.
+
+### J3 — Grâce revises for the TENAFEP on her mother's phone (PWA, Lingala)
+
+1. She opens `/education`, presses the single large button and asks in Lingala to be quizzed on fractions.
+2. `screenLearnerMessage()` passes; `findObjective()` anchors the request to the primary-6 mathematics objective; approved education documents are retrieved.
+3. The teaching call returns the teach-check-adapt steps; the micro-explanation is trimmed to 90 s of speech and localised into Lingala.
+4. `POST /api/v1/education/quiz` generates five rubric-bearing questions; the expected answers are never returned to the client (`publicQuestions`).
+5. She answers aloud; `scoreAnswer()` normalises accents, fillers, number words and fractions, matches the misconception rubric and gives feedback that names the criterion — never a bare "incorrect".
+6. `learning_evidence` records the attempt as a moment, with rubric, assistance level and misconception; `scheduleRevision()` puts the next recall on the SM-2 ladder and the reminder goes out by SMS.
+7. Her teacher later sees the topic in the class gap view — suppressed if fewer than the minimum group size.
+
+### J4 — A CHW works the queue in the morning
+
+1. Opens `/tableau-de-bord/sante`: unacknowledged urgent cases first, with the time remaining on each clock.
+2. Opens a case: risk banner, original transcript and audio, structured intake, the protocol path with triggered rule identifiers, the AI summary with its sources, consent status, prior contacts.
+3. Presses **Accuser réception** → `POST /cases/{id}/acknowledge` stops the clock and closes the acknowledgement task.
+4. Calls the citizen, then adds a note and captures the follow-up outcome (*went to clinic*).
+5. Judges the severity too high after speaking to the mother: `POST /cases/{id}/risk-overrides` demands a second factor, a reason code and a rationale of at least ten characters; the AI value is preserved and the override feeds the override rate.
+6. Closes the case: the closure gate requires outcome, action taken, citizen reachability and a follow-up decision.
+
+### J5 — An extension officer validates a cluster
+
+`GET /api/v1/agriculture/clusters?status=unverified` → compares each report's original evidence, model candidates and farmer answers → `PATCH` moves the cluster `unverified → under_review`, then a field visit → `confirmed` or `rejected`. Every transition is an event with the actor and the note. Below the privacy threshold the territory and the exact count are withheld even from the officer's list view.
+
+### J6 — A programme manager prepares the monthly donor pack
+
+`/rapports` → requests `monthly_ngo_impact` for the organisation's province in PDF → `POST /api/v1/report-jobs` queues it → the scheduler builds it with definitions, denominators, data freshness and small-cell suppression → a notification carries the link → the download is audited and the link expires after seven days.
+
+### J7 — A national analyst investigates a rise
+
+`/tableau-de-bord` shows a 34 % week-on-week rise in fever guidance in two provinces (`importantAlerts()`), with the insight of the day carrying the recommendation, the next action and the **basis**. The analyst drills into the province table, checks the language share, exports the anonymised health CSV, and reads the cost per interaction on the same page.
+
+### J8 — A citizen exercises data rights by voice
+
+Says *"effacez mes données"* → the assisted or self-service path creates a `data_requests` row with a 30-day clock → an administrator processes it → `tombstoneUser()` deletes the media, blanks the free text, pseudonymises the account and preserves the statutory audit → the request is completed with evidence, and the scheduler would have alerted on it had the clock run out.
+
+### J9 — The platform loses every AI provider mid-morning
+
+Provider calls fail down the chain; the offline rules provider takes over. Protocol trees still run; explanations come from approved protocol text; every answer carries a low-confidence flag; danger-sign detection and emergency scripts are untouched because they contain no model call. `/admin` shows the failure counts and the offline-mode flag; nothing in the citizen journey stops.
+
+### J10 — A worker records an interaction with no network (assisted, offline)
+
+The voice note is written to the IndexedDB outbox with a UUIDv7 and its own `Idempotency-Key`; the badge shows the unsynchronised count and warns before logout; on reconnection the service worker's background sync replays the queue; the server accepts each event exactly once (`sync_events`), applies the conflict policy per event family, and returns the canonical result.
+
 ---
 
 # 4. AI Command Centres per User Type
@@ -372,6 +444,20 @@ Provider chains by **internal key** with offline-mode flag; capability consumpti
 | Cluster candidate detection | Confirming a cluster |
 | Report generation and expiry | Changing a national risk rule |
 | Audit chain verification, ACU cap alerts, overdue data-request alerts | Re-identifying a pseudonymised record |
+
+## 4.10 The remaining command centres, in the same four columns
+
+| Actor | Sees | Can do | Automated for them | Decides |
+|-------|------|--------|--------------------|---------|
+| **Proxy / caregiver** | the same voice console with a visible "on behalf of" banner; the consent state of the person they speak for | declare the proxy relationship and its basis; speak, listen, repeat; hand the phone back | proxy context stamped on the session and on every consent record; shared-phone confirmation | whether to declare the relationship — the platform records, it does not assume |
+| **Nurse / clinical supervisor** | the escalated tier (`escalated_up`), unacknowledged urgent cases across the queues they supervise, override history and the override rate | acknowledge, reassign, override severity with step-up MFA and a written rationale, close, reopen | escalation ladder, clock restarts on escalation, supervisor notification | the clinical judgement that overrules the engine — the only place a human may lower a severity |
+| **Programme manager (NGO / donor)** | aggregated programme performance for their organisation's geography: volumes, escalations, acknowledgement and resolution times, backlog, outcomes, coverage by language and channel | request and schedule reports, define recipients and cadence, broadcast within their audience after an estimate, manage their organisation's users | report generation and delivery, audience estimation, duplicate suppression | what to report, to whom, and which broadcasts are worth a citizen's attention |
+| **National analyst** | approved de-identified national data products, with definitions, denominators, freshness and suppression notes on every figure | query the analytics endpoints, export governed reports, compare periods | suppression, freshness stamps, purpose coding on every export | which signal deserves a programme response — never a punitive one |
+| **Safety reviewer** | contract violations, prohibited-claim blocks, uncited fallbacks, override rate, low-confidence sample, red-team regressions, per-language quality | demand a rollback, downgrade a language to scripted mode, add a case to the red-team suite, require re-review of a protocol or a knowledge document | violation events, quality metrics, evaluation runs | whether a release is safe to keep in production |
+| **Tenant administrator** | their tenant's users, organisations, service points, templates, report definitions and consumption against the cap | create and manage institutional accounts, scope organisations, approve templates, set report cadences | cap alerts at 80/95/100 %, template rendering per language, audit of every change | who works in which territory, and on what |
+| **Platform operator** | provider chains by internal key, capability consumption and latency, error log, queue depth and oldest item, scheduler run report, audit-chain status | change routing order, re-run the scheduler, reload knowledge, open a break-glass grant | failover, degraded mode, audit verification, expiry cleanup, cap alerts | when to degrade, when to fail over, when to escalate an incident |
+| **Super administrator** | everything above plus the configuration surface and the audit journal | edit the ACU conversion table, cluster thresholds and the notifiable list; move a protocol through its lifecycle; manage tenancy | every change audited with before and after values | nothing about an individual citizen — that is deliberately not an administrative function |
+| **Developer / integrator** | the API surface, the event catalogue, the error contracts, the offline provider | build against `/api/v1`, run the whole platform locally with no key, extend an adapter behind its interface | offline mode makes every test deterministic | nothing in production; changes go through the release gates |
 
 ---
 
@@ -487,7 +573,7 @@ capture ──► autosave (files, interactions)                       ← origi
 | **Inputs** | French pivot text, learner profile (age band, level, instruction and explanation languages, exam target and date), mode, province, history |
 | **Outputs** | `EducationAssessmentPlus`: objective and curriculum code, teach-check-adapt `steps`, micro-explanation trimmed to 90 s of speech, a Congolese local example, guided and independent attempts, misconceptions with feedback, homework policy, recap, next step, parent summary, revision plan, teacher class view, story, evidence flag, citations |
 | **Permissions** | writes `education_sessions`, `learning_evidence`, `schedules` (revision nudges); reads `learner_profiles` |
-| **Triggers** | `module = education`; mode detected deterministically (`explain | quiz | read | homework | exam_prep | parent | teacher`) |
+| **Triggers** | `module = education`; mode detected deterministically (`explain \| quiz \| read \| homework \| exam_prep \| parent \| teacher`) |
 | **Workflow** | child-safety screen **before** teaching → curriculum anchor + approved knowledge → one teaching call → commercial and age filters → homework policy → mode-specific work (story, parent summary, revision plan with spaced repetition, class gaps) → evidence recorded only on a real attempt or a repeat request |
 | **Escalation** | a safeguarding disclosure abandons the lesson and returns the scripted supportive reply; an adult topic is redirected to a trusted adult; both create a restricted record |
 | **Tools** | `findObjective()` (DRC curriculum map), `generateQuiz()` / `scoreAnswer()` (rubric-based, deterministic scoring), `scheduleRevision()` (SM-2 variant), `classGaps()`, `STORIES` read-aloud library, `searchKnowledge("education", …)` |
@@ -517,7 +603,7 @@ capture ──► autosave (files, interactions)                       ← origi
 | **Permissions** | `case:read`, `case:write`, `case:assign`, `case:escalate` — checked at the route, and again per transition against `TransitionSpec.actorRoles` |
 | **Triggers** | auto-creation (`shouldAutoCreateCase`: severity ≥ 2, confidence < 0.40, notifiable disease, explicit request for a human, safeguarding); worker action; scheduler sweep |
 | **State machine** | `open`/`open_emergency` → `assigned` → `acknowledged` → `in_progress` → `needs_follow_up` → `resolved` → `closed`, with `reassigned`, `escalated`, `escalated_up`, `cancelled`, `duplicate`. Anything not in `TRANSITIONS` is refused with the list of permitted next states. |
-| **SLA** | severity 4 → 15 min · 3 → 4 h · 2 → 24 h · 1 → 72 h · 0 → no clock. Effects per transition: `start | keep | pause | resume | restart | stop`; every pause carries a reason and is audited (`CAS-004`). |
+| **SLA** | severity 4 → 15 min · 3 → 4 h · 2 → 24 h · 1 → 72 h · 0 → no clock. Effects per transition: `start \| keep \| pause \| resume \| restart \| stop`; every pause carries a reason and is audited (`CAS-004`). |
 | **Routing** | territory → organisation → province → role, on-duty first, then least loaded, deterministic tie-break by id |
 | **Atomicity** | assignment and every transition are a compare-and-swap on `cases.version`; the loser receives 409 (`CAS-002`) |
 | **Quality gates** | reason ≥ 10 characters for cancellation, reassignment and override; closure requires outcome, action taken, citizen reachability and follow-up decision (`CAS-006`); merges preserve identifiers and move open tasks, follow-ups and schedules (`FR-CS-07`) |
@@ -644,6 +730,42 @@ Purpose: make model behaviour a governed, reviewable, reversible artefact.
 - **Uncertainty**: the confidence vector is stored per interaction (`interactions.confidenceDimensions`) rather than a single deceptive score (PRD 2 §9.5).
 - **Human override telemetry**: `ai_overrides` + `ai.override.recorded` feed the override rate on the admin console and the monthly AI performance report.
 - **Boards**: clinical safety, child safeguarding and education, agriculture content, language inclusion, data ethics and privacy, model risk — constitution is a Phase 0 programme task; the data model already records their decisions.
+
+## 5.25 Agent tool contracts
+
+Every tool is a typed function with a stable signature. An agent may call only the tools listed for it; the orchestrator, not the model, decides when a tool runs.
+
+| Tool | Signature (simplified) | Owner agent | Determinism |
+|------|------------------------|-------------|-------------|
+| `aiGateway().generateJson` | `<T>({system, user, schema: ZodType<T>, schemaName, images?, maxTokens?}, {interactionId, scripted?}) → {output: T, model, inputTokens, outputTokens, providerKey}` | all | validated output, chain failover |
+| `aiGateway().transcribe` | `({audio, mimeType, languageHint?}) → {text, language?, confidence?, audioSeconds, model}` | Language | chain failover |
+| `aiGateway().synthesize` | `({text, language}) → {audio, mimeType, model} \| null` | Language | `null` means "use on-device synthesis" |
+| `runProtocol` | `(protocol: HealthProtocol, answers: AnswerMap) → ProtocolRunResult` | Health | pure function, no I/O, no model |
+| `deterministicAnswers` | `(protocol, textFr, entities) → AnswerMap` | Health | pure keyword pass in five languages |
+| `selectProtocolId` | `(textFr, entities) → string` | Health | pure |
+| `nearestFacility` | `({province, territory?, healthZone?}) → HealthFacility \| null` | Health | scored lookup over `service_directory` |
+| `vaccinationStatus` | `(dateOfBirth, dosesReceived, now) → {due[], overdue[], upToDate}` | Health | pure, from `EPI_SCHEDULE` |
+| `searchKnowledge` | `(module, query, k, {docIds?, boostDocIds?, onePerDocument?}) → KnowledgeHit[]` | Health, Agriculture, Education | filters before ranking |
+| `approvedDocIds` | `(docIds[]) → Set<string>` | Health | proves a citation exists and is approved |
+| `reviewEvidence` | `(images[]) → {results[], usableIndexes[], summary, recaptureGuidance, videoOnly}` | Agriculture | header parsing plus heuristics, no model |
+| `guardChemicalAdvice` | `(actions[], {crop, issue}) → {actions[], blocked[], avoid[], referral}` | Agriculture | registry lookup, no model |
+| `getPrices` | `({commodity?, province?, market?, limit}) → {prices: PriceQuote[]}` | Agriculture | database only, staleness computed |
+| `getWeather` | `(province, {date}) → WeatherAnswer` | Agriculture | Open-Meteo with a seasonal offline fallback |
+| `calendarAdvice` | `(province, crop, date) → {text, windows[], open}` | Agriculture | reference table |
+| `detectClusters` | `({now?, province?, config?, silent?}) → DetectResult` | Predictive | pure grouping plus upserts |
+| `findObjective` | `(text, level, subject?) → CurriculumObjective \| null` | Education | reference map |
+| `generateQuiz` | `({level, subject, topic, n, language}) → GeneratedQuiz` | Education | model-generated, rubric-bearing |
+| `scoreAnswer` | `(question, spokenAnswer) → ScoredAnswer` | Education | pure normalisation and rubric match |
+| `nextReview` | `(state, quality) → ReviewOutcome` | Education | pure SM-2 variant |
+| `classGaps` | `({province?, territory?, days}) → {gaps[], disclaimer}` | Education | suppressed below the minimum group |
+| `screenLearnerMessage` | `(text, language) → ChildSafetyResult` | Education | pure keyword screen |
+| `detectSafeguarding` | `(text) → {detected, categories[], matchedTerms[]}` | Health, Education | pure, five languages |
+| `scoreRisk` | `(RiskInput) → RiskResult` | Risk | pure, rules only |
+| `openCase` / `transitionCase` / `assignCase` / `overrideSeverity` / `mergeCases` | see `src/server/ai/agents/workflow.ts` | Workflow | state machine with optimistic concurrency |
+| `notify` / `notifyTemplate` / `notifyRole` / `sendBroadcast` | see `src/server/core/notifications.ts` | Workflow, Scheduler | policy-driven delivery |
+| `recordAcu` / `computeAcu` / `isDegradedMode` | see `src/server/core/metering.ts` | Gateway | pure computation plus a ledger write |
+| `audit` / `verifyAuditChain` | see `src/server/core/audit.ts` | all | append-only, hash-chained |
+| `emitEvent` | `(DomainEvent) → eventId` | all | never throws |
 
 ---
 
@@ -1032,11 +1154,71 @@ Every call is tried down the chain; every attempt — success or failure — is 
 | Event or audit write fails | the citizen still receives the reply; the failure is recorded and retried |
 | Database unreachable | `GET /api/v1/system/health` returns 503; the load balancer removes the instance |
 
+## 9.13 Channel walkthroughs (request by request)
+
+### IVR call
+
+```
+Twilio ─POST /api/hooks/ivr/twilio──────────────► validateTwilioSignature
+                                                  startOrResume(ivr_caller)
+                                                  nextGreetingLanguage → <Say> greeting + languageMenu
+citizen presses 3 ─POST /gather?step=language──► setSessionLanguage("kg") → openQuestionMenu
+citizen speaks ───<Record>──────────────────────► POST /recording
+                                                  fetchRecording → runTurn()
+                                                    ├─ emergency keywords? → scripted text now, pipeline in background
+                                                    └─ else runInteraction() → chunkForSpeech()
+                                                  replyTwiml: <Play signed-media-url> or <Say>, then
+                                                  gather("Je continue ?") → /continue for the next chunk
+```
+
+State lives in `sessions.state` (`step`, `continuation`, `greetingIndex`); the call can drop at any point and resume within 24 hours with `resumeSummary()`.
+
+### WhatsApp message
+
+```
+Meta ─POST /api/hooks/whatsapp──► verifySignature(X-Hub-Signature-256)
+                                  parseInbound → message id → withIdempotency
+                                  startOrResume(whatsapp)
+                                  media? downloadMedia → storeInboundMedia (checksum, MIME check)
+                                  detectOptOut? → applyOptOut + acknowledgement, stop
+                                  shouldConfirmSharedPhone? → buttons, stop
+                                  runTurn() → settleTurn()
+                                  sendText(reply) + sendVoiceNote(tts) when synthesis is available
+                                  buttons ≤ 3 / list ≤ 10 for the next choice
+                                  outside the 24 h window → sendTemplate(approved template)
+```
+
+### USSD dial
+
+```
+Aggregator ─POST /api/hooks/ussd──► parse (sessionId, msisdn, text)
+                                    startOrResume(ussd) → language digit → module digit
+                                    → the five common questions of that module (COMMON_QUESTIONS)
+                                    → "END Votre réponse arrive par SMS"          (within the 180 s budget)
+                                    runInBackground( runTurn() → localise() → sendSms(splitSms(answer)) )
+```
+
+### SMS
+
+Inbound: `POST /api/hooks/sms` → opt-out check → `runTurn()` → reply split into at most three concatenated parts. Outbound delivery reports: `POST /api/hooks/sms/dlr` → matched to `notifications.providerMessageId` → status and timestamps updated.
+
+### PWA online
+
+`POST /api/v1/sessions` → `POST /api/v1/sessions/{id}/turns` (multipart with the recorded blob) → `GET /api/v1/workflows/{id}` or `GET /api/v1/sessions/{id}/stream` for the stage indicator (*j'écoute…*, *je réfléchis…*) → the answer panel renders the seven parts and plays the audio.
+
+### PWA offline
+
+`enqueue()` writes the blob and the metadata to IndexedDB with a UUIDv7 and an `Idempotency-Key` → the badge shows the unsynchronised count → on reconnection `flush()` or the service worker's `cvos-sync` replays each item → `POST /api/v1/sessions/{id}/turns` returns the stored response on a duplicate → `POST /api/v1/sync/events` reconciles drafts and observations under the conflict policy.
+
+### Assisted console
+
+A worker opens `/cas/nouveau`, records or types the citizen's words with the proxy relationship declared, and the same `runInteraction()` produces the same seven-part answer and the same case — the only difference is `channel = "assisted"` and the proxy context on the session.
+
 ---
 
 # 10. Database Schema
 
-Source of truth: `src/server/db/schema.ts`. Migration: `drizzle/0000_init.sql` — **53 tables, 11 enumerated types, 26 indexes**, PostgreSQL dialect, applied automatically at boot.
+Source of truth: `src/server/db/schema.ts`. Migration: `drizzle/0000_init.sql` — **53 tables, 11 enumerated types, 43 indexes**, PostgreSQL dialect, applied automatically at boot.
 
 **Data classification** follows `SEC-01` and PRD 2 §12.3: `public` · `internal` · `confidential` (identifiable non-health) · `sensitive` (health, pregnancy, child) · `restricted` (safeguarding, authentication secrets, precise location). Classification drives encryption, log redaction, export permission, retention, backup and support access.
 
@@ -1231,7 +1413,7 @@ Multipart form fields: `text`, `module`, `province`, `wantsAudio`, `audio` (one 
 | `POST /api/v1/sessions/{id}/resume` | `interaction:create` | resumes within 24 h with the "where we left off" summary |
 | `POST /api/v1/sessions/{id}/turns` | `interaction:create`, `ai` limit | one turn; JSON or multipart; `Idempotency-Key` honoured |
 | `GET /api/v1/sessions/{id}/stream` | `interaction:create`, no limit | server-sent events: processing stage updates |
-| `GET /api/v1/workflows/{id}` | `interaction:create`, no limit | canonical processing status: `received → transcribing → understanding → reasoning → composing → completed | failed` |
+| `GET /api/v1/workflows/{id}` | `interaction:create`, no limit | canonical processing status: `received → transcribing → understanding → reasoning → composing → completed \| failed` |
 
 ```http
 POST /api/v1/sessions/{id}/turns
@@ -1380,6 +1562,103 @@ Planned event families (PRD 2 §13.4, Phase 3/4): `transcription.completed`, `ri
 ## 11.5 Internal contracts
 
 `FinalAnswer` (the seven-part answer) · `HealthTriageContract` (the machine-readable triage output) · `AgricultureFieldAssessment` · `EducationTeachingSession`, `EducationQuizSet`, `EducationRevisionPlan`, `EducationParentSummary` · `LanguageAnalysis`, `Localisation` · `RiskResult` · `TurnResult`. All in `src/server/ai/schemas.ts` and `src/server/channels/session.ts`, validated with zod at the boundary of every model call. `domain_result.citations` and `model_route` are omitted from citizen-facing payloads (`SEC-08`).
+
+## 11.6 Further worked examples
+
+### Broadcast with an audience estimate
+
+```http
+GET /api/v1/notifications/broadcast?role=citizen&province=Kongo-Central&language=kg
+200 { "audience": { "total": 4120, "reachable": 3390, "optedOut": 118, "withoutConsent": 612 } }
+
+POST /api/v1/notifications/broadcast
+{ "role": "citizen", "province": "Kongo-Central", "language": "kg", "channel": "sms",
+  "title": "Campagne de vaccination", "message": "…", "approvedBy": "<user id>", "dedupeKey": "vacc-2026-09" }
+200 { "attempted": 3390, "sent": 3311, "suppressed": 79 }
+```
+
+Opted-out citizens are skipped, citizens without the `reminders` consent are suppressed with a recorded reason, the weekly cap applies, and quiet hours defer rather than drop.
+
+### Report job
+
+```http
+POST /api/v1/report-jobs
+{ "type": "weekly_health_trends", "format": "pdf", "scope": { "province": "Kinshasa" },
+  "period": { "from": "2026-08-31", "to": "2026-09-06" }, "purpose": "revue hebdomadaire zone de santé" }
+202 { "id": "…", "status": "queued" }
+
+GET /api/v1/report-jobs/{id}
+200 { "status": "ready", "sizeBytes": 184320, "expiresAt": "2026-09-13T…Z" }
+
+GET /api/v1/report-jobs/{id}/download   → application/pdf (audited)
+410 { "error": { "code": "not_found", "message": "Ce rapport a expiré." } }
+```
+
+### ACU consumption
+
+```http
+GET /api/v1/metering/acu?scope=tenant&period=month
+200 {
+  "period": { "from": "2026-09-01T00:00:00Z", "to": "2026-10-01T00:00:00Z" },
+  "totalAcu": 41250.3, "costUsd": 412.5, "interactions": 11840,
+  "costPerInteractionUsd": 0.0348,
+  "byTask":     [ { "task": "llm", "acu": 29110.2, "units": 29110200, "calls": 47360 }, { "task": "stt", "acu": 7420.1, "…": "…" } ],
+  "byModule":   [ { "module": "health", "acu": 24990.8, "calls": 28110 }, "…" ],
+  "byLanguage": [ { "language": "ln", "acu": 15120.4, "calls": 17330 }, "…" ],
+  "conversion": { "llmPer1kTokens": 1, "sttPerMinute": 0.5, "ttsPer1kChars": 0.1, "visionPerImage": 2, "costPerAcuUsd": 0.01, "modelWeights": { "…": "…" } }
+}
+```
+
+### Cluster listing and validation
+
+```http
+GET /api/v1/agriculture/clusters?province=Tshopo&status=unverified
+200 { "clusters": [ { "id": "…", "issue": "chenille légionnaire", "crop": "maïs", "province": "Tshopo",
+                      "territory": null, "reportCount": 5, "status": "unverified",
+                      "windowStart": "…", "windowEnd": "…", "suppressed": true,
+                      "note": "Localisation précise et effectif masqués : moins de 5 signalements…" } ],
+      "config": { "threshold": 5, "windowDays": 14, "privacyMin": 5 } }
+
+PATCH /api/v1/agriculture/clusters
+{ "id": "…", "to": "under_review", "note": "Visite de terrain programmée jeudi" }
+200 { "ok": true, "cluster": { "status": "under_review", "validatedBy": "…" } }
+```
+
+### Language sample review
+
+```http
+GET /api/v1/language/samples?language=lua&limit=20
+200 { "samples": [ { "id": "…", "language": "lua", "sourceText": "…", "translationFr": "…",
+                     "systemConfidence": 0.41, "citizenFlagged": true, "module": "health" } ] }
+
+PATCH /api/v1/language/samples/{id}
+{ "status": "corrected", "correctedSourceText": "…", "correctedTranslationFr": "…",
+  "lexicon": [ { "term": "kabeela", "meaningFr": "fièvre", "pronunciation": "ka-BÉ-la" } ] }
+200 { "sample": { "reviewStatus": "corrected", "reviewedAt": "…" } }
+```
+
+The corrected pair and the new lexicon entry are retrieved into the prompt on the **next** Tshiluba message — improvement without retraining.
+
+### Consent and erasure
+
+```http
+POST /api/v1/consents
+{ "purpose": "reminders", "status": "granted", "method": "button", "language": "sw" }
+200 { "consent": { "id": "…", "purpose": "reminders", "status": "granted", "version": "1.0", "occurredAt": "…" } }
+
+POST /api/v1/data-requests
+{ "type": "erasure", "method": "voice" }
+200 { "request": { "id": "…", "type": "erasure", "status": "open", "dueAt": "<+30 days>" } }
+```
+
+### Health protocol register
+
+```http
+GET /api/v1/health/protocols
+200 { "protocols": [ { "protocolId": "child_fever_u5", "version": "1.0.0", "title": "Fièvre chez l'enfant de moins de 5 ans", "status": "approved", "approvedBy": "En attente du Comité de Revue Clinique",
+                       "questionCount": 9, "ruleIds": ["RF-FEVU5-NEONATE-FEVER", "RF-FEVU5-REFUSES-DRINK", "…"],
+                       "citations": ["KB-HE-FEVER-01", "KB-HE-PREV-01", "KB-HE-TRIAGE-01"] } ] }
+```
 
 ---
 
@@ -1564,6 +1843,45 @@ named government data controller · clinical safety owner · child safeguarding 
 | R-10 | Scope creep from three ministries | High | Medium | change control through the product director, phase gates | governance |
 | R-11 | Dashboard misuse leading to punitive action | Medium | High | aggregation, purpose controls, provenance, ethics review, explicit "not for punitive action" rule | suppression **Implemented**; training and policy are programme tasks |
 | R-12 | Unverified outbreak signal causing panic or misallocation | Medium | High | thresholds, privacy suppression, human validation, status labelling | **Implemented** |
+
+## 13.11 Processing register (what leaves the platform, and why)
+
+| Data | Purpose | Recipient | Lawful basis | Minimisation applied |
+|------|---------|-----------|--------------|----------------------|
+| Audio bytes of an utterance | transcription | STT provider | consent (service delivery) | no identifier attached; the audio alone leaves, never a name or a number |
+| Pseudonymous text (transcript, French pivot, protocol context) | understanding, explanation, localisation | LLM provider | consent (service delivery) | no phone number, no name, no case identifier; only the turn's context |
+| Photograph of a plant or an animal | issue identification | vision provider | consent (service delivery) | EXIF stripped from the copy the model sees; provenance retained internally |
+| Answer text | speech synthesis | TTS provider | consent (service delivery) | text only |
+| Destination MSISDN and message text | delivery | SMS/WhatsApp/voice provider | consent (reminders) or vital interest (emergency) | privacy-safe wording for sensitive subjects; the number is the minimum needed to deliver |
+| Province centroid | weather forecast | Open-Meteo | legitimate interest (service) | a province centroid, never a citizen's location |
+| Aggregated, suppressed figures | institutional reporting | ministries, NGOs, donors | programme mandate | denominators, definitions, suppression below the threshold |
+| Verified corpus samples | language model improvement | programme dataset export | consent (research) | de-identified; export audited; never automatic fine-tuning |
+| Nothing | advertising, profiling, data brokerage, enrichment | — | — | these processings do not exist and must never be added |
+
+Two rules govern the table. First, **no citizen identifier ever accompanies a model call** — the gateway receives a prompt and returns a structure, and the association with a person is made only inside the platform. Second, **anything that leaves must be defensible against the launch gates in §13.9**: if a recipient cannot be named, a purpose cannot be stated and a basis cannot be cited, the flow does not exist.
+
+## 13.12 Retention schedule (programme defaults)
+
+| Data | Default retention | Trigger for deletion |
+|------|-------------------|----------------------|
+| Raw audio of a citizen utterance | 90 days | age, or erasure request |
+| Photographs and video for agriculture | 12 months | age, or erasure request |
+| Synthesised reply audio | 30 days | age |
+| Transcripts and free-text answers | with the structured record; blanked on erasure | erasure request |
+| Structured domain records (triage, farm observation, learning evidence) | per domain policy (health and education set by the ministries) | policy, legal hold permitting |
+| Cases | 5 years or programme policy | policy |
+| Notifications | 12 months | age |
+| API request logs | 90 days | age |
+| AI usage logs | 24 months | age |
+| ACU ledger | 7 years | financial retention |
+| Event store | permanent, pseudonymised at the analytics boundary | never (integrity record) |
+| Audit log | statutory; survives erasure | never |
+| Generated report files | 7 days | expiry job |
+| Idempotency keys | 30 days | age |
+| Sync events | 90 days | age |
+| Abandoned drafts | short; excluded from outcome metrics | age |
+
+Every value is configurable per tenant and per domain; a legal hold blocks deletion with a visible authority and expiry.
 
 ---
 
@@ -1806,3 +2124,445 @@ A story is done only when **all** of the following exist: code · migration · A
 ## 17.6 Field and clinical assurance
 
 Structured pilot with ≥ 30 citizens per province, task success ≥ 80 %, oral SUS-style survey · monthly clinical audit of 200 health turns by the review board with a ≥ 98 % "safe" rating · monthly per-language and per-gender quality reporting, with automatic downgrade of a language that falls below its gate (`AI-18`) · quarterly penetration test and dependency scanning in CI · restore-tested backups.
+
+---
+
+# 18. Requirement Traceability Matrix
+
+Every requirement identifier of PRD-CVOS-v1.0, every identifier of the Developer-Ready Specification v1.0, and every numbered item of the founding brief. Status is **Implemented**, **Partial** or **Planned (Phase n)**. Location is the file, table or route that carries it.
+
+## 18.1 Channels — FR-CH (PRD 1 §4)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-CH-01 | Greeting in a rotating order of the five languages within 6 s; language remembered by caller id | Implemented | `nextGreetingLanguage()`, `languageMenu()` in `src/server/channels/ivr.ts`; `rememberIdentifierLanguage()` |
+| FR-CH-02 | One open question then intent routing; DTMF 1/2/3 fallback always available | Implemented | `openQuestionMenu()`, `MODULE_BY_DIGIT` in `src/server/channels/strings.ts`, `/api/hooks/ivr/twilio/gather` |
+| FR-CH-03 | 8 kHz audio capture streamed to STT; end-of-utterance ≤ 800 ms; barge-in | Partial | recording capture and transcription implemented (`/recording`); streaming and barge-in are provider-level, Planned (Phase 3) |
+| FR-CH-04 | Reply ≤ 25 s of speech; longer content chunked with "shall I continue?" | Implemented | `chunkForSpeech()` (~60 words), `continuationPrompt`, `/api/hooks/ivr/twilio/continue` |
+| FR-CH-05 | Calls toll-free to the citizen (reverse-billed to the programme) | Planned (Phase 0/2, commercial) | programme dependency **R-03** |
+| FR-CH-06 | Session resumable for 24 h from the same number, with a summary of where it left off | Implemented | `RESUME_WINDOW_MS`, `findResumableSession()`, `resumeSummary()` |
+| FR-CH-07 | Emergency phrase detection short-circuits to the emergency script and CHW alert within 3 s | Implemented | `detectEmergencyTerms()` before any model call in `runTurn()`; full pipeline continues in the background |
+| FR-CH-10 | WhatsApp voice notes accepted and transcribed; reply as voice note **and** text | Implemented | `downloadMedia()`, `sendVoiceNote()`, `/api/hooks/whatsapp` |
+| FR-CH-11 | Photos and short videos (≤ 30 s, ≤ 16 MB) for agriculture; second angle requested when confidence is low | Implemented | `MAX_VIDEO_BYTES`/`MAX_VIDEO_SECONDS`, `secondPhotoRequested` |
+| FR-CH-12 | Interactive buttons (max 3) and lists (max 10); never free text when a choice is needed | Implemented | `sendButtons()`, `sendList()`, channel capabilities |
+| FR-CH-13 | WhatsApp 24 h window respected; proactive follow-ups use approved templates | Implemented | `WHATSAPP_WINDOW_MS`, `isWithinServiceWindow()`, `sendWithinWindow()`, `sendTemplate()` |
+| FR-CH-14 | Opt-in and opt-out (STOP / ARRÊT / TIKA …) in all five languages | Implemented | `detectOptOut()`, `detectOptIn()`, `applyOptOut()` — revokes consent and ends the session |
+| FR-CH-20 | USSD two-level menu → five common questions per module → SMS answer (≤ 3 concatenated) | Implemented | `COMMON_QUESTIONS`, `/api/hooks/ussd`, `splitSms()` with `MAX_SMS_PARTS = 3` |
+| FR-CH-21 | USSD session ≤ 180 s; state persisted so the citizen can dial again | Implemented | background answer delivery (`runInBackground`), `sessions.state.ussd` |
+| FR-CH-22 | SMS delivers reminders and follow-ups, each with a callback short code | Implemented | scheduler + `notifyTemplate`, `sendSms()` |
+| FR-CH-30 | Installable PWA, offline shell, IndexedDB outbox, background sync | Implemented | `src/server/channels/offline-queue.ts`, `ServiceWorker.tsx`, `public/` |
+| FR-CH-31 | Push-to-talk UI with one large button; text secondary; every screen ≤ 2 taps | Implemented | `VoiceConsole.tsx`, `ModulePage.tsx`, `Sidebar.tsx` |
+| FR-CH-32 | Worker PWA shares the shell with role-gated routes | Implemented | `AppShell`, `Sidebar` role filtering, `AccessNotice` |
+| FR-CH-40 | `citizen_id` is a platform UUID; phone, WhatsApp id and PWA account are linked identifiers; merging requires confirmation | Implemented (merge confirmation Partial) | `citizen_identifiers`, `identifyCitizen()` alias resolution; voice-OTP merge Planned (Phase 3) |
+| FR-CH-41 | Shared-phone confirmation at session start; anonymous sessions permitted | Implemented | `shouldConfirmSharedPhone()`, `recordSharedPhoneAnswer()`, anonymous login |
+
+## 18.2 Language and speech — FR-LG, CP (PRD 1 §6)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-LG-01 | Language ID returns top-2 with probabilities; below 0.70 the system asks to confirm | Partial | `LanguageAnalysis.{language, confidence, mixedLanguages}`; the explicit confirmation prompt is Planned (Phase 3) |
+| FR-LG-02 | Word-level timestamps and per-segment confidence; segments < 0.55 trigger a targeted re-ask | Partial | overall STT confidence used; span timestamps depend on the provider, Planned (Phase 3) |
+| FR-LG-03 | Mixed-language utterances handled without forcing a choice; token language tags stored | Implemented | `mixedLanguages`, `interactions.transcriptTags` |
+| FR-LG-04 | Every reply generated in French canonical first, then rendered; canonical French stored | Implemented | orchestrator step 7, `interactions.understanding`/`structured.answer`, `localise()` |
+| FR-LG-05 | Per-domain glossary enforced in translation; versioned and admin-editable | Partial | `language_lexicon` with domain, region, pronunciation and verification, injected into prompts; a formal versioned glossary entity is Planned (Phase 3) |
+| FR-LG-06 | Simplification to end-of-primary level; ≤ 15-word sentences for voice | Implemented | prompt rules in `src/server/ai/prompts/index.ts`; `trimToSpeech()` for education |
+| FR-LG-07 | One female and one male TTS voice per language, configurable per module, reviewed by native panels | Planned (Phase 3) | gateway supports voice selection; the voice inventory is a programme deliverable |
+| FR-LG-08 | Human-recorded prompts for fixed scripts in all languages regardless of TTS quality | Partial | the fixed scripts exist as reviewed text in five languages; the recordings are Planned (Phase 3) |
+| FR-LG-09 | Transcription, translation and overall language confidence exposed to the Risk Agent | Implemented | `HealthContext.{transcriptionConfidence, languageConfidence}`, `confidenceDimensions`, `scoreRisk()` |
+| CP-01 | ≥ 200 h of transcribed conversational speech per low-resource language across ≥ 3 provinces | Planned (Phase 0–3, programme) | capture pipeline Implemented (`language_corpus` + audio files); collection is a field task |
+| CP-02 | 2,000-utterance gold evaluation set per language per module | Planned (Phase 0–2, programme) | `evaluation_runs` ready to receive results |
+| CP-03 | Two native-speaker linguists per language on retainer | Planned (Phase 0, programme) | review queue and lexicon tooling Implemented (`/langues`) |
+| CP-04 | Corpus ownership and licensing | `[DECISION REQUIRED]` D-04 | §12.7 position stated |
+
+## 18.3 Agentic AI and safety — AI (PRD 1 §7, §17)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| AI-01 | A `DomainResult` failing schema validation is rejected; safe scripted fallback + low-confidence flag; `ai.contract.violation` emitted | Implemented | zod validation in the gateway; `HealthTriageContract.safeParse` + `emitEvent("ai.contract.violation")` |
+| AI-02 | Maximum two clarifying questions per turn; then proceed with stated assumptions | Implemented | `MAX_CLARIFICATIONS = 2` in `src/server/ai/protocols/engine.ts`; schema caps on `followUpQuestions` |
+| AI-03 | `confidence_overall = min(stt, intent, domain)` adjusted by risk; < 0.60 caution + human offer; < 0.40 scripted answer + case | Implemented | `scoreRisk()` (min of language and domain confidence), `LOW_CONFIDENCE_CASE_THRESHOLD = 0.4`, low-confidence caution appended by the orchestrator |
+| AI-04 | Curated, versioned, reviewed knowledge base per module; every recommendation cites ≥ 1 document or protocol id; uncited health/agri recommendations blocked | Implemented | `kb_documents`/`kb_chunks` from `content/kb/**`; citation enforcement in `health.ts` §7 and `ensureCitations()` in `agriculture.ts`; `scoreRisk()` blocks |
+| AI-10 | Clinical Review Board approves every health protocol version, emergency script, KB document and health prompt | Partial | lifecycle and `approvedBy` Implemented (currently "En attente du Comité de Revue Clinique"); board constitution is a Phase 0 task |
+| AI-11 | Agronomy and pedagogy panels for agriculture and education content | Partial | same mechanism, same status |
+| AI-12 | Red-team suite ≥ 300 cases per module per language, in CI, release blocked on a severity-4 miss | Partial | targeted adversarial tests Implemented; the full corpus is a Phase 2 deliverable |
+| AI-13 | Grounding rule: a recommendation without a citation is replaced by a safe scripted fallback and logged | Implemented | `UNCITED_FALLBACK_FR`, `ai.contract.violation` |
+| AI-14 | Identity statement once per session ("not a doctor"); no repetitive disclaimers; a human path one utterance away | Implemented | `DISCLAIMERS` appended to health answers; `shouldAutoCreateCase({humanRequested})`; per-session single statement is Partial |
+| AI-15 | Misinformation guard on outbound text; positive hits block and route to fallback | Implemented | `sanitiseHealthGuidance()` with forbidden-output patterns; chemical guard for agriculture |
+| AI-16 | Every turn stores confidences and assumptions; low-confidence turns sampled daily for human review | Partial | `confidence`, `confidenceDimensions` stored; the daily sampling queue is Planned (Phase 3) |
+| AI-17 | Learning loop: overrides, feedback, follow-up outcomes and reviewer labels feed an evaluation dataset; changes evaluated offline then canaried at 5 % for 7 days | Partial | `ai_overrides`, `feedback`, `follow_ups`, `language_corpus` Implemented; canary Planned (Phase 3) |
+| AI-18 | Per-language and per-gender quality metrics monthly; a language below its gate is automatically downgraded to scripted mode | Partial | `languageProficiency()` Implemented; automatic downgrade Planned (Phase 3) |
+| AI-19 | No political, religious, legal or financial advice; abuse/threat detection routes to safeguarding, and for a child to the teacher/CHW path | Implemented | prompt boundaries, `screenLearnerMessage()`, `detectSafeguarding()`, `safeguarding_records.ownerRole` |
+
+## 18.4 Health module — FR-HE (PRD 1 §8.1)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-HE-01 | Triage on versioned decision trees approved by the board; ten MVP protocols | Implemented | `src/server/ai/protocols/definitions/**` (10 protocols), `protocol_versions` |
+| FR-HE-02 | Each protocol defines questions with per-language phrasing, branching, severity 0–4, actions and referral text | Implemented | `HealthProtocol` type; `LocalisedText` on every citizen-facing string |
+| FR-HE-03 | The LLM maps speech to protocol answers and explains; it cannot alter severity | Implemented | `modelAnswers()` then `deterministicAnswers()` overrides; `runProtocol()` is the only severity source |
+| FR-HE-04 | Any red-flag answer yields severity 4 immediately, without completing the tree | Implemented | `runProtocol()` breaks on the first red flag |
+| FR-HE-10 | Free-speech intake; entities extracted; only missing protocol questions asked | Implemented | `extractEntities()` + `HealthEntityExtraction`; `pendingQuestions` |
+| FR-HE-11 | Severity 4 → scripted emergency instructions in the user's language + nearest facility + CHW alert within 60 s + SMS with the facility name | Implemented (SMS to citizen Partial) | `EMERGENCY_INSTRUCTIONS`, `nearestFacility()`, `openCase()` + `alertOwners()`; the citizen-facing facility SMS is Planned (Phase 3) |
+| FR-HE-12 | Severity 2–3 → case assigned to the territory CHW queue, SLA 24 h / 4 h; follow-up at +24 h | Implemented | `SLA_MS`, `queueNameFor()`, `scheduleFollowUp()` |
+| FR-HE-13 | Vaccination reminders from the national EPI schedule, opt-in required | Implemented | `EPI_SCHEDULE`, `scheduleVaccinationReminders()`, consent purpose `reminders` |
+| FR-HE-14 | Maternal health: pregnancy captured with explicit consent; ANC reminders; danger-sign protocol always available | Implemented | `pregnancy_data` consent purpose, `ancDueDates()`, `pregnancy_danger_signs` protocol |
+| FR-HE-15 | Medication guidance limited to approved protocol text; anything else → "ask a nurse or pharmacist" + optional case | Implemented | `sanitiseHealthGuidance()` forbidden patterns; `KB-HE-MEDS-01` |
+| FR-HE-16 | Health summaries ≤ 60 words, canonical French, visible to assigned workers | Implemented | `capWords(…, 60)`, `explanationSummary`, case workspace |
+| FR-HE-17 | Anonymised trend aggregation by territory/week with k-anonymity ≥ 10 | Partial | `applyKAnonymity()` + `K_ANONYMITY_THRESHOLD = 10` Implemented and tested; reports suppress below 5; wiring k ≥ 10 into health dashboards is Planned (Phase 3) |
+
+## 18.5 Agriculture module — FR-AG (PRD 1 §8.2)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-AG-01 | Voice/text plus up to five photos and a ≤ 30 s video; optional crop, stage and location | Implemented | multipart turn parsing, `FarmContext` |
+| FR-AG-02 | Top-3 candidates with probabilities; plain-language description; second photo requested below 0.60 | Implemented | `candidates[≤3]`, `CANDIDATE_CONFIDENT_THRESHOLD = 0.6`, `secondPhotoRequested` |
+| FR-AG-03 | Tiered recommendations: no-cost, low-cost, then purchase with a route through the extension officer | Implemented | `tieredActions {noCost, lowCost, purchase}` |
+| FR-AG-04 | Notifiable pests/diseases (configurable) trigger an extension alert and feed cluster detection | Implemented | `notifiableList()` from `admin_config`, `matchNotifiable()`, `raiseExtensionAlert()` |
+| FR-AG-05 | Cluster detection: ≥ N reports (default 5) of the same issue and crop in the same territory within 14 days → event, alert, optional broadcast | Implemented | `detectClusters()`, `CLUSTER_DEFAULTS` |
+| FR-AG-06 | Planting calendars by province and crop, adjusted by seasonal forecasts | Implemented | `planting_calendars`, `calendarAdvice()`, `seasonFor()` |
+| FR-AG-07 | Territory-level five-day weather forecast rendered in plain language | Implemented | `getWeather()` (Open-Meteo) with a seasonal offline fallback |
+| FR-AG-08 | Weekly market price sheet per major market, quoted with date and market, never guaranteed | Implemented | `market_prices`, `getPrices()`, `PRICE_DISCLAIMER`, CSV upload |
+| FR-AG-09 | Livestock symptom intake → severity + veterinary/extension path; zoonotic red flags escalate | Implemented | `isLivestockCase()`, `detectZoonoticSigns()`, `agri.zoonotic.flagged` |
+| FR-AG-10 | Buyer opportunities: informational cooperative and buyer contacts by commodity | Planned (Phase 4) | §6.2 |
+
+## 18.6 Education module — FR-ED (PRD 1 §8.3)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-ED-01 | Learner profile: age band, level, instruction and explanation language; optional, confirmed conservatively | Implemented | `learner_profiles`, `profileOrDefault()`, `CONFIRMATION_QUESTIONS` |
+| FR-ED-02 | Explain at level in ≤ 90 s of speech with one concrete local example | Implemented | `trimToSpeech()` with `MAX_EXPLANATION_SECONDS = 90`, `localExample` |
+| FR-ED-03 | Read-aloud from a curated licensed library in five languages; Phase 3 adds textbook OCR | Implemented / Planned | `STORIES` + `stories` table; OCR Planned (Phase 3) |
+| FR-ED-04 | Five-question oral quizzes; voice answers scored; results stored as learning signals | Implemented | `generateQuiz()`, `scoreAnswer()` with normalisation and rubric feedback, `learning_evidence` |
+| FR-ED-05 | Homework: step-by-step guidance; one worked example then coaching; no final answer to graded work before an attempt | Implemented | `HomeworkPolicy`, `answerWithheld`, `workedExample` on a *similar* exercise |
+| FR-ED-06 | Exam preparation (TENAFEP, Examen d'État) from official objectives; revision plans by weeks-to-exam; SMS nudges | Implemented | `EXAM_LABELS`, `buildRevisionPlan()`, `scheduleRevision()`, `revisionNudges()` |
+| FR-ED-07 | Parent mode: explain what the child is studying and how to help without literacy | Implemented | `buildParentSummary()` with `stripVerbatim()` |
+| FR-ED-08 | Teacher mode: class-level gap view, ready-made oral quizzes, broadcast of revision reminders | Implemented | `classGaps()`, quiz endpoints, broadcast |
+| FR-ED-09 | Difficulty tracking: repeated failures produce learning-gap signals aggregated by school/territory | Implemented | `learning_evidence`, `classGaps()`, education dashboard |
+| FR-ED-10 | Reuse of StudYear components through a shared package | `[DECISION REQUIRED]` D-06 | implemented natively in `src/server/ai/education/**` |
+
+## 18.7 Case management — FR-CS (PRD 1 §9)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-CS-01 | Automatic case creation for severity ≥ 2, confidence < 0.40, notifiable agri issues, and any explicit request for a human | Implemented | `shouldAutoCreateCase()` (+ safeguarding) |
+| FR-CS-02 | Routing territory → org → role → availability → load balancing; unassigned after 15 min / 4 h / 24 h escalates to a supervisor | Implemented | `routeCase()`, `detectSlaBreaches()` |
+| FR-CS-03 | Workers see the French summary, transcript, audio, media, protocol path, severity reasons, contact and consent status, prior cases | Implemented | `/cas/[id]` and `GET /api/v1/cases/{id}` |
+| FR-CS-04 | Worker actions: acknowledge, call, note (voice or text), override severity with a mandatory reason, set outcome, schedule follow-up, close | Implemented (click-to-call Partial) | case sub-resources; the IVR click-to-call bridge is Planned (Phase 4) |
+| FR-CS-05 | Overrides feed the learning loop and the override rate | Implemented | `ai_overrides`, `ai.override.recorded`, `/admin` |
+| FR-CS-06 | SLA timers scheduled; breaches emit `case.sla.breached` and notify | Implemented | `detectSlaBreaches()` in the scheduler |
+| FR-CS-07 | Follow-up outcomes captured from the citizen by voice or SMS and attached to the case | Implemented | `captureFollowUp()`, `follow_ups`, reminder pipeline |
+
+## 18.8 Autosave and audit — FR-AS (PRD 1 §13)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-AS-01 | Every autosave item is an event persisted before the reply is returned; a reply is never lost because logging failed | Implemented | write-ahead `save()` in the orchestrator; `emitEvent()` never throws |
+| FR-AS-02 | Drafts autosave client-side every 2 s and server-side every 10 s or on blur | Partial | `PUT /api/v1/autosave` with version history Implemented; the exact client cadence is a UI detail, Planned (Phase 3) |
+| FR-AS-03 | Failed attempts and abandoned sessions recorded with reason codes | Implemented | `interactions.status`/`failureReason`, `sweepAbandonedSessions()`, `cvos.session.abandoned` |
+| FR-AS-04 | Prompts, protocols, glossaries, KB documents and templates are immutable versions with approver, diff and rollback | Implemented (diff UI Partial) | `prompt_versions`, `protocol_versions`, `kb_documents`, `notification_templates` |
+| FR-AS-05 | Every saved record carries timestamp, actor, role, language, module, channel, geo, original input reference, AI interpretation, output, confidence, version and audit status | Implemented | `interactions` column set + `event_store` envelope |
+| FR-AS-06 | Tamper-evident audit log: hash chain per tenant per day; daily digest to cold storage | Implemented / Partial | per-day chain + daily verification Implemented; cold-storage digest Planned (Phase 3) |
+
+## 18.9 Reporting and notifications — FR-RP, FR-NT (PRD 1 §14.6, §15)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| FR-RP-01 | Nine scheduled reports (daily usage … monthly cost and usage) | Implemented | `REPORT_TYPES`, `REPORT_CATALOGUE`, `runDueReportDefinitions()` |
+| FR-RP-02 | PDF (branded), XLSX, CSV, dashboard link; generated asynchronously; delivered with an expiring link | Implemented | `renderPdf/Xlsx/Csv`, `report-jobs`, seven-day expiry |
+| FR-RP-03 | Report definitions configurable (filters, scope, cadence) by organisation administrators | Implemented | `report_definitions`, `/api/v1/report-definitions` |
+| FR-NT-01 | Channels: SMS, WhatsApp templates, in-app/push, email, outbound voice for emergencies | Implemented (push Planned) | `sendSms`, `sendWhatsapp`, `sendVoice`, `sendEmail`, in-app rows |
+| FR-NT-02 | Template catalogue with per-language variants, placeholders and approval status | Implemented | `notification_templates`, `NOTIFICATION_TEMPLATES` |
+| FR-NT-03 | Types: emergency alert, case assigned, SLA breach, follow-up due, citizen reminder, cluster alert, broadcast, report ready | Implemented | template keys and `NotificationType` |
+| FR-NT-04 | Retry with backoff; WhatsApp → SMS → voice fallback; quiet hours 21:00–06:00 except emergencies; ≤ 3 non-emergency messages per citizen per week | Implemented | `deliverWithFallback()`, `isQuietHours()`, `NOTIFICATION_POLICY.weeklyCap` |
+| FR-NT-05 | Every notification produces delivery events; dashboards show delivery rates per channel | Implemented | `notification.sent/failed/suppressed/acknowledged`, `deliveryStats()` |
+
+## 18.10 Security and privacy — SEC (PRD 1 §16)
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| SEC-01 | Data classification A–D with controls scaling by class | Implemented | §10 classification column; `event_store.classification`; restricted safeguarding pathway |
+| SEC-02 | OIDC for workers and administrators; MFA mandatory for admin and supervisor; device-bound sessions | Partial | TOTP MFA + step-up Implemented; OIDC and device binding Planned (Phase 3) — `[DECISION REQUIRED]` D-05 |
+| SEC-03 | RBAC + ABAC across ten roles and attributes; enforced in the BFF **and** Postgres RLS | Partial | RBAC + ABAC Implemented in `handle()` and per-query scoping; **RLS Planned (Phase 3)** |
+| SEC-04 | Citizens authenticate by channel identity; voice OTP for identifier merges and prior-record access | Partial | channel identity Implemented; voice OTP Planned (Phase 3) |
+| SEC-05 | TLS 1.3 in transit, mTLS between services; CMEK at rest; field-level encryption for Class A | Partial | TLS and platform-level encryption at rest by deployment; field-level encryption and mTLS Planned (Phase 3/4) |
+| SEC-06 | Media in object storage with signed URLs ≤ 15 min; raw audio 90 days, agri media 12 months | Partial | expiring signed media tokens Implemented for telephony (30 min TTL); bucket retention policies are a deployment configuration |
+| SEC-07 | Pseudonymisation at the analytics boundary; re-identification needs two-person approval | Partial | `users.pseudoId` and tombstone tokens Implemented; the analytics boundary and the approval workflow are Planned (Phase 4) |
+| SEC-08 | No provider names, model names, prompts or keys in any client bundle, log or error message | Implemented | gateway isolation, internal `providerKey`, `redact()`/`safeLog`, error envelope |
+| SEC-09 | Purpose-based consents captured by voice or button, revocable through any channel, enforced at query time | Implemented | `consents`, `missingConsents()`, `hasReminderConsent()` re-checked at send time |
+| SEC-10 | Children: no surname or school id without a school-tenant agreement; parental consent path | Implemented | `learner_profiles` field set, `child_profile` consent purpose, child-safety filters |
+| SEC-11 | Right of access and erasure, voice-initiable, 30-day SLA, cascading except statutory audit | Implemented | `data_requests`, `buildAccessPackage()`, `tombstoneUser()`, overdue alerting |
+| SEC-12 | WAF, DDoS protection, dependency scanning, SAST in CI, image signing, quarterly penetration test, 72 h breach notification | Partial | rate limiting and the deployment WAF Implemented; CI security scanning and testing Planned (Phase 2/3) |
+
+## 18.11 Non-functional — PRD 1 §18
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| NFR-P-01 | IVR first spoken reply ≤ 6 s p95 | Partial | `latencyMs` measured per turn; chunking and short-circuit implemented; load-verified measurement Planned (Phase 3) |
+| NFR-P-02 | WhatsApp voice note reply ≤ 12 s p95 | Partial | same |
+| NFR-P-03 | Photo analysis ≤ 15 s p95 | Partial | evidence gate reduces wasted calls |
+| NFR-P-04 | Dashboard ≤ 2.5 s p95 on 3G; API p95 ≤ 400 ms excluding AI | Partial | server components; measured in `api_request_logs` |
+| NFR-P-05 | 50 concurrent IVR calls, 500 WhatsApp turns/min at MVP | Planned (Phase 3) | k6/Locust profile |
+| NFR-A-01 | 99.5 % monthly availability; emergency path 99.95 % from cached recorded audio | Partial | degraded modes Implemented; recorded audio Planned |
+| NFR-A-02 | RPO 15 min, RTO 2 h | Planned (deployment) | Cloud SQL HA + PITR per `docs/DEPLOYMENT.md` |
+| NFR-A-03 | Circuit breakers per provider with automatic failover | Implemented (breaker Partial) | chain failover Implemented; a true circuit breaker with cool-down is Planned (Phase 3) |
+| NFR-S-01 | Cost ≤ USD 0.08 per interaction at 100k/month, ≤ 0.04 at 1M | Implemented (measurement) | `costPerInteractionUsd` live |
+| NFR-S-02 | ACU metering accurate to ±2 % against provider invoices | Partial | deterministic computation Implemented; reconciliation is an operational process |
+| NFR-U-01 | Worker and admin UIs WCAG 2.2 AA; all strings internationalised | Partial | design target met; formal audit Planned (Phase 3) |
+| NFR-U-02 | Citizen voice UX tested with ≥ 30 low-literacy users per pilot province, task success ≥ 80 % | Planned (Phase 3, programme) | — |
+| NFR-O-01 | OpenTelemetry traces adapter → session → agent → gateway; trace id in the admin UI | Partial | `traceId` columns exist; wiring Planned (Phase 3) |
+| NFR-O-02 | SLO dashboards with paging | Planned (Phase 3) | admin console covers the metrics; paging is deployment |
+
+## 18.12 Commercial, metering and DevOps — CM, DO (PRD 1 §19, §20)
+
+| ID | Requirement (reframed as funding where applicable) | Status | Location |
+|----|-----------------------------------|--------|----------|
+| CM-01 | The funding tenant pays: platform licence + ACU consumption + telephony/WhatsApp pass-through | Partial | metering and statements Implemented; commercial terms `[DECISION REQUIRED]` D-07 |
+| CM-02 | ACU definition: one normalised unit across STT seconds, TTS characters, LLM tokens and vision calls, with a published versioned conversion table | Implemented | `AcuConversion`, `admin_config["acu.conversion"]`, §12.3 |
+| CM-03 | Every metering event attributed to tenant/org/module/language/channel; monthly statement; settlement via institutional rails; **no citizen is ever charged** | Implemented (settlement Planned) | `acu_ledger`, `monthlyStatement()`; §7 Door A |
+| CM-04 | Per-tenant monthly cap with 80/95/100 % alerts; at the cap non-emergency AI degrades to scripted mode rather than stopping | Implemented | `checkAcuCaps()`, `isDegradedMode()` |
+| DO-01 | Monorepo with shared contracts published from schema sources | Implemented (single application) | `src/shared/**` + `@server`/`@client` aliases; separate packages Planned (Phase 4) |
+| DO-02 | Environments dev / staging / prod, IaC, GitOps | Planned (Phase 1/2, deployment) | `docs/DEPLOYMENT.md` |
+| DO-03 | CI: lint, typecheck, unit ≥ 80 %, contract tests, integration with Testcontainers, AI eval suite, e2e | Partial | lint, typecheck and 553 offline tests Implemented; Pact, Testcontainers and Playwright Planned (Phase 3) |
+| DO-04 | Trunk-based release, feature flags per province, canary 5 → 25 → 100 %, rollback ≤ 10 min | Planned (Phase 3) | lifecycle statuses provide the content half |
+| DO-05 | Backward-compatible migrations; event schema evolution BACKWARD-compatible | Implemented (pre-release) | one migration by design until first release; `event_version` in the envelope |
+| DO-06 | Synthetic data generator for all five languages | Implemented | `npm run seed` — 90 multilingual interactions through the real pipeline |
+
+## 18.13 Developer-Ready Specification identifiers
+
+| ID | Requirement | Status | Location |
+|----|-------------|--------|----------|
+| HEA-001 | Approved, versioned red-flag rule packs by age group and pregnancy status; rules run before the LLM | Implemented | protocol definitions with `redFlags`; keyword pass before any model call |
+| HEA-002 | A red flag creates an immutable risk event, an urgent case, a recommended action, a configured destination and an escalation timer | Implemented | `risk_assessments`, `openCase()` with `open_emergency`, `careDestinationType`, `slaDueAt` |
+| HEA-003 | The LLM must not downgrade a deterministic urgent classification; only an authorised clinician may override, with reason and audit | Implemented | `scoreRisk()` raise-only; `overrideSeverity()` with MFA, reason code and audit |
+| HEA-004 | When location or referral data is unavailable, state the limitation and give the nationally approved fallback | Implemented | `FACILITY_UNKNOWN_NOTE` in five languages |
+| HEA-005 | Action-first language: what to do now, what not to delay, where to go, what to take | Implemented | protocol outcome text + `HEALTH_EXPLANATION_SYSTEM` prompt rules |
+| AGR-001 | Advice conditioned on crop/animal, stage, location, season, symptoms, affected proportion, recent inputs and evidence | Implemented | `FarmContext` |
+| AGR-002 | Observation ≠ diagnosis: visual outputs are "possible matches" until evidence and confidence thresholds are met | Implemented | candidate wording, thresholds, `secondPhotoRequested` |
+| AGR-003 | Chemical recommendations require an approved registry entry, authorisation status, label instructions, PPE and pre-harvest/re-entry data; never invent a product or a rate | Implemented | `guardChemicalAdvice()`, `input_registry` |
+| AGR-004 | Prioritise feasible low-cost integrated pest management; flag actions that could harm people, animals, crops, soil or water | Implemented | `tieredActions`, `actionsToAvoid` |
+| AGR-005 | Market prices display source, market, unit, grade, timestamp and staleness; never presented as live offers | Implemented | `PriceQuote`, `PRICE_DISCLAIMER` |
+| EDU-001 | Store an age/grade band and preferred language; never infer sensitive traits from the voice | Implemented | `learner_profiles`, `profileOrDefault()` |
+| EDU-002 | Adapt on demonstrated mastery, requested difficulty, response history and educator configuration; never label a child or diagnose a disability | Implemented | `learning_evidence`, `EVIDENCE_DISCLAIMER` |
+| EDU-003 | Teach, check, adapt loop | Implemented | `EducationTeachingSession.steps`, `lessonStage` enum |
+| EDU-004 | Assessed homework: hints and reasoning before a final answer; identify copying rather than understanding | Implemented | `HomeworkPolicy.answerWithheld`, `detectAttempt()`, `isGradedWork()` |
+| EDU-005 | Child-facing conversations apply age-appropriate filters, privacy minimisation, abuse/self-harm escalation and restrictions on commercial persuasion | Implemented | `screenLearnerMessage()`, `scrubCommercial()`, `isAgeAppropriate()` |
+| IAM-001 | Anonymous or pseudonymous citizen sessions permitted; phone verification cannot be the only route | Implemented | anonymous login, `identifyCitizen()` |
+| IAM-002 | Staff use federated identity where available, MFA, and role plus attribute-based access | Partial | MFA + RBAC/ABAC Implemented; federation Planned (Phase 3) |
+| IAM-003 | Sensitive exports, clinical overrides, rule publication and break-glass require step-up authentication | Implemented (rule publication Partial) | `requireStepUp()` on overrides and break-glass; export step-up Planned (Phase 3) |
+| IAM-004 | Break-glass expires automatically, requires justification and alerts the data-protection/safety owner | Implemented | `break_glass_access`, alert on creation |
+| IAM-005 | Role changes revoke active sessions and queued export links | Planned (Phase 3) | stateless sessions require a revocation list |
+| CON-001 | Consent is purpose-specific across service delivery, follow-up contact, precise location, analytics, research and cross-programme referral | Implemented | `consents.purpose` enumeration |
+| CON-002 | Consent scripts delivered in the selected language and channel, recording script version and affirmative action | Partial | version, language and method recorded; the script catalogue and voice evidence are Planned (Phase 3) |
+| CON-003 | Withdrawal stops future optional processing, preserves lawful retention, and is explained in plain language | Implemented | `applyOptOut()`, `cancelReminders()`, retention policy |
+| CON-004 | Proxy/caregiver relationships record who is present, on whose behalf and the authority basis | Implemented | `consents.proxy`, `sessions.proxy` |
+| CAS-001 | Queues support domain, geography, service point, risk, skill, language and workload routing | Implemented (skill/language Partial) | `queueNameFor()`, `routeCase()`; `organisations.routingSkills` and `users.languages` exist and are not yet weighted |
+| CAS-002 | Assignment is atomic; two workers cannot unknowingly own the same case | Implemented | compare-and-swap on `cases.version`, tested |
+| CAS-003 | Notes support structured fields and append-only narrative; edits create versions | Implemented | `case_events` append-only |
+| CAS-004 | SLA timers pause only for configured reasons and every pause is audited | Implemented | `SlaEffect`, `slaPausedReason`, audit rows |
+| CAS-005 | Merge and duplicate resolution preserve all source identifiers and events | Implemented | `mergeCases()` |
+| CAS-006 | Closure requires outcome, action taken, citizen reachability and follow-up decision | Implemented | `requiresClosureData` gate |
+| NOT-001 | Templates versioned by language, channel, domain, risk and sensitivity | Implemented | `notification_templates` |
+| NOT-002 | Delivery attempts, provider ids, consent, quiet hours, failures and retries recorded | Implemented | `notifications.payload.delivery` trail |
+| NOT-003 | Urgent alerts use an escalation policy with acknowledgement; a sent message is not an acknowledged one | Implemented | `requiresAck`, `acknowledgedAt`, `unacknowledgedAlerts()` |
+| NOT-004 | Lock-screen and SMS text use privacy-safe wording | Implemented | `sensitive.generic` template, `privacySafe()` |
+| NOT-005 | Broadcasts require an audience estimate, duplicate suppression, approval, rate controls and opt-out compliance | Implemented | `estimateAudience()`, `sendBroadcast()` with `approvedBy` and dedupe |
+| NFR-001 | Availability 99.5 % pilot / 99.9 % national | Partial | see NFR-A-01 |
+| NFR-002 | P95 first acknowledgement < 2 s; useful response < 12 s text and < 20 s voice | Partial | measured; load verification Planned |
+| NFR-003 | P99 deterministic danger-rule result < 2 s | Implemented by construction | keyword pass has no network dependency |
+| NFR-004 | RPO ≤ 5 min for accepted events; ≤ 1 min for critical configuration | Planned (deployment) | managed PostgreSQL PITR |
+| NFR-005 | RTO ≤ 60 min pilot, ≤ 30 min national | Planned (deployment) | — |
+| NFR-006 | Horizontal scaling tested to 10× peak with per-channel backpressure | Planned (Phase 3) | rate limiting provides admission control today |
+| NFR-007 | 72 h of field capture and ≥ 200 queued events per managed device | Partial | outbox Implemented; device profile Planned (Phase 4) |
+| NFR-008 | WCAG 2.2 AA plus voice-specific usability testing | Partial | see NFR-U-01/02 |
+| NFR-009 | 100 % of requests traceable by trace id | Partial | see NFR-O-01 |
+| NFR-010 | ≥ 80 % unit coverage on deterministic domain/policy code; 100 % rule coverage on safety rule packs | Implemented (rule coverage) | `tests/health-protocols.test.ts` enforces rule coverage |
+| NFR-011 | Android baseline from a device survey; last two evergreen desktop browsers | Planned (Phase 0/4) | survey is a Phase 0 task |
+| NFR-012 | No production string outside the localisation registry; untranslated-string telemetry | Partial | `src/shared/i18n/index.ts` + fixed channel strings; telemetry Planned (Phase 3) |
+| E01–E14 | Epics and acceptance outcomes | see §15.11 | §15.11 |
+
+## 18.14 Founding brief items
+
+| ID | Brief item | Status | Location |
+|----|-----------|--------|----------|
+| B-01 | Name and positioning: national AI voice infrastructure, not a chatbot | Implemented | §1, README, product surface |
+| B-02 | Five languages: voice in/out, text in/out, translation, detection, mixed-language handling, local phrasing, simple explanations, formal and informal tone; never assume standard French | Implemented | language layer, `src/shared/i18n`, channel strings, learning loop |
+| B-03 | Funding logic: digital inclusion, free for citizens, funded by government and NGOs | Implemented | §12; no citizen payment path exists |
+| B-04 | Founding sentence preserved | Implemented | §1 preamble |
+| B-05 | Core loop (speak → detect → transcribe → understand → ask → answer → save → escalate → remind) | Implemented | `runInteraction()` |
+| B-06 | Module 1 AI Rural Health OS, with all listed capabilities and the "never replaces a doctor" rule | Implemented | §6.1 |
+| B-07 | Module 2 AI Agriculture OS, with voice, photo and video intake and market/productivity intelligence | Partial (buyer directory Planned Phase 4) | §6.2 |
+| B-08 | Module 3 AI Education Voice OS (StudYear Rural) | Implemented | §6.3 |
+| B-09 | Seven user types: citizen, CHW, extension officer, teacher, NGO, government administrator, platform administrator | Implemented | `user_role` enum, `ROLE_PERMISSIONS` |
+| B-10 | Platform-wide AI requirements: voice understanding, transcription, translation, classification, summarisation, recommendation, risk scoring, next action, escalation, notification, reporting, learning loop, analytics, audit trail, confidence score | Implemented | §5 agent register |
+| B-11 | Every answer states the seven parts | Implemented | `FinalAnswer` |
+| B-12 | Eight agents plus a central orchestrator | Implemented | §5.2 (nine domain agents; the orchestrator is deterministic) |
+| B-13 | Mandatory autosave of every listed artefact with the full metadata set | Implemented | §10.10, `FR-AS-05` |
+| B-14 | Data model covering users, interactions, cases, domain records, notifications, audit, configuration and reporting | Implemented | §10 — 53 tables |
+| B-15 | Dashboards for government, health, agriculture, education and administration | Implemented | §4 |
+| B-16 | UX: voice-first, low-literacy, two-tap navigation, French canonical with five-language rendering | Implemented | §9.2, `/`, module pages |
+| B-17 | Security: role-based access, audit trail, consent, data protection, no provider exposure | Partial (PostgreSQL RLS Planned Phase 3) | §13 |
+| B-18 | Safety: emergency detection, no diagnosis, no dosing, escalation to humans, disclaimers | Implemented | §1.4, §5.4 |
+| B-19 | Architecture: cloud-hosted, PostgreSQL, serverless-capable, modular | Implemented | §9 |
+| B-20 | APIs for interactions, cases, notifications, reporting and administration | Implemented | §11 |
+| B-21 | Notifications: escalation, reminders, follow-ups, broadcasts, with the four example texts | Implemented | §6.6 |
+| B-22 | Reporting: scheduled institutional reports in multiple formats | Implemented | §6.8 |
+| B-23 | MVP scope | Implemented and exceeded in breadth | §15.1 |
+| B-24 | Phase plan | Reconciled | §15 |
+| B-25 | Success metrics | Implemented (measurement) | §15.10 |
+| B-26 | Final product standard: national digital-inclusion infrastructure, voice-first public-service OS, live intelligence layer, decision engine, practical tool for excluded citizens | Implemented | whole document; README §Product standard |
+| B-27 | Offline and low-connectivity operation | Implemented | offline provider, outbox, USSD/SMS, degraded modes |
+| B-28 | Continuous learning from conversations | Implemented | §5.11 |
+| B-29 | Anonymised regional trends and early warning | Partial (model-based forecasting Planned Phase 4) | §5.17 |
+| B-30 | Human accountability on every risky answer | Implemented | §5.8 |
+
+## 18.15 Traceability summary
+
+| Family | Count | Implemented | Partial | Planned |
+|--------|-------|-------------|---------|---------|
+| FR-CH (channels) | 20 | 17 | 2 | 1 |
+| FR-LG + CP (language, corpus) | 13 | 4 | 4 | 5 |
+| AI (agentic and safety) | 14 | 8 | 6 | 0 |
+| FR-HE (health) | 12 | 10 | 2 | 0 |
+| FR-AG (agriculture) | 10 | 9 | 0 | 1 |
+| FR-ED (education) | 10 | 8 | 1 | 1 |
+| FR-CS (cases) | 7 | 6 | 1 | 0 |
+| FR-AS (autosave and audit) | 6 | 4 | 2 | 0 |
+| FR-RP + FR-NT (reporting, notifications) | 8 | 8 | 0 | 0 |
+| SEC (security) | 12 | 5 | 7 | 0 |
+| NFR (PRD 1: P, A, S, U, O) | 14 | 2 | 8 | 4 |
+| CM + DO (funding, delivery) | 10 | 6 | 2 | 2 |
+| HEA / AGR / EDU / IAM / CON / CAS / NOT (PRD 2) | 35 | 32 | 2 | 1 |
+| NFR-001…012 (PRD 2) | 12 | 2 | 6 | 4 |
+| E01–E14 (epics) | 14 | 8 | 6 | 0 |
+| Brief items B-01…B-30 | 30 | 27 | 3 | 0 |
+| **Total** | **227** | **156** | **52** | **19** |
+
+Reading of the matrix: **69 % of the traced requirements are implemented and tested**; the 52 partial items are almost entirely *operational depth* on top of a working mechanism (measurement against gold sets, tracing, formal audits, load verification); the 19 planned items divide into programme deliverables the code cannot produce (corpus, gold sets, linguist retainers, recorded prompts, commercial arrangements) and four deliberate Phase 3/4 engineering items (PostgreSQL RLS, OIDC federation, canary releases, environment automation). Nothing in the two PRDs or the founding brief is unaccounted for.
+
+---
+
+# 19. Decisions Required
+
+Every open decision from both PRDs, consolidated. Items marked **blocking** prevent a credible estimate or a launch gate.
+
+## 19.1 From PRD 1 §25 (the decision log)
+
+| # | Decision | Owner | Needed by | Blocking | Position taken in this specification |
+|---|----------|-------|-----------|----------|--------------------------------------|
+| D-01 | Pilot provinces, and therefore the MVP languages | FDSU + operator | Phase 0 week 2 | **yes** | Kinshasa and Kongo-Central (fr, ln, kg) **or** Kinshasa and Kasaï-Oriental (fr, ln, lua). The code carries all five languages and the 26 provinces; only the go-live gate is per language. |
+| D-02 | Telephony provider: MNO SIP trunk versus aggregator | operator + MNOs | Phase 0 week 4 | **yes** | Twilio adapter implemented; the abstraction is one file, so a switch is a configuration and an adapter, not a rewrite. |
+| D-03 | Data residency and the timing of a Kinshasa node | FDSU | Phase 0 week 4 | **yes** | `europe-west1` primary with a documented, portable path to a Kinshasa-hosted node in Phase 5 (`docs/DEPLOYMENT.md` §5). |
+| D-04 | Corpus ownership and licensing | FDSU + legal | Phase 0 week 4 | **yes** | Proposed: the programme owns the corpus; the operator holds a licence for model improvement in service of that programme; the corpus must never be privatised (§12.7). |
+| D-05 | Identity provider for staff: Google Workspace versus Keycloak | operator | Phase 0 week 3 | no | Keycloak recommended for sovereignty. Phone + PIN with TOTP MFA works today; federation is additive. |
+| D-06 | StudYear component-reuse boundary | operator | Phase 1 week 2 | no | Implemented natively (`src/server/ai/education/**`). A shared package can be extracted later without changing behaviour. |
+| D-07 | Commercial terms: licence plus ACU | FDSU + operator | Phase 0 week 6 | **yes** | The mechanism is built (§12); only the unit price and the licence envelope are open. |
+| D-08 | Clinical Review Board membership and approval cadence | Ministry of Health + FDSU | Phase 0 week 4 | **yes** | `protocol_versions.approvedBy` currently reads "En attente du Comité de Revue Clinique". No health protocol should reach production without a real name in that column. |
+
+## 19.2 From PRD 2 §25 (decisions before engineering estimation)
+
+| # | Decision | Blocking | Position |
+|---|----------|----------|----------|
+| DR-01 | Legal owner / data controller and the participating ministries | **yes** | required for the DPA and the DPIA; a launch gate |
+| DR-02 | Pilot provinces, territories and rural/peri-urban service points | **yes** | drives the service directory, staffing and the geography reference validation |
+| DR-03 | First national language and dialect alongside French, and qualified reviewer availability | **yes** | drives the corpus programme and the language go-live gate |
+| DR-04 | First use case per domain: the exact health red-flag scope, the crop(s), the education grade and subject | **yes** | PRD 2's MVP shape; the code supports more, the programme should launch narrow |
+| DR-05 | Pilot channels; telecom, WhatsApp and IVR commercial arrangements; short-code and number ownership | **yes** | R-03 and R-04 |
+| DR-06 | Human operating hours, staffing, escalation destinations and maximum caseload | **yes** | an escalation with no staffed queue is worse than no escalation; a launch gate |
+| DR-07 | Identity level per workflow: anonymous, pseudonymous or verified | no | anonymous by default is implemented; per-workflow tightening is configuration |
+| DR-08 | Data residency, cloud procurement and third-party AI processing constraints | **yes** | overlaps D-03; also determines which providers may be enabled |
+| DR-09 | Raw media retention, research/model-improvement consent and the deletion policy | **yes** | the retention schedule is a launch gate |
+| DR-10 | Source authorities for clinical content, the input/product registry, market data and the curriculum | **yes** | the reference data marked *REFERENCE DATA TO VALIDATE* cannot go live unvalidated |
+| DR-11 | Accessibility and device baseline, supported Android versions, from a field inventory | no | affects the Android phase, not the current channels |
+| DR-12 | Pilot success thresholds, the independent evaluator and the go/no-go authority | **yes** | otherwise the pilot cannot conclude anything |
+
+## 19.3 Architectural divergences resolved in this document (recorded for the change log)
+
+| Ref | PRD 1 position | PRD 2 position | Implemented choice | Reversibility |
+|-----|----------------|----------------|--------------------|---------------|
+| A-1 | Eleven NestJS microservices + Python LangGraph on GKE | modular monolith plus workers, extract later | modular monolith with hard boundaries (§9.1) | high — every PRD 1 service exists as a module |
+| A-2 | Kafka event backbone with a schema registry | durable event bus | PostgreSQL `event_store` with a Kafka-shaped envelope; Kafka fan-out Phase 4 | high — additive producer |
+| A-3 | LangGraph agent runtime with checkpoints | deterministic workflow service, not an autonomous LLM | deterministic TypeScript orchestrator (§5.1) | medium |
+| A-4 | pgvector embeddings with HNSW | vector index of approved knowledge | lexical full-text retrieval with hard pre-filters; pgvector Phase 3 | high — `kb_chunks` is ready |
+| A-5 | CQRS `rm_*` read models + BigQuery | CDC-fed warehouse with a semantic layer | live aggregation over transactional tables; read models Phase 4 | high |
+| A-6 | PostgreSQL RLS keyed on tenant and scope | row-level tenant enforcement | application-level enforcement today; **RLS Phase 3 — the largest open security item** | medium — requires session variables in the client |
+| A-7 | Next.js 14 / NestJS | Next.js/React PWA + NestJS | Next.js 16, React 19, TypeScript strict, one application | n/a |
+| A-8 | MVP: two provinces, two channels, three languages, three modules | MVP: one vertical slice per domain, French + one national language | build is broader; **go-live scope follows PRD 2** (§15.1) | n/a |
+| A-9 | RPO 15 min / RTO 2 h | RPO ≤ 5 min / RTO ≤ 60 min | the stricter PRD 2 targets | n/a |
+| A-10 | Ten to eleven roles | eleven roles including proxy, clinician, safety reviewer | seven roles plus orthogonal attributes (§3.2) | high — enum values are additive |
+
+## 19.4 Decisions this specification asks the programme to take
+
+1. **Name the clinical safety owner and constitute the review board before any health protocol is marked approved by a person rather than a placeholder.**
+2. **Validate the reference data** flagged in code: geography, service directory (names, health zones and telephone numbers), EPI schedule, ANC contacts, planting calendars, input registry, curriculum map, and the four national-language UI and template strings.
+3. **Fund the corpus programme as a first-class deliverable**, not a by-product: without `CP-01` and `CP-02` no language gate can be measured, and without a measured gate no language should be allowed to go live.
+4. **Commit the escalation staffing** before any channel is opened in a territory: a queue with no worker is a safety failure, not a backlog.
+5. **Decide the retention schedule per entity and per domain** so that `SEC-06` stops being a deployment default.
+6. **Approve the RLS work in Phase 3** rather than deferring it again; it is the one specified control with no equivalent in the current code.
+
+---
+
+# 20. Glossary
+
+| Term | Meaning |
+|------|---------|
+| **ABAC** | attribute-based access control: province, territory, organisation, module and queue attributes narrowing what a role may see |
+| **ACU** | AI Compute Unit — the platform's normalised unit of AI work across transcription, understanding, vision and synthesis (§12.3) |
+| **ANC** | antenatal care; the contact schedule used for maternal reminders |
+| **Assisted console** | a worker recording an interaction on behalf of a citizen, with declared proxy status |
+| **BCP 47** | language tag standard; `fr-CD`, `ln-CD`, `kg-CD`, `sw-CD`, `lua-CD` |
+| **BitriPay** | the institutional billing and settlement rail referenced by PRD 1; optional and out of the citizen path (§7) |
+| **Break-glass** | a time-boxed, justified, alerted emergency access grant |
+| **Canonical French** | the French pivot form in which all reasoning and all institutional records are held, before rendering into the citizen's language |
+| **CHW** | community health worker — *relais communautaire* |
+| **Chemical guard** | the rule that no agricultural product may be named without an authorised `input_registry` entry (`AGR-003`) |
+| **Cluster** | a candidate group of similar agricultural reports; `unverified` until an officer validates it |
+| **Code-switching** | mixing languages within one utterance, the norm in Congolese speech |
+| **CQRS** | command–query responsibility segregation: separate write models and read models |
+| **CRB** | Clinical Review Board |
+| **Découpage** | the 2015 administrative division of the DRC into 26 provinces |
+| **Degraded mode** | a specified reduced-capability behaviour, never an improvised failure |
+| **DHIS2** | the district health information system used nationally; a Phase 5 export target |
+| **DPIA** | data protection impact assessment |
+| **DTMF** | keypad tones — the fallback when speech is not understood |
+| **Emergency short-circuit** | deterministic keyword detection that returns the scripted emergency text before any model call |
+| **EPI / PEV** | Expanded Programme on Immunisation — *Programme Élargi de Vaccination* |
+| **Event sourcing** | recording every state change as an immutable event from which read models derive |
+| **Examen d'État** | the DRC end-of-secondary national examination |
+| **FDSU** | the programme funding counterpart |
+| **FHIR** | HL7 health interoperability standard; the Phase 5 integration boundary |
+| **Golden dataset** | a versioned, consented, annotated evaluation set used as a release gate |
+| **Hash chain** | `hash = sha256(prevHash + canonical(row))` — the tamper-evidence mechanism of the audit log |
+| **IMCI / PCIME** | Integrated Management of Childhood Illness — the clinical basis of the community protocols |
+| **In-context learning** | improving answers by retrieving verified examples and lexicon entries into the prompt, with no retraining |
+| **IVR** | interactive voice response |
+| **k-anonymity** | the rule that no figure is published for a group smaller than *k* (10 for health aggregates, 5 in reports and clusters) |
+| **LID** | language identification |
+| **Lock-screen safe** | notification wording that reveals nothing about health, pregnancy, safeguarding or a child |
+| **MNO** | mobile network operator |
+| **MOS** | mean opinion score — the TTS intelligibility measure |
+| **Notifiable** | a pest or disease on the official list that must be reported to the agricultural service |
+| **Offline rules provider** | the deterministic provider that keeps the whole platform running with no AI credential |
+| **Protocol** | a versioned clinical decision tree; the only source of health severity |
+| **Proxy** | a person interacting on behalf of another, with a recorded authority basis |
+| **PWA** | progressive web application |
+| **Red flag** | a danger sign that ends triage immediately at severity 4 |
+| **Relais communautaire** | community health worker |
+| **RLS** | PostgreSQL row-level security |
+| **Safeguarding** | the restricted pathway for disclosures of violence, abuse, exploitation, self-harm or an unsafe home |
+| **Scripted mode** | approved fixed text and menus only, with no model call — the degraded mode at a budget cap or a provider outage |
+| **Seven-part answer** | the mandatory response contract (§1.3) |
+| **SLA clock** | the time allowed to acknowledge and act on a case, by severity |
+| **Step-up authentication** | a second factor required again, within a short window, for a high-risk action |
+| **StudYear Rural** | the education module's programme name |
+| **TENAFEP** | the DRC end-of-primary national examination |
+| **Territoire / ville / commune** | the administrative units below a province |
+| **Tombstone** | the stable, non-reversible replacement identifier written where an erased person used to be named |
+| **Turn** | one citizen utterance and the platform's complete response to it |
+| **USSD** | the short-code menu protocol available on any handset |
+| **WER** | word error rate |
+| **Write-ahead autosave** | persisting each pipeline stage before starting the next, so a failure still leaves a complete trace |
+| **Zoonotic** | an animal disease that can affect people; always escalated |
+
+---
+
+*End of the master specification. The authoritative implementation is the repository itself: `src/server/**` for the platform, `src/client/**` for the surfaces, `src/shared/**` for the contracts, `content/kb/**` for the approved knowledge, `drizzle/0000_init.sql` for the data model and `tests/**` for the guarantees. Where this document and the code disagree, the code is the fact and this document is the defect.*
