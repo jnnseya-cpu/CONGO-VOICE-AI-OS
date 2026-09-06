@@ -30,7 +30,7 @@ npm run workflow:run                             # reminders, SLA sweep, blocked
 src/app/              Next.js App Router: pages (frontend entry points) and /api/v1 route handlers (backend entry points)
 src/client/           Frontend: shell, home, voice console, dashboards, workspaces (React components)
 src/shared/           Shared contracts: types, i18n dictionaries (5 languages), formatters
-src/server/  (src/lib during the stabilisation refactor)
+src/server/  (src/server during the stabilisation refactor)
   db/                 Drizzle schema (single source of truth), embedded PGlite / PostgreSQL client, seed, reference data
   core/               auth, RBAC, API handler, audit chain, events, notifications, scheduler, metering, storage, privacy
   ai/                 gateway (Claude · Gemini · OpenAI · Google TTS · offline mock), agents, protocols, knowledge base, safety

@@ -1,9 +1,9 @@
 import { desc } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { safeLog } from "@/lib/core/redact";
-import { REPORT_CATALOGUE, REPORT_TYPES, createReportJob, runReportJob } from "@/lib/reports";
+import { handle, paging } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { safeLog } from "@server/core/redact";
+import { REPORT_CATALOGUE, REPORT_TYPES, createReportJob, runReportJob } from "@server/reports";
 
 /**
  * Asynchronous report jobs.

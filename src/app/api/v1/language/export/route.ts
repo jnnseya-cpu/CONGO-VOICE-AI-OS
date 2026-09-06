@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { exportDataset } from "@/lib/ai/agents/learning";
-import type { LanguageCode } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { exportDataset } from "@server/ai/agents/learning";
+import type { LanguageCode } from "@server/db/schema";
 
 /** JSONL dataset of verified samples for speech/translation model fine-tuning. */
 export const GET = handle({ permission: "language:export" }, async ({ req, user, ip }) => {

@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { estimateAudience, sendBroadcast } from "@/lib/core/notifications";
-import { audit } from "@/lib/core/audit";
-import { emitEvent } from "@/lib/core/events";
-import type { Role } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { estimateAudience, sendBroadcast } from "@server/core/notifications";
+import { audit } from "@server/core/audit";
+import { emitEvent } from "@server/core/events";
+import type { Role } from "@server/db/schema";
 
 const ROLES = ["citizen", "chw", "agri_officer", "teacher", "ngo", "gov_admin", "platform_admin"] as const;
 

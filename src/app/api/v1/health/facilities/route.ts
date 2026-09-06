@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import { handle, paging } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { nearestFacility } from "@/lib/ai/agents/health";
-import { FACILITY_UNKNOWN_NOTE } from "@/lib/ai/safety";
-import type { LanguageCode } from "@/lib/db/schema";
+import { handle, paging } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { nearestFacility } from "@server/ai/agents/health";
+import { FACILITY_UNKNOWN_NOTE } from "@server/ai/safety";
+import type { LanguageCode } from "@server/db/schema";
 
 /**
  * Health facilities known for an area (HEA-004). When nothing is known the limitation is

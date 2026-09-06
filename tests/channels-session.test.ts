@@ -1,11 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { EMERGENCY_MESSAGES } from "@/lib/ai/safety";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { EMERGENCY_MESSAGES } from "@server/ai/safety";
 import {
   capabilitiesFromRecord,
   negotiateCapabilities,
-} from "@/lib/channels/capabilities";
+} from "@server/channels/capabilities";
 import {
   chunkForSpeech,
   consentSnapshot,
@@ -21,10 +21,10 @@ import {
   setSessionLanguage,
   shouldConfirmSharedPhone,
   startOrResume,
-} from "@/lib/channels/session";
-import { splitSms } from "@/lib/channels/sms";
-import { uuidv7 } from "@/lib/channels/offline-queue";
-import { withIdempotency } from "@/lib/core/idempotency";
+} from "@server/channels/session";
+import { splitSms } from "@server/channels/sms";
+import { uuidv7 } from "@server/channels/offline-queue";
+import { withIdempotency } from "@server/core/idempotency";
 
 describe("channel session service", () => {
   beforeAll(async () => {

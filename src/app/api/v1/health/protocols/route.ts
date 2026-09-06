@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { HEALTH_PROTOCOLS } from "@/lib/ai/protocols/definitions";
-import { badRequest } from "@/lib/core/errors";
-import type { LanguageCode } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { HEALTH_PROTOCOLS } from "@server/ai/protocols/definitions";
+import { badRequest } from "@server/core/errors";
+import type { LanguageCode } from "@server/db/schema";
 
 const LANGS: LanguageCode[] = ["fr", "ln", "kg", "sw", "lua"];
 

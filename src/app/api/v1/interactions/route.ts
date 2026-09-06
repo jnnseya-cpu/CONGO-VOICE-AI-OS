@@ -1,13 +1,13 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { isAllowedMime, kindFromMime, storeUpload } from "@/lib/core/storage";
-import { env } from "@/lib/core/env";
-import { schema } from "@/lib/db/client";
-import { runInteraction } from "@/lib/ai/agents/orchestrator";
-import type { ModuleType } from "@/lib/db/schema";
+import { handle, paging } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { isAllowedMime, kindFromMime, storeUpload } from "@server/core/storage";
+import { env } from "@server/core/env";
+import { schema } from "@server/db/client";
+import { runInteraction } from "@server/ai/agents/orchestrator";
+import type { ModuleType } from "@server/db/schema";
 
 const Json = z.object({
   text: z.string().max(4000).optional(),

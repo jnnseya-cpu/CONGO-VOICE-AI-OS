@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
-import { getSession } from "@/lib/core/auth";
-import { getDb, schema } from "@/lib/db/client";
+import { getSession } from "@server/core/auth";
+import { getDb, schema } from "@server/db/client";
 import { PageHeader, Badge, EmptyState } from "@client/components/ui";
 
 export const metadata = { title: "Mon historique" };

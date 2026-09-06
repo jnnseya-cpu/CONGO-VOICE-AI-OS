@@ -1,8 +1,8 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { env } from "@/lib/core/env";
-import { getWeather, PROVINCE_CENTROIDS } from "@/lib/ai/tools/weather";
-import { normaliseProvince, PROVINCES } from "@/lib/db/reference/agriculture";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { env } from "@server/core/env";
+import { getWeather, PROVINCE_CENTROIDS } from "@server/ai/tools/weather";
+import { normaliseProvince, PROVINCES } from "@server/db/reference/agriculture";
 
 /**
  * Seven-day weather for a province (FR-AG-06), rendered in plain language, with a seasonal

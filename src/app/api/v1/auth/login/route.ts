@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { SESSION_COOKIE, cookieOptions, encodeSession, verifyPin } from "@/lib/core/auth";
-import { unauthorized } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
-import { publicUser } from "@/lib/core/users";
+import { handle } from "@server/core/api";
+import { SESSION_COOKIE, cookieOptions, encodeSession, verifyPin } from "@server/core/auth";
+import { unauthorized } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
+import { publicUser } from "@server/core/users";
 
 const Body = z.union([
   z.object({ phone: z.string().min(6).max(32), pin: z.string().min(4).max(12) }),

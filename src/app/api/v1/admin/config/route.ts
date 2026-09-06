@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
 
 /** Runtime configuration editable by platform admins (thresholds, feature flags, messages). */
 export const GET = handle({ permission: "admin:config" }, async ({ db }) => ({ config: await db.select().from(schema.adminConfig) }));

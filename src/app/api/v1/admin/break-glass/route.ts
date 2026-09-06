@@ -1,12 +1,12 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { emitEvent } from "@/lib/core/events";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { requireStepUp } from "@/lib/core/mfa";
-import { notifyRole } from "@/lib/core/notifications";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { emitEvent } from "@server/core/events";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { requireStepUp } from "@server/core/mfa";
+import { notifyRole } from "@server/core/notifications";
 
 /** Break-glass grants: who opened one, why, until when, and whether it was revoked. */
 export const GET = handle({ permission: "admin:config" }, async ({ db }) => ({

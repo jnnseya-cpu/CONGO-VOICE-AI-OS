@@ -12,10 +12,10 @@
  */
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { emitEvent } from "@/lib/core/events";
-import { channelGuard, parseJson, requestId } from "@/lib/channels/http";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { emitEvent } from "@server/core/events";
+import { channelGuard, parseJson, requestId } from "@server/channels/http";
 
 const Event = z.object({
   id: z.string().min(8).max(64),
@@ -117,7 +117,7 @@ export const POST = handle({ permission: "interaction:create" }, async ({ req, d
   });
 });
 
-type Db = Awaited<ReturnType<typeof import("@/lib/db/client").getDb>>;
+type Db = Awaited<ReturnType<typeof import("@server/db/client").getDb>>;
 
 /** Last-write-wins on the client timestamp; a stale write is kept but not applied. */
 async function applyDraft(db: Db, userId: string, clientTimestamp: Date, payload: Record<string, unknown>): Promise<boolean> {

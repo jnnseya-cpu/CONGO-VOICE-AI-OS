@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { ensureProtocolsRegistered, listProtocols } from "@/lib/ai/protocols/registry";
-import { HEALTH_PROTOCOLS } from "@/lib/ai/protocols/definitions";
-import { protocolRuleIds, validateProtocol } from "@/lib/ai/protocols/engine";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { ensureProtocolsRegistered, listProtocols } from "@server/ai/protocols/registry";
+import { HEALTH_PROTOCOLS } from "@server/ai/protocols/definitions";
+import { protocolRuleIds, validateProtocol } from "@server/ai/protocols/engine";
 
 /** Clinical protocol catalogue: versions, lifecycle status and the rules each one can trigger. */
 export const GET = handle({ permission: "admin:config" }, async () => {

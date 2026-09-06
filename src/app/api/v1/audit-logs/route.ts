@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
-import { handle, paging } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
+import { handle, paging } from "@server/core/api";
+import { schema } from "@server/db/client";
 
 export const GET = handle({ permission: "audit:read" }, async ({ req, db }) => {
   const { limit, offset } = paging(req);

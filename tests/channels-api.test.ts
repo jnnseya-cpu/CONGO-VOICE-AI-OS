@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { encodeSession } from "@/lib/core/auth";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { encodeSession } from "@server/core/auth";
 
 import { POST as createSessionRoute } from "@/app/api/v1/sessions/route";
 import { GET as getSessionRoute } from "@/app/api/v1/sessions/[id]/route";

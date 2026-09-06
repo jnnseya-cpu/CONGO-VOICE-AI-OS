@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
+import { getDb } from "@server/db/client";
 import { sql } from "drizzle-orm";
 
 /** Liveness/readiness probe. */

@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { moduleScopeFor } from "@/lib/core/rbac";
-import { queueDepths } from "@/lib/ai/agents/workflow";
-import type { ModuleType } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { moduleScopeFor } from "@server/core/rbac";
+import { queueDepths } from "@server/ai/agents/workflow";
+import type { ModuleType } from "@server/db/schema";
 
 /**
  * Queue board: depth, unassigned count, breached count and the oldest waiting item per

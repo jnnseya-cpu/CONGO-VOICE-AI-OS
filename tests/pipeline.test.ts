@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { resetDbForTests, getDb, schema } from "@/lib/db/client";
-import { runInteraction } from "@/lib/ai/agents/orchestrator";
+import { resetDbForTests, getDb, schema } from "@server/db/client";
+import { runInteraction } from "@server/ai/agents/orchestrator";
 import { eq } from "drizzle-orm";
 
 describe("citizen interaction pipeline (offline provider)", () => {

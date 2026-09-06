@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { searchKnowledge } from "@/lib/ai/knowledge";
-import type { ModuleType } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { searchKnowledge } from "@server/ai/knowledge";
+import type { ModuleType } from "@server/db/schema";
 
 const MODULES: ModuleType[] = ["health", "agriculture", "education", "general"];
 

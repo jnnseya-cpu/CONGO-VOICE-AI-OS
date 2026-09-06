@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { badRequest, notFound } from "@/lib/core/errors";
-import { getProtocol } from "@/lib/ai/protocols/definitions";
-import { listProtocols, setProtocolStatus } from "@/lib/ai/protocols/registry";
-import { protocolRuleIds } from "@/lib/ai/protocols/engine";
-import { LIFECYCLE_STATUSES } from "@/lib/ai/protocols/lifecycle";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { badRequest, notFound } from "@server/core/errors";
+import { getProtocol } from "@server/ai/protocols/definitions";
+import { listProtocols, setProtocolStatus } from "@server/ai/protocols/registry";
+import { protocolRuleIds } from "@server/ai/protocols/engine";
+import { LIFECYCLE_STATUSES } from "@server/ai/protocols/lifecycle";
 
 /** Full decision tree of one protocol, for review by the Clinical Review Board. */
 export const GET = handle<{ id: string }>({ permission: "admin:config" }, async ({ params }) => {

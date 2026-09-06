@@ -7,11 +7,11 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { assessAgriculture } from "@/lib/ai/agents/agriculture";
-import { assessEducation } from "@/lib/ai/agents/education";
-import { detectClusters } from "@/lib/ai/agents/clusters";
-import { ensureAgricultureReference } from "@/lib/db/reference/agriculture";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { assessAgriculture } from "@server/ai/agents/agriculture";
+import { assessEducation } from "@server/ai/agents/education";
+import { detectClusters } from "@server/ai/agents/clusters";
+import { ensureAgricultureReference } from "@server/db/reference/agriculture";
 
 describe("orchestrator contract · agriculture and education persistence", () => {
   beforeAll(async () => {

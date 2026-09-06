@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { exportCsv } from "@/lib/ai/agents/reporting";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { exportCsv } from "@server/ai/agents/reporting";
 
 const TYPES = ["interactions", "cases", "health", "agriculture", "education", "audit", "usage"] as const;
 

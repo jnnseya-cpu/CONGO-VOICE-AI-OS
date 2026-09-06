@@ -1,10 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { moduleScopeFor } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { FOLLOW_UP_DECISIONS, REACHABILITY_VALUES, addCaseNote, assignCase, transitionCase } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { forbidden, notFound } from "@server/core/errors";
+import { moduleScopeFor } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { FOLLOW_UP_DECISIONS, REACHABILITY_VALUES, addCaseNote, assignCase, transitionCase } from "@server/ai/agents/workflow";
 
 async function loadScoped(db: Parameters<Parameters<typeof handle>[1]>[0]["db"], id: string, role: Parameters<typeof moduleScopeFor>[0]) {
   const [c] = await db.select().from(schema.cases).where(eq(schema.cases.id, id));

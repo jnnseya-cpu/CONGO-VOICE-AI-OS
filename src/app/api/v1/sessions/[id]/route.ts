@@ -2,10 +2,10 @@
  * GET /api/v1/sessions/{id} — the session as the client needs it: capabilities, consent
  * snapshot, turn count and the safe part of the channel state.
  */
-import { handle } from "@/lib/core/api";
-import { capabilitiesFromRecord } from "@/lib/channels/capabilities";
-import { channelGuard, loadOwnedSession, requestId } from "@/lib/channels/http";
-import { readState, resumeSummary } from "@/lib/channels/session";
+import { handle } from "@server/core/api";
+import { capabilitiesFromRecord } from "@server/channels/capabilities";
+import { channelGuard, loadOwnedSession, requestId } from "@server/channels/http";
+import { readState, resumeSummary } from "@server/channels/session";
 
 export const GET = handle<{ id: string }>({ permission: "interaction:create" }, async ({ req, user, params }) => {
   const id = requestId(req);

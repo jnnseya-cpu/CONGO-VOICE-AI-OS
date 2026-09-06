@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { aiGateway } from "@/lib/ai/gateway";
+import { handle } from "@server/core/api";
+import { aiGateway } from "@server/ai/gateway";
 
 const Body = z.object({ text: z.string().min(1).max(2000), language: z.enum(["fr", "ln", "kg", "sw", "lua"]).default("fr") });
 

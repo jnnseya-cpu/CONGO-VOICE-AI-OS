@@ -1,11 +1,11 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { hashPin } from "@/lib/core/auth";
-import { audit } from "@/lib/core/audit";
-import { badRequest } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { publicUser } from "@/lib/core/users";
+import { handle, paging } from "@server/core/api";
+import { hashPin } from "@server/core/auth";
+import { audit } from "@server/core/audit";
+import { badRequest } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { publicUser } from "@server/core/users";
 
 export const GET = handle({ permission: "user:manage" }, async ({ db, req }) => {
   const { limit, offset } = paging(req);

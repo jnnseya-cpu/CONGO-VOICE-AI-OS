@@ -1,10 +1,10 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { moduleScopeFor } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { openCase } from "@/lib/ai/agents/workflow";
-import type { CaseStatus, ModuleType } from "@/lib/db/schema";
+import { handle, paging } from "@server/core/api";
+import { moduleScopeFor } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { openCase } from "@server/ai/agents/workflow";
+import type { CaseStatus, ModuleType } from "@server/db/schema";
 
 export const GET = handle({ permission: "case:read" }, async ({ req, db, user }) => {
   const { limit, offset } = paging(req);

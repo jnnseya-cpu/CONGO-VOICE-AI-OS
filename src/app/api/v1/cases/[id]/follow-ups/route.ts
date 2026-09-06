@@ -1,8 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { captureFollowUp, scheduleFollowUp } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { captureFollowUp, scheduleFollowUp } from "@server/ai/agents/workflow";
 import { loadCaseScoped } from "../../_shared";
 
 export const GET = handle<{ id: string }>({ permission: "case:read" }, async ({ db, user, params }) => {

@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { EPI_CALENDAR, TD_SCHEDULE_FR, vaccinationStatus } from "@/lib/ai/protocols/vaccination";
-import type { LanguageCode } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { EPI_CALENDAR, TD_SCHEDULE_FR, vaccinationStatus } from "@server/ai/protocols/vaccination";
+import type { LanguageCode } from "@server/db/schema";
 
 const LANGS: LanguageCode[] = ["fr", "ln", "kg", "sw", "lua"];
 

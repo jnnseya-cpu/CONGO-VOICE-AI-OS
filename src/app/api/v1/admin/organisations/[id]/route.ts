@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
 
 export const GET = handle<{ id: string }>({ permission: "admin:config" }, async ({ db, params }) => {
   const [organisation] = await db.select().from(schema.organisations).where(eq(schema.organisations.id, params.id));

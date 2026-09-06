@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { seedReferenceData } from "@/lib/db/reference";
-import { EPI_SCHEDULE, PROVINCES, nextSowWindow, revisionNudges, vaccinationDueDates } from "@/lib/db/reference";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { seedReferenceData } from "@server/db/reference";
+import { EPI_SCHEDULE, PROVINCES, nextSowWindow, revisionNudges, vaccinationDueDates } from "@server/db/reference";
 import {
   cancelReminders,
   fireDueSchedules,
@@ -11,11 +11,11 @@ import {
   schedulePlantingReminders,
   scheduleRevisionReminders,
   scheduleVaccinationReminders,
-} from "@/lib/core/scheduler";
-import { base32Decode, base32Encode, generateSecret, hotp, otpauthUri, requireStepUp, stepUpStatus, totp, verifyCode, verifyTotp } from "@/lib/core/mfa";
-import { buildAccessPackage, createDataRequest, processDataRequest, tombstoneToken, tombstoneUser } from "@/lib/core/privacy";
-import { maskPhone, redact, redactText } from "@/lib/core/redact";
-import type { Session } from "@/lib/core/auth";
+} from "@server/core/scheduler";
+import { base32Decode, base32Encode, generateSecret, hotp, otpauthUri, requireStepUp, stepUpStatus, totp, verifyCode, verifyTotp } from "@server/core/mfa";
+import { buildAccessPackage, createDataRequest, processDataRequest, tombstoneToken, tombstoneUser } from "@server/core/privacy";
+import { maskPhone, redact, redactText } from "@server/core/redact";
+import type { Session } from "@server/core/auth";
 
 const DAY = 24 * 3600 * 1000;
 const ids = { consenting: "", revoking: "", admin: "" };

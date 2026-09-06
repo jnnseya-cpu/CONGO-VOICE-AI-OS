@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
 import {
   REPORT_CATALOGUE,
   REPORT_TYPES,
@@ -15,7 +15,7 @@ import {
   runDueReportDefinitions,
   runReportJob,
   suppress,
-} from "@/lib/reports";
+} from "@server/reports";
 
 describe("report engine", () => {
   beforeAll(async () => {

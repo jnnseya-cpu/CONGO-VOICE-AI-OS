@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
 
 const Body = z.object({ rating: z.number().int().min(1).max(5).optional(), useful: z.boolean().optional(), comment: z.string().max(2000).optional() });
 

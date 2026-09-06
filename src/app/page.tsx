@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getSession } from "@/lib/core/auth";
-import { hasPermission } from "@/lib/core/rbac";
-import { commandStats, importantAlerts, insightOfTheDay, recentActivity } from "@/lib/ai/agents/reporting";
+import { getSession } from "@server/core/auth";
+import { hasPermission } from "@server/core/rbac";
+import { commandStats, importantAlerts, insightOfTheDay, recentActivity } from "@server/ai/agents/reporting";
 import { Hero } from "@client/components/home/Hero";
 import { ModuleCards } from "@client/components/home/ModuleCards";
 import { LiveActivity } from "@client/components/home/LiveActivity";

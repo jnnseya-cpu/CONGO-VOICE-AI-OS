@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { ApiError, notFound } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { getReportFile } from "@/lib/reports";
+import { handle } from "@server/core/api";
+import { ApiError, notFound } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { getReportFile } from "@server/reports";
 
 /**
  * Stream a finished report. Links expire after seven days; every download is audited with

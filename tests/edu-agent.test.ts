@@ -1,11 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { assessEducation, detectAttempt, detectMode, isGradedWork, stripVerbatim, trimToSpeech, MAX_EXPLANATION_SECONDS } from "@/lib/ai/agents/education";
-import { confirmLearnerProfile, CONFIRMATION_QUESTIONS, getLearnerProfile, profileOrDefault, weeksToExam } from "@/lib/ai/education/profile";
-import { classGaps, learnerEvidence, recordEvidence, summariseEvidence, EVIDENCE_DISCLAIMER } from "@/lib/ai/education/evidence";
-import { isAgeAppropriate, screenLearnerMessage, scrubCommercial } from "@/lib/ai/education/child-safety";
-import { ensureStories, resetStoriesCache, STORIES, storyWordCount } from "@/lib/db/reference/stories";
-import { searchKnowledge } from "@/lib/ai/knowledge";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { assessEducation, detectAttempt, detectMode, isGradedWork, stripVerbatim, trimToSpeech, MAX_EXPLANATION_SECONDS } from "@server/ai/agents/education";
+import { confirmLearnerProfile, CONFIRMATION_QUESTIONS, getLearnerProfile, profileOrDefault, weeksToExam } from "@server/ai/education/profile";
+import { classGaps, learnerEvidence, recordEvidence, summariseEvidence, EVIDENCE_DISCLAIMER } from "@server/ai/education/evidence";
+import { isAgeAppropriate, screenLearnerMessage, scrubCommercial } from "@server/ai/education/child-safety";
+import { ensureStories, resetStoriesCache, STORIES, storyWordCount } from "@server/db/reference/stories";
+import { searchKnowledge } from "@server/ai/knowledge";
 
 async function makeUser(role: "citizen" | "teacher" = "citizen", province = "Kinshasa") {
   const db = await getDb();

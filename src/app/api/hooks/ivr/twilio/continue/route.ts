@@ -1,10 +1,10 @@
 /**
  * "Shall I continue?" — plays the next ~25 s chunk of a long answer (FR-CH-04).
  */
-import { startOrResume, isContinuationRequest } from "@/lib/channels/session";
-import { readTwilioRequest, say, twimlResponse, hangup } from "@/lib/channels/twilio";
-import { continueTwiml } from "@/lib/channels/ivr";
-import { t } from "@/lib/channels/strings";
+import { startOrResume, isContinuationRequest } from "@server/channels/session";
+import { readTwilioRequest, say, twimlResponse, hangup } from "@server/channels/twilio";
+import { continueTwiml } from "@server/channels/ivr";
+import { t } from "@server/channels/strings";
 
 export const dynamic = "force-dynamic";
 

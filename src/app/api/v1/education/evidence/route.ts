@@ -1,8 +1,8 @@
-import { handle } from "@/lib/core/api";
-import { forbidden } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { classGaps, EVIDENCE_DISCLAIMER, learnerEvidence, summariseEvidence } from "@/lib/ai/education/evidence";
-import { plannedRevisions } from "@/lib/ai/education/spaced-repetition";
+import { handle } from "@server/core/api";
+import { forbidden } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { classGaps, EVIDENCE_DISCLAIMER, learnerEvidence, summariseEvidence } from "@server/ai/education/evidence";
+import { plannedRevisions } from "@server/ai/education/spaced-repetition";
 
 /**
  * Learning evidence (FR-ED-08). By default a learner reads their own events; `?scope=class`

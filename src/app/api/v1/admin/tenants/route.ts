@@ -1,9 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
-import { monthlyConsumption } from "@/lib/core/metering";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
+import { monthlyConsumption } from "@server/core/metering";
 
 /** Tenants with their live ACU consumption against their monthly cap. */
 export const GET = handle({ permission: "admin:config" }, async ({ db }) => {

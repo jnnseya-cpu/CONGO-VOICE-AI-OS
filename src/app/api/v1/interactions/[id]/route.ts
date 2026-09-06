@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { forbidden, notFound } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { schema } from "@server/db/client";
 
 export const GET = handle<{ id: string }>({ permission: "interaction:read_own" }, async ({ db, user, params }) => {
   const [row] = await db.select().from(schema.interactions).where(eq(schema.interactions.id, params.id));

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { AUDIT_GENESIS, audit, auditRowHash, canonicalJson, verifyAuditChain } from "@/lib/core/audit";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { AUDIT_GENESIS, audit, auditRowHash, canonicalJson, verifyAuditChain } from "@server/core/audit";
 
 describe("tamper-evident audit chain", () => {
   beforeAll(async () => {

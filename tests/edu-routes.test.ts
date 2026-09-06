@@ -3,9 +3,9 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { encodeSession } from "@/lib/core/auth";
-import type { Role } from "@/lib/db/schema";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { encodeSession } from "@server/core/auth";
+import type { Role } from "@server/db/schema";
 
 const BASE = "http://localhost:3000";
 const tokens: Record<string, string> = {};

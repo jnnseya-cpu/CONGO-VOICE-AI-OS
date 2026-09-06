@@ -5,10 +5,10 @@
  * the stream simply polls it twice a second and emits a stage event whenever it changes.
  * Works on any host, with no message broker.
  */
-import { handle } from "@/lib/core/api";
-import { channelGuard, loadOwnedSession, requestId } from "@/lib/channels/http";
-import { latestInteractionOfSession, loadInteraction, toWorkflowStatus, type WorkflowStatus } from "@/lib/channels/workflow";
-import { readState } from "@/lib/channels/session";
+import { handle } from "@server/core/api";
+import { channelGuard, loadOwnedSession, requestId } from "@server/channels/http";
+import { latestInteractionOfSession, loadInteraction, toWorkflowStatus, type WorkflowStatus } from "@server/channels/workflow";
+import { readState } from "@server/channels/session";
 
 const POLL_MS = 500;
 const MAX_MS = 120_000;

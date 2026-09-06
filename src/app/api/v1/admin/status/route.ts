@@ -1,6 +1,6 @@
-import { handle } from "@/lib/core/api";
-import { aiGateway } from "@/lib/ai/gateway";
-import { env } from "@/lib/core/env";
+import { handle } from "@server/core/api";
+import { aiGateway } from "@server/ai/gateway";
+import { env } from "@server/core/env";
 
 /** Internal platform status: which capability chains are active (internal keys only). */
 export const GET = handle({ permission: "dashboard:admin" }, async () => ({

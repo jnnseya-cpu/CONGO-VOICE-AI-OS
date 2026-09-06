@@ -1,9 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { requireStepUp } from "@/lib/core/mfa";
-import { OVERRIDE_MIN_REASON, overrideSeverity } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { requireStepUp } from "@server/core/mfa";
+import { OVERRIDE_MIN_REASON, overrideSeverity } from "@server/ai/agents/workflow";
 import { loadCaseScoped } from "../../_shared";
 
 export const GET = handle<{ id: string }>({ permission: "case:read" }, async ({ db, user, params }) => {

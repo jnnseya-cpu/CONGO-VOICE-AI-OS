@@ -1,12 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { awaitBackground } from "@/lib/channels/background";
-import { resetSmsOutbox, smsOutbox } from "@/lib/channels/sms";
-import { resetWhatsappOutbox, whatsappOutbox } from "@/lib/channels/whatsapp";
-import { sendFollowUp } from "@/lib/channels/follow-up";
-import { patchState } from "@/lib/channels/session";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { awaitBackground } from "@server/channels/background";
+import { resetSmsOutbox, smsOutbox } from "@server/channels/sms";
+import { resetWhatsappOutbox, whatsappOutbox } from "@server/channels/whatsapp";
+import { sendFollowUp } from "@server/channels/follow-up";
+import { patchState } from "@server/channels/session";
 
 import { GET as whatsappVerify, POST as whatsappHook } from "@/app/api/hooks/whatsapp/route";
 import { POST as ussdHook } from "@/app/api/hooks/ussd/route";

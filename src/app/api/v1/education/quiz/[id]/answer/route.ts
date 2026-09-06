@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { badRequest, notFound } from "@/lib/core/errors";
-import { getQuizSession, masteryFromScore, saveQuizSession, scoreAnswer, scoreQuiz } from "@/lib/ai/education/quiz";
-import { recordEvidence } from "@/lib/ai/education/evidence";
-import { qualityFromScore, scheduleRevision } from "@/lib/ai/education/spaced-repetition";
-import { profileOrDefault } from "@/lib/ai/education/profile";
+import { handle } from "@server/core/api";
+import { badRequest, notFound } from "@server/core/errors";
+import { getQuizSession, masteryFromScore, saveQuizSession, scoreAnswer, scoreQuiz } from "@server/ai/education/quiz";
+import { recordEvidence } from "@server/ai/education/evidence";
+import { qualityFromScore, scheduleRevision } from "@server/ai/education/spaced-repetition";
+import { profileOrDefault } from "@server/ai/education/profile";
 
 const Body = z.object({ questionId: z.string().min(1).max(60), answer: z.string().max(1000), assisted: z.boolean().optional() });
 

@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
 
 const Body = z.object({
   clientKey: z.string().min(1).max(120),

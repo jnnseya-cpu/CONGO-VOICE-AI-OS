@@ -6,11 +6,11 @@
  * covered here.
  */
 import { describe, expect, it } from "vitest";
-import { HEALTH_PROTOCOLS } from "@/lib/ai/protocols/definitions";
-import { evaluateCondition, nextQuestionId, protocolRuleIds, runProtocol, validateProtocol } from "@/lib/ai/protocols/engine";
-import type { AnswerMap, AnswerValue, HealthProtocol, ProtocolCondition, ProtocolQuestion } from "@/lib/ai/protocols/types";
-import { EPI_CALENDAR, vaccinationStatus } from "@/lib/ai/protocols/vaccination";
-import { applyKAnonymity, isPublishable } from "@/lib/ai/protocols/aggregation";
+import { HEALTH_PROTOCOLS } from "@server/ai/protocols/definitions";
+import { evaluateCondition, nextQuestionId, protocolRuleIds, runProtocol, validateProtocol } from "@server/ai/protocols/engine";
+import type { AnswerMap, AnswerValue, HealthProtocol, ProtocolCondition, ProtocolQuestion } from "@server/ai/protocols/types";
+import { EPI_CALENDAR, vaccinationStatus } from "@server/ai/protocols/vaccination";
+import { applyKAnonymity, isPublishable } from "@server/ai/protocols/aggregation";
 
 const LANGUAGES = ["fr", "ln", "kg", "sw", "lua"] as const;
 

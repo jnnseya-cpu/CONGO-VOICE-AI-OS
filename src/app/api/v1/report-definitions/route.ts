@@ -1,9 +1,9 @@
 import { desc } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
-import { REPORT_TYPES } from "@/lib/reports";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
+import { REPORT_TYPES } from "@server/reports";
 
 /** Scheduled report definitions: what is produced, how often, for which scope and whom. */
 export const GET = handle({ permission: "report:export" }, async ({ db }) => ({

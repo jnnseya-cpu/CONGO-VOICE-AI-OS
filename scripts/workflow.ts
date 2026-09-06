@@ -1,4 +1,4 @@
-import { runScheduler } from "@/lib/core/scheduler";
+import { runScheduler } from "@server/core/scheduler";
 
 runScheduler()
   .then((r) => {

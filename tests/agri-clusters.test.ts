@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { canTransition, clusterConfig, CLUSTER_DEFAULTS, detectClusters, listClusters, publishCluster, validateCluster } from "@/lib/ai/agents/clusters";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { canTransition, clusterConfig, CLUSTER_DEFAULTS, detectClusters, listClusters, publishCluster, validateCluster } from "@server/ai/agents/clusters";
 
 const DAY = 24 * 3600 * 1000;
 

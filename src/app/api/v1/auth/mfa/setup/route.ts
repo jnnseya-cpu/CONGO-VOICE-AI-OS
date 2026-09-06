@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { beginEnrolment, mfaRequiredFor, stepUpStatus } from "@/lib/core/mfa";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { beginEnrolment, mfaRequiredFor, stepUpStatus } from "@server/core/mfa";
 
 /** Current MFA state for the signed-in user. */
 export const GET = handle({ auth: true }, async ({ db, user }) => {

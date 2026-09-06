@@ -5,10 +5,10 @@
  * consents still required before the citizen can be served.
  */
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { CHANNEL_CAPABILITIES, negotiateCapabilities } from "@/lib/channels/capabilities";
-import { channelGuard, parseJson, requestId } from "@/lib/channels/http";
-import { createSession, consentSnapshot, hashIdentifier, missingConsents } from "@/lib/channels/session";
+import { handle } from "@server/core/api";
+import { CHANNEL_CAPABILITIES, negotiateCapabilities } from "@server/channels/capabilities";
+import { channelGuard, parseJson, requestId } from "@server/channels/http";
+import { createSession, consentSnapshot, hashIdentifier, missingConsents } from "@server/channels/session";
 
 const Body = z.object({
   channel: z.enum(["pwa", "ivr", "whatsapp", "ussd", "sms", "assisted", "android"]).default("pwa"),

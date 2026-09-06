@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { answersMatch, canonicalFraction, generateQuiz, masteryFromScore, normaliseAnswer, numericValue, publicQuestions, scoreAnswer, scoreQuiz } from "@/lib/ai/education/quiz";
-import type { QuizQuestion } from "@/lib/ai/schemas";
-import { nextReview, qualityFromScore, reviewLadder, scheduleRevision, plannedRevisions, BASE_INTERVALS, DEFAULT_EASE, MIN_EASE } from "@/lib/ai/education/spaced-repetition";
-import { CURRICULUM, findObjective, levelFromAgeBand, objectivesFor, prerequisiteChain, examObjectives } from "@/lib/ai/education/curriculum";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { answersMatch, canonicalFraction, generateQuiz, masteryFromScore, normaliseAnswer, numericValue, publicQuestions, scoreAnswer, scoreQuiz } from "@server/ai/education/quiz";
+import type { QuizQuestion } from "@server/ai/schemas";
+import { nextReview, qualityFromScore, reviewLadder, scheduleRevision, plannedRevisions, BASE_INTERVALS, DEFAULT_EASE, MIN_EASE } from "@server/ai/education/spaced-repetition";
+import { CURRICULUM, findObjective, levelFromAgeBand, objectivesFor, prerequisiteChain, examObjectives } from "@server/ai/education/curriculum";
 
 const QUESTION: QuizQuestion = {
   id: "q1",

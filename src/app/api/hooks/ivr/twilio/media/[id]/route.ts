@@ -4,8 +4,8 @@
  * Telephony providers fetch audio anonymously, so the URL carries an expiring HMAC instead
  * of a session cookie. Nothing else is reachable here: only the file id named in the token.
  */
-import { storage } from "@/lib/core/storage";
-import { readMediaFile, verifyMediaToken } from "@/lib/channels/media";
+import { storage } from "@server/core/storage";
+import { readMediaFile, verifyMediaToken } from "@server/channels/media";
 
 export const dynamic = "force-dynamic";
 

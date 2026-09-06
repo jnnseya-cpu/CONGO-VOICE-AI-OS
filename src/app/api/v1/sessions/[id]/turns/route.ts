@@ -5,15 +5,15 @@
  * text-only turns. `Idempotency-Key` makes a replay of a queued offline turn safe: the
  * stored response is returned instead of running the pipeline twice.
  */
-import { handle } from "@/lib/core/api";
-import { env } from "@/lib/core/env";
-import { IdempotencyConflict, requestHash, withIdempotency } from "@/lib/core/idempotency";
-import { isAllowedMime } from "@/lib/core/storage";
-import type { LanguageCode, ModuleType } from "@/lib/db/schema";
-import { ChannelError, channelErrorBody } from "@/lib/channels/errors";
-import { channelGuard, loadOwnedSession, requestId } from "@/lib/channels/http";
-import { storeInboundMedia } from "@/lib/channels/media";
-import { readState, runTurn, settleTurn, setSessionLanguage, type TurnResult } from "@/lib/channels/session";
+import { handle } from "@server/core/api";
+import { env } from "@server/core/env";
+import { IdempotencyConflict, requestHash, withIdempotency } from "@server/core/idempotency";
+import { isAllowedMime } from "@server/core/storage";
+import type { LanguageCode, ModuleType } from "@server/db/schema";
+import { ChannelError, channelErrorBody } from "@server/channels/errors";
+import { channelGuard, loadOwnedSession, requestId } from "@server/channels/http";
+import { storeInboundMedia } from "@server/channels/media";
+import { readState, runTurn, settleTurn, setSessionLanguage, type TurnResult } from "@server/channels/session";
 
 const LANGUAGES = ["fr", "ln", "kg", "sw", "lua"] as const;
 const MODULES = ["health", "agriculture", "education", "general"] as const;

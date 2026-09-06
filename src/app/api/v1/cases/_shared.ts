@@ -3,10 +3,10 @@
  * Not a route: Next.js only exposes `route.ts` files.
  */
 import { eq } from "drizzle-orm";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { moduleScopeFor } from "@/lib/core/rbac";
-import { schema, type Database } from "@/lib/db/client";
-import type { Role } from "@/lib/db/schema";
+import { forbidden, notFound } from "@server/core/errors";
+import { moduleScopeFor } from "@server/core/rbac";
+import { schema, type Database } from "@server/db/client";
+import type { Role } from "@server/db/schema";
 
 /** Load a case and refuse it when the caller's role does not cover its module. */
 export async function loadCaseScoped(db: Database, id: string, role: Role) {

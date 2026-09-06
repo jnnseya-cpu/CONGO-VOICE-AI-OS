@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { moduleScopeFor } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { escalateCase } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { forbidden, notFound } from "@server/core/errors";
+import { moduleScopeFor } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { escalateCase } from "@server/ai/agents/workflow";
 
 const Body = z.object({ reason: z.string().max(1000).optional() });
 

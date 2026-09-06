@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { decodeSession, encodeSession, hashPin, verifyPin } from "@/lib/core/auth";
-import { escalationRoleFor, hasPermission, moduleScopeFor, ROLE_PERMISSIONS } from "@/lib/core/rbac";
-import { checkRateLimit, resetRateLimits } from "@/lib/core/rate-limit";
-import { scoreRisk } from "@/lib/ai/agents/risk";
-import { detectEmergencyTerms, sanitiseHealthGuidance } from "@/lib/ai/safety";
-import { chunkText, parseFrontMatter } from "@/lib/ai/knowledge";
+import { decodeSession, encodeSession, hashPin, verifyPin } from "@server/core/auth";
+import { escalationRoleFor, hasPermission, moduleScopeFor, ROLE_PERMISSIONS } from "@server/core/rbac";
+import { checkRateLimit, resetRateLimits } from "@server/core/rate-limit";
+import { scoreRisk } from "@server/ai/agents/risk";
+import { detectEmergencyTerms, sanitiseHealthGuidance } from "@server/ai/safety";
+import { chunkText, parseFrontMatter } from "@server/ai/knowledge";
 
 describe("sessions", () => {
   it("round-trips a signed session and rejects tampering", () => {

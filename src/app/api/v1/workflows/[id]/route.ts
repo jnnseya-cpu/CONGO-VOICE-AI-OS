@@ -2,11 +2,11 @@
  * GET /api/v1/workflows/{id} — processing status of one interaction: the stage it has
  * reached and the safe partial state already available.
  */
-import { handle } from "@/lib/core/api";
-import { hasPermission } from "@/lib/core/rbac";
-import { ChannelError } from "@/lib/channels/errors";
-import { channelGuard, requestId } from "@/lib/channels/http";
-import { loadInteraction, toWorkflowStatus } from "@/lib/channels/workflow";
+import { handle } from "@server/core/api";
+import { hasPermission } from "@server/core/rbac";
+import { ChannelError } from "@server/channels/errors";
+import { channelGuard, requestId } from "@server/channels/http";
+import { loadInteraction, toWorkflowStatus } from "@server/channels/workflow";
 
 export const GET = handle<{ id: string }>({ permission: "interaction:create", limit: "none" }, async ({ req, user, params }) => {
   const id = requestId(req);

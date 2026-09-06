@@ -4,10 +4,10 @@
  * Unauthenticated by design; the reply goes back out over the SMS client as at most three
  * concatenated messages (FR-CH-21). STOP / ARRÊT / TIKA / ACHA revoke consent (FR-CH-14).
  */
-import { withIdempotency, IdempotencyConflict } from "@/lib/core/idempotency";
-import { runTurn, settleTurn, startOrResume, continueTurn, isContinuationRequest, readState } from "@/lib/channels/session";
-import { sendSms } from "@/lib/channels/sms";
-import { safeMessage } from "@/lib/channels/errors";
+import { withIdempotency, IdempotencyConflict } from "@server/core/idempotency";
+import { runTurn, settleTurn, startOrResume, continueTurn, isContinuationRequest, readState } from "@server/channels/session";
+import { sendSms } from "@server/channels/sms";
+import { safeMessage } from "@server/channels/errors";
 
 export const dynamic = "force-dynamic";
 

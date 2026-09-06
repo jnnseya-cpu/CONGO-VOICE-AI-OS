@@ -1,12 +1,12 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { emitEvent } from "@/lib/core/events";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { cancelReminders } from "@/lib/core/scheduler";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { emitEvent } from "@server/core/events";
+import { forbidden, notFound } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { cancelReminders } from "@server/core/scheduler";
 
 const PURPOSES = [
   "service",

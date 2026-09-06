@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { invalidateKnowledgeCache, listKnowledgeDocuments, loadKnowledgeFromContent } from "@/lib/ai/knowledge";
-import type { ModuleType } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { invalidateKnowledgeCache, listKnowledgeDocuments, loadKnowledgeFromContent } from "@server/ai/knowledge";
+import type { ModuleType } from "@server/db/schema";
 
 /** Approved knowledge documents, with their authority and review dates. */
 export const GET = handle({ permission: "admin:config" }, async ({ req }) => {

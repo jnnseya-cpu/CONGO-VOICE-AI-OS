@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { handle } from "@/lib/core/api";
-import { SESSION_COOKIE } from "@/lib/core/auth";
+import { handle } from "@server/core/api";
+import { SESSION_COOKIE } from "@server/core/auth";
 
 export const POST = handle({}, async () => {
   const res = NextResponse.json({ ok: true });

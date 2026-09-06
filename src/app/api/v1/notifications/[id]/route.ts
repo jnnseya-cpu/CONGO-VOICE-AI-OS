@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
 
 /** Mark a notification as read. */
 export const PATCH = handle<{ id: string }>({ permission: "notification:read_own" }, async ({ db, user, params }) => {

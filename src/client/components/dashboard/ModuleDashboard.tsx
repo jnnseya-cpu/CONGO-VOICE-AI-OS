@@ -4,8 +4,8 @@
  * k-anonymity rule (cells under 10 are never published).
  */
 import Link from "next/link";
-import { moduleDashboard } from "@/lib/ai/agents/reporting";
-import type { ModuleType } from "@/lib/db/schema";
+import { moduleDashboard } from "@server/ai/agents/reporting";
+import type { ModuleType } from "@server/db/schema";
 import { PageHeader } from "../ui";
 import {
   BarList,
@@ -27,6 +27,9 @@ import { IconAlert, IconBriefcase, IconGraduation, IconHeart, IconLeaf, IconUser
 
 const REFERRAL_FR: Record<string, string> = {
   none: "Aucune orientation",
+  within_days: "Consultation dans les jours qui viennent",
+  today: "Consultation le jour même",
+  immediately: "Orientation immédiate",
   advised: "Conseil donné",
   referred: "Orienté vers un centre",
   emergency: "Urgence",
@@ -87,8 +90,8 @@ export async function ModuleDashboard({ module }: { module: Exclude<ModuleType, 
     "referrals" in d
       ? d.referrals.map((r) => ({ label: REFERRAL_FR[r.referral ?? ""] ?? r.referral ?? "Non renseigné", value: r.n }))
       : "crops" in d
-        ? d.crops.map((c) => ({ label: c.crop ?? "Culture non précisée", value: c.n }))
-        : d.gaps.map((g) => ({ label: g.topic ?? "Notion non précisée", value: g.n }));
+        ? d.crops.map((c) => ({ label: !c.crop || c.crop === "unknown" ? "Culture non précisée" : c.crop, value: c.n }))
+        : d.gaps.map((g) => ({ label: !g.topic || g.topic === "unknown" ? "Notion non précisée" : g.topic, value: g.n }));
 
   const thirdRows = "ages" in d ? d.ages.map((a) => ({ label: AGE_FR[a.age ?? ""] ?? a.age ?? "Non renseigné", value: a.n })) : [];
 
@@ -119,7 +122,7 @@ export async function ModuleDashboard({ module }: { module: Exclude<ModuleType, 
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid gap-3 sm:grid-cols-2 ${tiles.length === 2 ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
         <StatTile label="Cas actifs" value={fmt(d.openCases.length)} hint={`Module ${MODULE_FR[module].toLowerCase()}`} icon={<IconBriefcase size={16} />} tone={meta.tone} href={`/cas?module=${module}`} />
         <StatTile label="Suivis en retard" value={fmt(d.overdue)} hint="Cas dont la date de suivi est dépassée." icon={<IconAlert size={16} />} tone={d.overdue > 0 ? "danger" : "muted"} />
         {tiles.map((t) => (

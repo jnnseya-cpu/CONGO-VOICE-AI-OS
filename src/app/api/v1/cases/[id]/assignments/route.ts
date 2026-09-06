@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { assignCase, autoAssignCase, routeCase } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { assignCase, autoAssignCase, routeCase } from "@server/ai/agents/workflow";
 import { loadCaseScoped } from "../../_shared";
 
 /** Who the routing rules would pick for this case, and why. */

@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { storage } from "@/lib/core/storage";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { forbidden, notFound } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { storage } from "@server/core/storage";
+import { schema } from "@server/db/client";
 
 /** Streams a stored file to its owner or to officers/admins. */
 export const GET = handle<{ id: string }>({ auth: true }, async ({ db, user, params }) => {

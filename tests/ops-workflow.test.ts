@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
 import {
   ACTIVE_STATUSES,
   SLA_MS,
@@ -19,8 +19,8 @@ import {
   shouldAutoCreateCase,
   slaDueFor,
   transitionCase,
-} from "@/lib/ai/agents/workflow";
-import type { ModuleType, Severity } from "@/lib/db/schema";
+} from "@server/ai/agents/workflow";
+import type { ModuleType, Severity } from "@server/db/schema";
 
 const SUPERVISOR = { userId: "", role: "gov_admin" };
 
@@ -134,7 +134,7 @@ describe("case state machine", () => {
   });
 
   it("escalates to the supervisor level and raises the severity floor", async () => {
-    const { escalateCase } = await import("@/lib/ai/agents/workflow");
+    const { escalateCase } = await import("@server/ai/agents/workflow");
     const c = await makeCase({ severity: "medium" });
     const first = await escalateCase(c.id, SUPERVISOR, "Aucune amélioration après 24 h");
     expect(first?.status).toBe("escalated");

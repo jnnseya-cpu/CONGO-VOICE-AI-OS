@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
 import {
   ACU_CONFIG_KEY,
   DEFAULT_ACU_CONVERSION,
@@ -15,7 +15,7 @@ import {
   rawUnits,
   recordAcu,
   resetAcuCache,
-} from "@/lib/core/metering";
+} from "@server/core/metering";
 
 const ids = { tenant: "", cappedTenant: "", admin: "" };
 
@@ -141,7 +141,7 @@ describe("ACU metering", () => {
   it("meters through the AI gateway's usage funnel", async () => {
     const db = await getDb();
     const before = (await db.select().from(schema.acuLedger)).length;
-    const { aiGateway } = await import("@/lib/ai/gateway");
+    const { aiGateway } = await import("@server/ai/gateway");
     await aiGateway().transcribe({ audio: Buffer.from("hello world audio payload"), mimeType: "audio/webm", languageHint: "fr" });
     const after = await db.select().from(schema.acuLedger);
     expect(after.length).toBeGreaterThan(before);

@@ -1,13 +1,13 @@
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
 import {
   FOLLOW_UP_DECISIONS,
   REACHABILITY_VALUES,
   permittedTransitions,
   transitionCase,
-} from "@/lib/ai/agents/workflow";
+} from "@server/ai/agents/workflow";
 import { loadCaseScoped } from "../../_shared";
 
 /** The transitions this case may take right now, with their rules. */

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { createQuizSession, generateQuiz, publicQuestions } from "@/lib/ai/education/quiz";
-import { profileOrDefault } from "@/lib/ai/education/profile";
-import { LEVELS } from "@/lib/ai/education/curriculum";
+import { handle } from "@server/core/api";
+import { createQuizSession, generateQuiz, publicQuestions } from "@server/ai/education/quiz";
+import { profileOrDefault } from "@server/ai/education/profile";
+import { LEVELS } from "@server/ai/education/curriculum";
 
 const Body = z.object({
   topic: z.string().min(2).max(160),

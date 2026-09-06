@@ -10,8 +10,8 @@
  * buttons (≤3) and lists (≤10) for confirmations (FR-CH-12), templates outside the
  * 24 h window (FR-CH-13), opt-in / opt-out (FR-CH-14).
  */
-import type { LanguageCode, ModuleType } from "@/lib/db/schema";
-import { withIdempotency, IdempotencyConflict } from "@/lib/core/idempotency";
+import type { LanguageCode, ModuleType } from "@server/db/schema";
+import { withIdempotency, IdempotencyConflict } from "@server/core/idempotency";
 import {
   continueTurn,
   getSessionById,
@@ -26,7 +26,7 @@ import {
   startOrResume,
   type ChannelSession,
   type TurnResult,
-} from "@/lib/channels/session";
+} from "@server/channels/session";
 import {
   downloadMedia,
   parseInbound,
@@ -37,12 +37,12 @@ import {
   verifySignature,
   verifyWebhookChallenge,
   type InboundWhatsappMessage,
-} from "@/lib/channels/whatsapp";
-import { recordDeliveryReport } from "@/lib/channels/sms";
-import { synthesizeReply, storeInboundMedia, MAX_VIDEO_BYTES } from "@/lib/channels/media";
-import { safeMessage } from "@/lib/channels/errors";
-import { LANGUAGE_NAMES, moduleLabel, t } from "@/lib/channels/strings";
-import { menuQuestions, questionLabel } from "@/lib/channels/menus";
+} from "@server/channels/whatsapp";
+import { recordDeliveryReport } from "@server/channels/sms";
+import { synthesizeReply, storeInboundMedia, MAX_VIDEO_BYTES } from "@server/channels/media";
+import { safeMessage } from "@server/channels/errors";
+import { LANGUAGE_NAMES, moduleLabel, t } from "@server/channels/strings";
+import { menuQuestions, questionLabel } from "@server/channels/menus";
 
 export const dynamic = "force-dynamic";
 

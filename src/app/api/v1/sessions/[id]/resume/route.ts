@@ -4,13 +4,13 @@
  * (FR-CH-06, FR-CH-04).
  */
 import { eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { emitEvent } from "@/lib/core/events";
-import { ChannelError } from "@/lib/channels/errors";
-import { channelGuard, loadOwnedSession, requestId } from "@/lib/channels/http";
-import { readState, resumeSummary, RESUME_WINDOW_MS, shouldConfirmSharedPhone } from "@/lib/channels/session";
-import { t } from "@/lib/channels/strings";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { emitEvent } from "@server/core/events";
+import { ChannelError } from "@server/channels/errors";
+import { channelGuard, loadOwnedSession, requestId } from "@server/channels/http";
+import { readState, resumeSummary, RESUME_WINDOW_MS, shouldConfirmSharedPhone } from "@server/channels/session";
+import { t } from "@server/channels/strings";
 
 export const POST = handle<{ id: string }>({ permission: "interaction:create" }, async ({ req, db, user, params }) => {
   const id = requestId(req);

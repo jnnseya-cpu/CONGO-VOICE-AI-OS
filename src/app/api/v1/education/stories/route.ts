@@ -1,8 +1,8 @@
 import { desc, eq, and } from "drizzle-orm";
-import { handle, paging } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { ensureStories, storyMeta, storyWordCount } from "@/lib/db/reference/stories";
+import { handle, paging } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { ensureStories, storyMeta, storyWordCount } from "@server/db/reference/stories";
 
 const LANGUAGES = ["fr", "ln", "kg", "sw", "lua"] as const;
 

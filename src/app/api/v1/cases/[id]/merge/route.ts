@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { mergeCases } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { mergeCases } from "@server/ai/agents/workflow";
 import { loadCaseScoped } from "../../_shared";
 
 const Body = z.object({

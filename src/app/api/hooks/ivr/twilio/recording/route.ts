@@ -3,11 +3,11 @@
  * (trim-silence + a 3 s timeout on the <Record> verb), then the recording goes through the
  * canonical pipeline and the answer is played back.
  */
-import { runTurn, settleTurn, startOrResume } from "@/lib/channels/session";
-import { fetchRecording, readTwilioRequest, say, twimlResponse, hangup } from "@/lib/channels/twilio";
-import { recordQuestion, replyTwiml } from "@/lib/channels/ivr";
-import { safeMessage } from "@/lib/channels/errors";
-import { t } from "@/lib/channels/strings";
+import { runTurn, settleTurn, startOrResume } from "@server/channels/session";
+import { fetchRecording, readTwilioRequest, say, twimlResponse, hangup } from "@server/channels/twilio";
+import { recordQuestion, replyTwiml } from "@server/channels/ivr";
+import { safeMessage } from "@server/channels/errors";
+import { t } from "@server/channels/strings";
 
 export const dynamic = "force-dynamic";
 

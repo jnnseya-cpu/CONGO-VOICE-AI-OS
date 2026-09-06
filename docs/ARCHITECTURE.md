@@ -27,8 +27,8 @@ The seven-part contract (`FinalAnswer`): what the user asks · what the system u
 | Frontend | `src/app/*` pages, `src/client/**` | Server components read server modules directly; client components call `/api/v1`. |
 | Shared | `src/shared/**` | Types, the seven-part contract, i18n dictionaries, formatters. No server imports. |
 | Backend entry points | `src/app/api/v1/**`, `src/app/api/hooks/**` | Thin handlers through `handle()` (auth, RBAC, rate limit, logging, errors) or signature-verified webhooks. |
-| Backend services | `src/lib/{core,db,ai,channels,reports}` (moving to `src/server`) | Business logic, agents, gateway, workflow, reports. |
-| Data | `src/lib/db/schema.ts`, `drizzle/` | PostgreSQL dialect; embedded PGlite in dev/test. |
+| Backend services | `src/server/{core,db,ai,channels,reports}` (moving to `src/server`) | Business logic, agents, gateway, workflow, reports. |
+| Data | `src/server/db/schema.ts`, `drizzle/` | PostgreSQL dialect; embedded PGlite in dev/test. |
 
 ## 3. AI gateway and routing
 `ai/gateway.ts` is the only module that knows vendors. Chains per capability (env-configurable):

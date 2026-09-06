@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { notFound } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { publicUser } from "@/lib/core/users";
+import { handle } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { notFound } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { publicUser } from "@server/core/users";
 
 export const GET = handle({ auth: true }, async ({ db, user }) => {
   const [u] = await db.select().from(schema.users).where(eq(schema.users.id, user.userId));

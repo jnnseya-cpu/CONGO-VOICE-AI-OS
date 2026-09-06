@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
 
 /** Cancel a single scheduled reminder without unsubscribing from the programme. */
 export const DELETE = handle<{ id: string }>({ auth: true }, async ({ db, user, params, ip }) => {

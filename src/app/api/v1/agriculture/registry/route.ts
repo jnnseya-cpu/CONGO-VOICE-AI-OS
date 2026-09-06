@@ -1,5 +1,5 @@
-import { handle } from "@/lib/core/api";
-import { CHEMICAL_TERMS, REFERRAL_TEXT, searchRegistry } from "@/lib/ai/tools/input-registry";
+import { handle } from "@server/core/api";
+import { CHEMICAL_TERMS, REFERRAL_TEXT, searchRegistry } from "@server/ai/tools/input-registry";
 
 /**
  * Approved input registry (AGR-003). No product may be recommended by the platform unless it

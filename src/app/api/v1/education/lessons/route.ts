@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { assessEducation, type EducationMode } from "@/lib/ai/agents/education";
-import { objectivesFor } from "@/lib/ai/education/curriculum";
-import { profileOrDefault } from "@/lib/ai/education/profile";
+import { handle } from "@server/core/api";
+import { assessEducation, type EducationMode } from "@server/ai/agents/education";
+import { objectivesFor } from "@server/ai/education/curriculum";
+import { profileOrDefault } from "@server/ai/education/profile";
 
 const MODES = ["explain", "quiz", "read", "homework", "exam_prep", "parent", "teacher"] as const;
 

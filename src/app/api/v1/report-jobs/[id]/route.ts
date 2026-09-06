@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { handle } from "@/lib/core/api";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { REPORT_CATALOGUE, type ReportType } from "@/lib/reports";
+import { handle } from "@server/core/api";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { REPORT_CATALOGUE, type ReportType } from "@server/reports";
 
 /** Job status. When `status` is "ready", the file is at …/download until `expiresAt`. */
 export const GET = handle<{ id: string }>({ permission: "report:export" }, async ({ db, params }) => {

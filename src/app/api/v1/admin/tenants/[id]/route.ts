@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { isDegradedMode, monthlyConsumption } from "@/lib/core/metering";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { isDegradedMode, monthlyConsumption } from "@server/core/metering";
 
 export const GET = handle<{ id: string }>({ permission: "admin:config" }, async ({ db, params }) => {
   const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, params.id));

@@ -1,5 +1,5 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
 import {
   CALENDAR_CROPS,
   calendarAdvice,
@@ -8,7 +8,7 @@ import {
   PROVINCES,
   seasonFor,
   type CalendarCrop,
-} from "@/lib/db/reference/agriculture";
+} from "@server/db/reference/agriculture";
 
 /**
  * Planting calendars by province x crop (FR-AG-04). Public reference data.

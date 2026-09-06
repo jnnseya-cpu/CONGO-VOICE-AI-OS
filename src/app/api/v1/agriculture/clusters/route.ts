@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { badRequest, notFound } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { clusterConfig, detectClusters, listClusters, publishCluster, validateCluster, type ClusterStatus } from "@/lib/ai/agents/clusters";
-import { normaliseProvince } from "@/lib/db/reference/agriculture";
+import { handle } from "@server/core/api";
+import { badRequest, notFound } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { clusterConfig, detectClusters, listClusters, publishCluster, validateCluster, type ClusterStatus } from "@server/ai/agents/clusters";
+import { normaliseProvince } from "@server/db/reference/agriculture";
 
 const STATUSES = ["unverified", "under_review", "confirmed", "rejected", "closed"] as const;
 

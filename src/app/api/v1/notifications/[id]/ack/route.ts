@@ -1,7 +1,7 @@
-import { handle } from "@/lib/core/api";
-import { notFound } from "@/lib/core/errors";
-import { acknowledgeNotification } from "@/lib/core/notifications";
-import { audit } from "@/lib/core/audit";
+import { handle } from "@server/core/api";
+import { notFound } from "@server/core/errors";
+import { acknowledgeNotification } from "@server/core/notifications";
+import { audit } from "@server/core/audit";
 
 /**
  * Acknowledge an urgent alert. Delivery is a provider fact; acknowledgement is a human

@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { AiGateway } from "@/lib/ai/gateway";
-import { assessAgriculture, matchNotifiable, notifiableList, detectZoonoticSigns, CANDIDATE_CONFIDENT_THRESHOLD } from "@/lib/ai/agents/agriculture";
-import { ensureAgricultureReference } from "@/lib/db/reference/agriculture";
-import { searchKnowledge } from "@/lib/ai/knowledge";
-import { searchRegistry } from "@/lib/ai/tools/input-registry";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { AiGateway } from "@server/ai/gateway";
+import { assessAgriculture, matchNotifiable, notifiableList, detectZoonoticSigns, CANDIDATE_CONFIDENT_THRESHOLD } from "@server/ai/agents/agriculture";
+import { ensureAgricultureReference } from "@server/db/reference/agriculture";
+import { searchKnowledge } from "@server/ai/knowledge";
+import { searchRegistry } from "@server/ai/tools/input-registry";
 
 function jpeg(width: number, height: number, bytes: number): Buffer {
   const head: number[] = [0xff, 0xd8];

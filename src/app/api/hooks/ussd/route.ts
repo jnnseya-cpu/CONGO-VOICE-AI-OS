@@ -8,11 +8,11 @@
  * The answer itself is far too long for a USSD screen, so it is delivered by SMS in the
  * citizen's language within the 180 s budget (FR-CH-21).
  */
-import type { LanguageCode, ModuleType } from "@/lib/db/schema";
-import { localise } from "@/lib/ai/agents/language";
-import { runInBackground } from "@/lib/channels/background";
-import { menuQuestions, questionLabel } from "@/lib/channels/menus";
-import { sendSms } from "@/lib/channels/sms";
+import type { LanguageCode, ModuleType } from "@server/db/schema";
+import { localise } from "@server/ai/agents/language";
+import { runInBackground } from "@server/channels/background";
+import { menuQuestions, questionLabel } from "@server/channels/menus";
+import { sendSms } from "@server/channels/sms";
 import {
   detectOptOut,
   applyOptOut,
@@ -23,8 +23,8 @@ import {
   setSessionLanguage,
   setSessionModule,
   startOrResume,
-} from "@/lib/channels/session";
-import { LANGUAGE_BY_DIGIT, LANGUAGE_NAMES, MODULE_BY_DIGIT, moduleLabel, t } from "@/lib/channels/strings";
+} from "@server/channels/session";
+import { LANGUAGE_BY_DIGIT, LANGUAGE_NAMES, MODULE_BY_DIGIT, moduleLabel, t } from "@server/channels/strings";
 
 export const dynamic = "force-dynamic";
 

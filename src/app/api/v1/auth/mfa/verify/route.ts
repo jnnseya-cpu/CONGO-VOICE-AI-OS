@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { ApiError } from "@/lib/core/errors";
-import { stepUpStatus, verifyCode } from "@/lib/core/mfa";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { ApiError } from "@server/core/errors";
+import { stepUpStatus, verifyCode } from "@server/core/mfa";
 
 const Body = z.object({ code: z.string().min(6).max(8) });
 

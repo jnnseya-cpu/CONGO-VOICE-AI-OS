@@ -11,12 +11,12 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { env } from "@/lib/core/env";
-import { schema } from "@/lib/db/client";
-import { isAllowedMime, kindFromMime, storage, storeUpload } from "@/lib/core/storage";
-import { ChannelError } from "@/lib/channels/errors";
-import { channelGuard, parseJson, requestId } from "@/lib/channels/http";
+import { handle } from "@server/core/api";
+import { env } from "@server/core/env";
+import { schema } from "@server/db/client";
+import { isAllowedMime, kindFromMime, storage, storeUpload } from "@server/core/storage";
+import { ChannelError } from "@server/channels/errors";
+import { channelGuard, parseJson, requestId } from "@server/channels/http";
 
 const CHUNK_PREFIX = "resumable";
 const UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;

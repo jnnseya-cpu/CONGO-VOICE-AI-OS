@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { notFound } from "@/lib/core/errors";
-import { reviewSample } from "@/lib/ai/agents/learning";
+import { handle } from "@server/core/api";
+import { notFound } from "@server/core/errors";
+import { reviewSample } from "@server/ai/agents/learning";
 
 const Body = z.object({
   status: z.enum(["verified", "corrected", "rejected"]),

@@ -1,8 +1,8 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { isAllowedMime, kindFromMime, storeUpload } from "@/lib/core/storage";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { isAllowedMime, kindFromMime, storeUpload } from "@server/core/storage";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
 
 /** Generic upload (photos, videos, audio, PDF). Returns file ids to attach to an interaction. */
 export const POST = handle({ permission: "interaction:create" }, async ({ req, db, user }) => {

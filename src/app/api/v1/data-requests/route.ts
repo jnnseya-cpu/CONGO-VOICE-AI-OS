@@ -1,10 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { forbidden } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { DATA_REQUEST_SLA_DAYS, createDataRequest } from "@/lib/core/privacy";
+import { handle, paging } from "@server/core/api";
+import { forbidden } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { DATA_REQUEST_SLA_DAYS, createDataRequest } from "@server/core/privacy";
 
 /** Access and erasure requests. Citizens see their own; administrators see all. */
 export const GET = handle({ auth: true }, async ({ req, db, user }) => {

@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { assessEducation } from "@/lib/ai/agents/education";
-import { profileOrDefault, weeksToExam } from "@/lib/ai/education/profile";
-import { examObjectives } from "@/lib/ai/education/curriculum";
-import { plannedRevisions, reviewLadder } from "@/lib/ai/education/spaced-repetition";
+import { handle } from "@server/core/api";
+import { assessEducation } from "@server/ai/agents/education";
+import { profileOrDefault, weeksToExam } from "@server/ai/education/profile";
+import { examObjectives } from "@server/ai/education/curriculum";
+import { plannedRevisions, reviewLadder } from "@server/ai/education/spaced-repetition";
 
 const Body = z.object({ request: z.string().max(2000).optional(), province: z.string().max(120).optional() });
 

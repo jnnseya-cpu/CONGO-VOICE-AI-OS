@@ -6,14 +6,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { assessHealth, nearestFacility, capWords } from "@/lib/ai/agents/health";
-import { scoreRisk } from "@/lib/ai/agents/risk";
-import { HealthTriageContract } from "@/lib/ai/schemas";
-import { detectDangerSigns, detectSafeguarding, SAFEGUARDING_NOTIFICATION_BODY } from "@/lib/ai/safety";
-import { selectProtocolId, extractEntities } from "@/lib/ai/protocols/extraction";
-import { listProtocols, loadApprovedProtocol, setProtocolStatus } from "@/lib/ai/protocols/registry";
-import { approvedDocIds, listKnowledgeDocuments, searchKnowledge } from "@/lib/ai/knowledge";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { assessHealth, nearestFacility, capWords } from "@server/ai/agents/health";
+import { scoreRisk } from "@server/ai/agents/risk";
+import { HealthTriageContract } from "@server/ai/schemas";
+import { detectDangerSigns, detectSafeguarding, SAFEGUARDING_NOTIFICATION_BODY } from "@server/ai/safety";
+import { selectProtocolId, extractEntities } from "@server/ai/protocols/extraction";
+import { listProtocols, loadApprovedProtocol, setProtocolStatus } from "@server/ai/protocols/registry";
+import { approvedDocIds, listKnowledgeDocuments, searchKnowledge } from "@server/ai/knowledge";
 
 describe("health triage (offline provider)", () => {
   beforeAll(async () => {

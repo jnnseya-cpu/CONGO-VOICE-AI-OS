@@ -2,7 +2,7 @@
  * Twilio <Gather> callback: language selection, resume choice, the one open question and
  * its DTMF fallback 1 = santé, 2 = agriculture, 3 = éducation (FR-CH-02).
  */
-import type { LanguageCode } from "@/lib/db/schema";
+import type { LanguageCode } from "@server/db/schema";
 import {
   endSession,
   patchState,
@@ -12,10 +12,10 @@ import {
   setSessionLanguage,
   setSessionModule,
   startOrResume,
-} from "@/lib/channels/session";
-import { readTwilioRequest, say, twimlResponse, hangup } from "@/lib/channels/twilio";
-import { languageMenu, openQuestionMenu, recordQuestion, replyTwiml } from "@/lib/channels/ivr";
-import { LANGUAGE_BY_DIGIT, LANGUAGE_NAMES, MODULE_BY_DIGIT, t } from "@/lib/channels/strings";
+} from "@server/channels/session";
+import { readTwilioRequest, say, twimlResponse, hangup } from "@server/channels/twilio";
+import { languageMenu, openQuestionMenu, recordQuestion, replyTwiml } from "@server/channels/ivr";
+import { LANGUAGE_BY_DIGIT, LANGUAGE_NAMES, MODULE_BY_DIGIT, t } from "@server/channels/strings";
 
 export const dynamic = "force-dynamic";
 

@@ -1,8 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
 
 /** Organisations: the operational units cases are routed to. `?tenantId=…&type=…` */
 export const GET = handle({ permission: "admin:config" }, async ({ req, db }) => {

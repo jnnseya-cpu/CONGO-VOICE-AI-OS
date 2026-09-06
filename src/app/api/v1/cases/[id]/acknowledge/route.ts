@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { acknowledgeCase } from "@/lib/ai/agents/workflow";
+import { handle } from "@server/core/api";
+import { acknowledgeCase } from "@server/ai/agents/workflow";
 import { loadCaseScoped } from "../../_shared";
 
 const Body = z.object({ note: z.string().max(2000).optional() });

@@ -6,8 +6,8 @@ import { LanguageProvider } from "@client/components/shell/LanguageProvider";
 import { ServiceWorker } from "@client/components/shell/ServiceWorker";
 import { isLanguageCode, LANG_COOKIE } from "@shared/i18n";
 import type { LanguageCode, SessionUser } from "@shared/types";
-import { getSession } from "@/lib/core/auth";
-import { unreadNotificationCount } from "@/lib/core/unread";
+import { getSession } from "@server/core/auth";
+import { unreadNotificationCount } from "@server/core/unread";
 
 export const metadata: Metadata = {
   title: { default: "CONGO VOICE AI OS", template: "%s · CONGO VOICE AI OS" },

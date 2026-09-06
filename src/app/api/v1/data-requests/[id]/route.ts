@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { hasPermission } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { requireStepUp } from "@/lib/core/mfa";
-import { processDataRequest } from "@/lib/core/privacy";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { forbidden, notFound } from "@server/core/errors";
+import { hasPermission } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { requireStepUp } from "@server/core/mfa";
+import { processDataRequest } from "@server/core/privacy";
 
 export const GET = handle<{ id: string }>({ auth: true }, async ({ db, user, params }) => {
   const [row] = await db.select().from(schema.dataRequests).where(eq(schema.dataRequests.id, params.id));

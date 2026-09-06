@@ -2,7 +2,7 @@
  * SMS delivery reports. The provider posts the message id and its final status; the
  * matching notification row gets `deliveredAt` so "sent" and "delivered" stay distinct.
  */
-import { recordDeliveryReport } from "@/lib/channels/sms";
+import { recordDeliveryReport } from "@server/channels/sms";
 
 export const dynamic = "force-dynamic";
 

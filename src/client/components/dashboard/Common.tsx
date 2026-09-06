@@ -389,7 +389,7 @@ export function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor
 }
 
 const CONTROL = "h-10 rounded-[10px] border border-line bg-white px-3 text-[13.5px] text-ink outline-none placeholder:text-muted-2 focus:border-brand-2 focus:ring-4 focus:ring-brand-soft";
-const CONTROL_SELECT = "h-10 appearance-none rounded-[10px] border border-line bg-white px-3 pr-8 text-[13.5px] text-ink outline-none focus:border-brand-2 focus:ring-4 focus:ring-brand-soft";
+const CONTROL_SELECT = "h-10 rounded-[10px] border border-line bg-white px-3 pr-8 text-[13.5px] text-ink outline-none focus:border-brand-2 focus:ring-4 focus:ring-brand-soft";
 
 /** Full-width form controls. */
 export const inputClass = `w-full ${CONTROL}`;

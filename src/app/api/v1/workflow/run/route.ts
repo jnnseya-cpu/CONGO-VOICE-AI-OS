@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessionFromRequest } from "@/lib/core/auth";
-import { hasPermission } from "@/lib/core/rbac";
-import { runScheduler } from "@/lib/core/scheduler";
-import { audit } from "@/lib/core/audit";
-import { clientIp } from "@/lib/core/api";
+import { sessionFromRequest } from "@server/core/auth";
+import { hasPermission } from "@server/core/rbac";
+import { runScheduler } from "@server/core/scheduler";
+import { audit } from "@server/core/audit";
+import { clientIp } from "@server/core/api";
 
 /**
  * Scheduled maintenance entry point (Cloud Scheduler / cron / `npm run workflow:run`).

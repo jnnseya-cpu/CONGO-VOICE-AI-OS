@@ -1,4 +1,4 @@
-import { seed } from "@/lib/db/seed";
+import { seed } from "@server/db/seed";
 
 seed({ log: console.log })
   .then((r) => {

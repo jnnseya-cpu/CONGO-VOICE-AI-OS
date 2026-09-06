@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
-import { checkImageQuality, reviewEvidence } from "@/lib/ai/tools/image-quality";
-import { getPrices, parsePricesCsv, renderPrices, stalenessOf, PRICE_DISCLAIMER } from "@/lib/ai/tools/market";
-import { getWeather, PROVINCE_CENTROIDS } from "@/lib/ai/tools/weather";
-import { guardChemicalAdvice, mentionsChemical, searchRegistry, REFERRAL_TEXT } from "@/lib/ai/tools/input-registry";
-import { calendarAdvice, ensureAgricultureReference, plantingCalendars, PROVINCES, CALENDAR_CROPS, seasonFor, normaliseProvince } from "@/lib/db/reference/agriculture";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
+import { checkImageQuality, reviewEvidence } from "@server/ai/tools/image-quality";
+import { getPrices, parsePricesCsv, renderPrices, stalenessOf, PRICE_DISCLAIMER } from "@server/ai/tools/market";
+import { getWeather, PROVINCE_CENTROIDS } from "@server/ai/tools/weather";
+import { guardChemicalAdvice, mentionsChemical, searchRegistry, REFERRAL_TEXT } from "@server/ai/tools/input-registry";
+import { calendarAdvice, ensureAgricultureReference, plantingCalendars, PROVINCES, CALENDAR_CROPS, seasonFor, normaliseProvince } from "@server/db/reference/agriculture";
 
 beforeAll(async () => {
   resetDbForTests();

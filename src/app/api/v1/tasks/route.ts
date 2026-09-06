@@ -1,10 +1,10 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { forbidden, notFound } from "@/lib/core/errors";
-import { moduleScopeFor } from "@/lib/core/rbac";
-import { schema } from "@/lib/db/client";
-import { TASK_TYPES, createTask } from "@/lib/ai/agents/workflow";
+import { handle, paging } from "@server/core/api";
+import { forbidden, notFound } from "@server/core/errors";
+import { moduleScopeFor } from "@server/core/rbac";
+import { schema } from "@server/db/client";
+import { TASK_TYPES, createTask } from "@server/ai/agents/workflow";
 
 /** The worker's work list: `?mine=1`, `?queue=…`, `?caseId=…`, `?status=…`. */
 export const GET = handle({ permission: "case:read" }, async ({ req, db, user }) => {

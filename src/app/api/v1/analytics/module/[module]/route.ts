@@ -1,8 +1,8 @@
-import { handle } from "@/lib/core/api";
-import { badRequest, forbidden } from "@/lib/core/errors";
-import { hasPermission, type Permission } from "@/lib/core/rbac";
-import { moduleDashboard } from "@/lib/ai/agents/reporting";
-import type { ModuleType } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { badRequest, forbidden } from "@server/core/errors";
+import { hasPermission, type Permission } from "@server/core/rbac";
+import { moduleDashboard } from "@server/ai/agents/reporting";
+import type { ModuleType } from "@server/db/schema";
 
 const PERM: Record<string, Permission> = { health: "dashboard:health", agriculture: "dashboard:agri", education: "dashboard:edu" };
 

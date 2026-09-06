@@ -8,10 +8,10 @@
  * caller says or presses their language (FR-CH-02). A caller recognised within 24 hours is
  * offered "where we left off" instead (FR-CH-06).
  */
-import { patchState, startOrResume } from "@/lib/channels/session";
-import { readTwilioRequest, say, twimlResponse, gather, hangup } from "@/lib/channels/twilio";
-import { IVR_BASE, IVR_GATHER, languageMenu, nextGreetingLanguage } from "@/lib/channels/ivr";
-import { t } from "@/lib/channels/strings";
+import { patchState, startOrResume } from "@server/channels/session";
+import { readTwilioRequest, say, twimlResponse, gather, hangup } from "@server/channels/twilio";
+import { IVR_BASE, IVR_GATHER, languageMenu, nextGreetingLanguage } from "@server/channels/ivr";
+import { t } from "@server/channels/strings";
 
 export const dynamic = "force-dynamic";
 

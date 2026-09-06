@@ -1,10 +1,10 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
-import { renderTemplate } from "@/lib/core/notifications";
-import { NOTIFICATION_TEMPLATES } from "@/lib/db/reference/notification-templates";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
+import { renderTemplate } from "@server/core/notifications";
+import { NOTIFICATION_TEMPLATES } from "@server/db/reference/notification-templates";
 
 /** The template catalogue. `?key=…&language=…`, or `?preview=key&vars={}` to render one. */
 export const GET = handle({ permission: "admin:config" }, async ({ req, db }) => {

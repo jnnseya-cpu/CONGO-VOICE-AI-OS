@@ -31,7 +31,7 @@ export function DataRights() {
       const res = await fetch("/api/v1/data-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, method: "web" }),
+        body: JSON.stringify({ type, method: "button" }),
       });
       const payload = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
       if (!res.ok) throw new Error(payload?.error?.message ?? `Échec de la demande (${res.status}).`);

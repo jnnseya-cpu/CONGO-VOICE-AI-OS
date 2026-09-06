@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { getDb, resetDbForTests, schema } from "@/lib/db/client";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
 import {
   NOTIFICATION_POLICY,
   acknowledgeNotification,
@@ -16,8 +16,8 @@ import {
   sendBroadcast,
   sendDueNotifications,
   unacknowledgedAlerts,
-} from "@/lib/core/notifications";
-import { seedReferenceData } from "@/lib/db/reference";
+} from "@server/core/notifications";
+import { seedReferenceData } from "@server/db/reference";
 
 const ids: { citizen: string; worker: string; noConsent: string } = { citizen: "", worker: "", noConsent: "" };
 
@@ -136,7 +136,7 @@ describe("notification templates and delivery policy", () => {
     // WhatsApp configured for a provider without credentials: it fails, SMS (log) takes over.
     vi.resetModules();
     process.env.WHATSAPP_PROVIDER = "twilio";
-    const mod = await import("@/lib/core/notifications");
+    const mod = await import("@server/core/notifications");
     const outcome = await mod.deliverWithFallback("whatsapp", "+243810000001", "Titre", "Corps");
     expect(outcome.ok).toBe(true);
     expect(outcome.channelUsed).toBe("sms");
@@ -146,7 +146,7 @@ describe("notification templates and delivery policy", () => {
     // SMS unavailable too: outbound IVR is the last resort.
     process.env.SMS_PROVIDER = "twilio";
     vi.resetModules();
-    const mod2 = await import("@/lib/core/notifications");
+    const mod2 = await import("@server/core/notifications");
     const voice = await mod2.deliverWithFallback("sms", "+243810000001", "Titre", "Corps");
     expect(voice.ok).toBe(true);
     expect(voice.channelUsed).toBe("voice");

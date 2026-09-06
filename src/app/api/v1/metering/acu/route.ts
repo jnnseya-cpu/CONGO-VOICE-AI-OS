@@ -1,6 +1,6 @@
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { acuBreakdown, isDegradedMode, monthBounds, monthlyConsumption } from "@/lib/core/metering";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { acuBreakdown, isDegradedMode, monthBounds, monthlyConsumption } from "@server/core/metering";
 
 /**
  * ACU consumption and cost per interaction.

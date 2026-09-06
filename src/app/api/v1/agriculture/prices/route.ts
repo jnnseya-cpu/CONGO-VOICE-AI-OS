@@ -1,5 +1,5 @@
-import { handle, paging } from "@/lib/core/api";
-import { getPrices, priceFacets, renderPrices, resolveProvinceFilter } from "@/lib/ai/tools/market";
+import { handle, paging } from "@server/core/api";
+import { getPrices, priceFacets, renderPrices, resolveProvinceFilter } from "@server/ai/tools/market";
 
 /**
  * Market prices (FR-AG-07). Public reference data: every quote carries its market, unit,

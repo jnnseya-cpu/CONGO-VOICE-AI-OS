@@ -4,13 +4,13 @@ National voice-first AI infrastructure (health, agriculture, education) for the 
 
 ## Stack
 - Next.js 16 (App Router, `src/app`), React 19, Tailwind 4, TypeScript strict.
-- Drizzle ORM, PostgreSQL dialect. `DATABASE_URL` → node-postgres; otherwise embedded PGlite under `DATA_DIR/pglite` (in-memory in tests). Schema: `src/lib/db/schema.ts` (single source of truth). After changing it: `rm -rf drizzle && npx drizzle-kit generate --name init` (pre-release, one migration).
-- AI: `src/lib/ai/gateway.ts` is the ONLY place that knows vendors (Claude, Gemini, OpenAI, Google TTS, offline mock). Agents call `aiGateway().generateJson({ system, user, schema (zod), schemaName })`, `transcribe`, `synthesize`. Never import a provider elsewhere. Never expose provider names, prompts or keys to clients.
-- Every `/api/v1` route uses `handle({ permission | auth, limit }, async (ctx) => …)` from `src/lib/core/api.ts` (auth, RBAC, rate limit, logging, errors). Validate bodies with `ctx.json(zodSchema)`. Params via `ctx.params`.
-- Audit with `audit()` (`src/lib/core/audit.ts`); notify with `notify()` / `notifyRole()`; storage via `storeUpload()`.
-- Roles/permissions: `src/lib/core/rbac.ts`. Add permissions there, never inline role checks.
+- Drizzle ORM, PostgreSQL dialect. `DATABASE_URL` → node-postgres; otherwise embedded PGlite under `DATA_DIR/pglite` (in-memory in tests). Schema: `src/server/db/schema.ts` (single source of truth). After changing it: `rm -rf drizzle && npx drizzle-kit generate --name init` (pre-release, one migration).
+- AI: `src/server/ai/gateway.ts` is the ONLY place that knows vendors (Claude, Gemini, OpenAI, Google TTS, offline mock). Agents call `aiGateway().generateJson({ system, user, schema (zod), schemaName })`, `transcribe`, `synthesize`. Never import a provider elsewhere. Never expose provider names, prompts or keys to clients.
+- Every `/api/v1` route uses `handle({ permission | auth, limit }, async (ctx) => …)` from `src/server/core/api.ts` (auth, RBAC, rate limit, logging, errors). Validate bodies with `ctx.json(zodSchema)`. Params via `ctx.params`.
+- Audit with `audit()` (`src/server/core/audit.ts`); notify with `notify()` / `notifyRole()`; storage via `storeUpload()`.
+- Roles/permissions: `src/server/core/rbac.ts`. Add permissions there, never inline role checks.
 - Server-only modules start with `import "server-only"`; tests alias it to a stub (`vitest.config.ts`).
-- Citizen-facing text is French canonical first, then localised through the Language Agent (`localise()`); UI strings live in `src/lib/i18n`.
+- Citizen-facing text is French canonical first, then localised through the Language Agent (`localise()`); UI strings live in `src/server/i18n`.
 - Offline provider (`providers/mock.ts`) must keep the whole platform runnable with no API keys; all tests run offline.
 
 ## Commands

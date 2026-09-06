@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { confirmLearnerProfile, CONFIRMATION_QUESTIONS, describeProfile, getLearnerProfile } from "@/lib/ai/education/profile";
-import { LEVELS, LEVEL_LABELS, objectivesFor } from "@/lib/ai/education/curriculum";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { confirmLearnerProfile, CONFIRMATION_QUESTIONS, describeProfile, getLearnerProfile } from "@server/ai/education/profile";
+import { LEVELS, LEVEL_LABELS, objectivesFor } from "@server/ai/education/curriculum";
 
 const AGE_BANDS = ["6-8", "9-11", "12-14", "15-18", "adult"] as const;
 const LEVEL_VALUES = LEVELS as unknown as [string, ...string[]];

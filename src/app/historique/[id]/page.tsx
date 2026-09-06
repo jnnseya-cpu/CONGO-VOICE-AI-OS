@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/core/auth";
-import { hasPermission } from "@/lib/core/rbac";
-import { getDb, schema } from "@/lib/db/client";
+import { getSession } from "@server/core/auth";
+import { hasPermission } from "@server/core/rbac";
+import { getDb, schema } from "@server/db/client";
 import { PageHeader, Badge } from "@client/components/ui";
 import type { FinalAnswer } from "@shared/types";
 

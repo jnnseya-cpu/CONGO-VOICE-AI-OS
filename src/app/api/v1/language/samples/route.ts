@@ -1,6 +1,6 @@
-import { handle } from "@/lib/core/api";
-import { pendingSamples } from "@/lib/ai/agents/learning";
-import type { LanguageCode } from "@/lib/db/schema";
+import { handle } from "@server/core/api";
+import { pendingSamples } from "@server/ai/agents/learning";
+import type { LanguageCode } from "@server/db/schema";
 
 /** Review queue for native speakers: lowest-confidence and citizen-flagged samples first. */
 export const GET = handle({ permission: "language:review" }, async ({ req }) => ({

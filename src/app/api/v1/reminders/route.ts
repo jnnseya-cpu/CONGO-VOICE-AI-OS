@@ -1,10 +1,10 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { schema } from "@/lib/db/client";
-import { hasReminderConsent } from "@/lib/core/notifications";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { schema } from "@server/db/client";
+import { hasReminderConsent } from "@server/core/notifications";
 import {
   cancelReminders,
   scheduleAncReminders,
@@ -12,7 +12,7 @@ import {
   scheduleRevisionReminders,
   scheduleVaccinationReminders,
   upcomingReminders,
-} from "@/lib/core/scheduler";
+} from "@server/core/scheduler";
 
 /** A citizen's reminder subscriptions and what is coming next. */
 export const GET = handle({ auth: true }, async ({ db, user }) => {

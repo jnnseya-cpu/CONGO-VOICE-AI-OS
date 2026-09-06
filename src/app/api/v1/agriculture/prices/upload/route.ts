@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { badRequest } from "@/lib/core/errors";
-import { audit } from "@/lib/core/audit";
-import { insertPrices, parsePricesCsv } from "@/lib/ai/tools/market";
-import { PRICE_SOURCE } from "@/lib/db/reference/agriculture";
+import { handle } from "@server/core/api";
+import { badRequest } from "@server/core/errors";
+import { audit } from "@server/core/audit";
+import { insertPrices, parsePricesCsv } from "@server/ai/tools/market";
+import { PRICE_SOURCE } from "@server/db/reference/agriculture";
 
 const Body = z.object({ csv: z.string().min(10).max(2_000_000), source: z.string().max(160).optional(), dryRun: z.boolean().optional() });
 

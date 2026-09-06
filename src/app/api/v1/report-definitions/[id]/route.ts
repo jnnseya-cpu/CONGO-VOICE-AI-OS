@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle } from "@/lib/core/api";
-import { audit } from "@/lib/core/audit";
-import { notFound } from "@/lib/core/errors";
-import { schema } from "@/lib/db/client";
-import { generateReport, type ReportFormat, type ReportType } from "@/lib/reports";
+import { handle } from "@server/core/api";
+import { audit } from "@server/core/audit";
+import { notFound } from "@server/core/errors";
+import { schema } from "@server/db/client";
+import { generateReport, type ReportFormat, type ReportType } from "@server/reports";
 
 const Patch = z.object({
   name: z.string().min(2).max(160).optional(),

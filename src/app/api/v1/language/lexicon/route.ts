@@ -1,9 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handle, paging } from "@/lib/core/api";
-import { schema } from "@/lib/db/client";
-import { audit } from "@/lib/core/audit";
-import type { LanguageCode } from "@/lib/db/schema";
+import { handle, paging } from "@server/core/api";
+import { schema } from "@server/db/client";
+import { audit } from "@server/core/audit";
+import type { LanguageCode } from "@server/db/schema";
 
 export const GET = handle({ permission: "language:review" }, async ({ req, db }) => {
   const { limit, offset } = paging(req);
