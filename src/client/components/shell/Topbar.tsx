@@ -6,7 +6,7 @@ import type { SessionUser } from "@shared/types";
 import { useLanguage } from "./LanguageProvider";
 import { IconBell, IconLogout, IconMenu, IconMic, IconSearch, IconUser } from "../icons";
 
-export function Topbar({ user, unread, onMenu }: { user: SessionUser | null; unread: number; onMenu: () => void }) {
+export function Topbar({ user, unread, onMenu, healthy = true }: { user: SessionUser | null; unread: number; onMenu: () => void; healthy?: boolean }) {
   const { t } = useLanguage();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -28,8 +28,8 @@ export function Topbar({ user, unread, onMenu }: { user: SessionUser | null; unr
       </button>
       <h1 className="truncate text-[15px] font-semibold text-ink sm:text-[16.5px]">{t("welcome")}</h1>
       <div className="ml-auto hidden items-center gap-2 text-[13px] font-medium text-ink-2 md:flex">
-        <span className="live-dot" />
-        {t("systemOk")}
+        <span className={healthy ? "live-dot" : "h-2 w-2 rounded-full bg-warn"} />
+        {healthy ? t("systemOk") : "Service dégradé"}
       </div>
       <form
         onSubmit={(e) => {

@@ -42,5 +42,6 @@
     "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.0"
-  }
+  },
+  "description": "Plateforme nationale d'inclusion num\u00e9rique vocale en sant\u00e9, agriculture et \u00e9ducation \u2014 R\u00e9publique D\u00e9mocratique du Congo."
 }

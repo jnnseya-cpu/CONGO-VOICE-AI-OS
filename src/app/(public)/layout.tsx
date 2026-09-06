@@ -1,0 +1,37 @@
+import { PublicHeader } from "@client/components/public/PublicHeader";
+import { PublicFooter } from "@client/components/public/PublicFooter";
+import { SITE } from "@shared/site";
+
+/**
+ * Chrome for the public programme site: no session, no sidebar, indexable.
+ * A serif face is loaded here only, so the operating system itself stays on one font.
+ */
+export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "GovernmentService",
+    name: SITE.name,
+    alternateName: SITE.shortDescription,
+    description: SITE.description,
+    serviceType: "Information santé, agriculture et éducation par la voix",
+    areaServed: { "@type": "Country", name: SITE.country },
+    availableLanguage: SITE.languages.map((l) => l.label),
+    isAccessibleForFree: true,
+    provider: { "@type": "Organization", name: SITE.operator },
+    audience: { "@type": "Audience", audienceType: "Population rurale et péri-urbaine" },
+    url: SITE.url,
+  };
+  return (
+    <>
+      <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+      <div className="flex min-h-screen flex-col bg-bg">
+        <PublicHeader />
+        <main id="contenu" className="flex-1">
+          {children}
+        </main>
+        <PublicFooter year={new Date().getUTCFullYear()} />
+      </div>
+      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+    </>
+  );
+}

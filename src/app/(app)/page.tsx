@@ -12,6 +12,7 @@ import { RecentActivity, type ActivityItem } from "@client/components/home/Recen
 import { Insight } from "@client/components/home/Insight";
 import { HowItWorks } from "@client/components/home/HowItWorks";
 import { Footer } from "@client/components/home/Footer";
+import { PublicBand } from "@client/components/home/PublicBand";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,7 @@ export default async function HomePage() {
         <div className="space-y-4">
           <Hero photo={photo} />
           <ModuleCards stats={modules} />
+          {!session && <PublicBand />}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <RecentActivity items={items} now={now} href={institutional ? "/tableau-de-bord#activite" : "/historique"} />
             {institutional && insight ? <Insight insight={insight} /> : <HowItWorks />}
@@ -83,7 +85,7 @@ export default async function HomePage() {
           <QuickActions />
         </div>
       </div>
-      <Footer />
+      <Footer year={new Date(now).getUTCFullYear()} />
     </div>
   );
 }

@@ -9,7 +9,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-[560px] py-12">
+    <div className="mx-auto max-w-[560px] px-5 py-12">
       <section className="card p-7 text-center">
         <span className="icon-tile mx-auto h-12 w-12 bg-danger-soft text-danger">
           <IconAlert size={24} />

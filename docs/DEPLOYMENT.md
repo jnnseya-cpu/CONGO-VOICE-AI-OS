@@ -21,6 +21,10 @@ The embedded PGlite database and uploads live under `DATA_DIR`. Suitable for a s
 | Edge | Cloud Armor / WAF in front; HTTPS only; `Permissions-Policy` restricts microphone/camera to same origin |
 | Observability | Cloud Logging picks up structured logs; `/api/v1/system/health` for probes; request logs in `api_request_logs` |
 
+## 2b. Public site and search engines
+
+Set `NEXT_PUBLIC_SITE_URL` to the live origin (for example `https://congovoice.cd`). It drives the canonical links, `robots.txt`, `sitemap.xml` and the social preview image, and it flips the public pages from "address being activated" to live. `robots.txt` allows the public programme pages and disallows `/api`, `/cas`, `/admin`, `/tableau-de-bord`, `/historique`, `/messages`, `/notifications`, `/parametres`, `/rapports`, `/recherche`, `/langues`, `/ressources` and `/connexion`; keep that list in step with any new route that can display citizen data. Register the domain, then submit `${NEXT_PUBLIC_SITE_URL}/sitemap.xml` to the search engines used in the country.
+
 ## 3. AI providers
 Set any subset; routing order is configurable (`AI_LLM_ORDER`, `AI_VISION_ORDER`, `AI_STT_ORDER`, `AI_TTS_ORDER`). With none set the platform runs in offline rules mode (`AI_ALLOW_MOCK=true`), which is also the degraded mode when every provider fails. Provider names never reach clients.
 

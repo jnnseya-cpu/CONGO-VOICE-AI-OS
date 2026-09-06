@@ -27,10 +27,13 @@ npm run workflow:run                             # reminders, SLA sweep, blocked
 ## Repository layout
 
 ```
-src/app/              Next.js App Router: pages (frontend entry points) and /api/v1 route handlers (backend entry points)
-src/client/           Frontend: shell, home, voice console, dashboards, workspaces (React components)
-src/shared/           Shared contracts: types, i18n dictionaries (5 languages), formatters
-src/server/  (src/server during the stabilisation refactor)
+src/app/(public)/     Public programme site: programme, services, access, emergency, FAQ, languages,
+                      governance, funding, partners, privacy, accessibility, terms, contact
+src/app/(app)/        The operating system itself: home, voice consoles, dashboards, workspaces
+src/app/api/          Backend entry points: /api/v1 routes and the channel webhooks
+src/client/           Frontend components: public site, shell, home, voice console, dashboards
+src/shared/           Shared contracts: types, i18n dictionaries (5 languages), formatters, site identity
+src/server/            Backend: data, core services, AI, channels, reports
   db/                 Drizzle schema (single source of truth), embedded PGlite / PostgreSQL client, seed, reference data
   core/               auth, RBAC, API handler, audit chain, events, notifications, scheduler, metering, storage, privacy
   ai/                 gateway (Claude · Gemini · OpenAI · Google TTS · offline mock), agents, protocols, knowledge base, safety
@@ -41,6 +44,10 @@ drizzle/              Generated SQL migration
 docs/                 Master specification, architecture, API, deployment, languages, requirement brief
 tests/                Vitest suites (protocol coverage, red-flag recall, workflow, channels, metering, learning loop…)
 ```
+
+## Public site
+
+The programme has a public, indexable surface separate from the operating system: `/programme` (front door for ministries, donors and press), `/services`, `/acces` (how to reach the service by call, WhatsApp, USSD, SMS or web), `/urgence` (danger signs and what to do, in all five languages), `/aide`, `/langues-nationales`, `/gouvernance`, `/financement`, `/partenaires`, `/confidentialite`, `/accessibilite`, `/conditions` and `/contact`. Set `NEXT_PUBLIC_SITE_URL` so canonical links, the sitemap and the social preview point at the real domain. Public identity, access channels and contact routes live in one file, `src/shared/site.ts`.
 
 ## Documentation
 - `docs/MASTER_SPECIFICATION.md` — the complete developer-ready specification (vision, users, command centres, agents, modules, data model, APIs, security, funding model, roadmap) with the requirement → implementation map.

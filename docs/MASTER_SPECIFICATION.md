@@ -883,6 +883,28 @@ Covered in §12. `acu_ledger` + `ai_usage_logs`, the conversion table in `admin_
 
 `/recherche` — tenant- and role-filtered search across interactions and cases, module-scoped for field officers, `interaction:read_all` required for the national scope. `/ressources` — the approved knowledge base with authority, version, evidence grade and status, plus the protocol register. `/historique` and `/historique/[id]` — the citizen's own conversations with the full seven-part answer. **Implemented.**
 
+## 6.14 Public programme site
+
+A public, indexable surface separate from the operating system, in its own route group `src/app/(public)/` with its own chrome (`src/client/components/public/`). It exists because three audiences arrive without an account and must not land in an operations console: citizens who need to know how to reach the service without a smartphone, institutions assessing the programme, and press. Public identity, access channels and contact routes come from one file, `src/shared/site.ts`, so a number or an address can never drift between pages.
+
+| Page | Audience | Content of record |
+|------|----------|-------------------|
+| `/programme` | ministries, funders, press | The exclusion problem mapped to design constraints, the five layers, the citizen journey, live platform figures with their caveat, the three services, the non-goals, the staged roll-out behind language quality gates |
+| `/services` | all | What each module accepts and returns, the seven-part answer, what each refuses to do, which approved sources it cites, who receives the escalation |
+| `/acces` | citizens | One card per channel (voice call, WhatsApp, USSD, SMS, web, assisted desk), cost to the citizen, what each channel can carry, shared-phone confirmation, 24-hour resumption, opt-out keywords, and a per-language block on what to say to start |
+| `/urgence` | citizens | Danger signs by group, the conduct to follow immediately, the emergency message in all five languages taken from `EMERGENCY_MESSAGES`, and what the system does when it detects danger |
+| `/aide` | citizens | Frequently asked questions with `FAQPage` structured data generated from the same array |
+| `/langues-nationales` | all | Per-language coverage, the learning loop, the go-live quality gates and what happens when a language falls below them |
+| `/gouvernance` | institutions | The separation between deterministic safeguards and generative AI, grounding and citation rules, safeguarding, review boards, release process, provider policy, degraded modes, audit chain |
+| `/financement` | funders | Who pays for what, the ACU unit, budget caps and degraded mode, cost per completed outcome, exit and sovereignty commitments |
+| `/partenaires` | institutions | What each partner type brings and receives, onboarding, and the technical integration surface |
+| `/confidentialite` | all | Controller and processor, legal frame, data categories mapped to purpose, basis, retention and access, the implemented consent purposes, rights and how to exercise them |
+| `/accessibilite` | all | WCAG 2.2 AA target, what is done, what is not yet audited, non-web channel accessibility, how to report a barrier |
+| `/conditions` | all | What the service is and is not, acceptable use, responsibilities, corpus licence, applicable law |
+| `/contact` | all | The five e-mail routes and their purpose, the human route for citizens who cannot write, briefing requests, press kit and boilerplate, security disclosure |
+
+Supporting metadata is generated rather than hand-maintained: `src/app/robots.ts` allows the public surface and disallows every route that can hold citizen conversations, cases or institutional data; `src/app/sitemap.ts` is built from the same `PUBLIC_PAGES` array as the navigation and footer; `src/app/opengraph-image.tsx` and `twitter-image.tsx` render the social card; `GovernmentService` JSON-LD is emitted from the public layout. The home screen shows a public band to signed-out visitors linking to access, emergency and governance. `NEXT_PUBLIC_SITE_URL` sets the canonical origin; until it is configured the planned domain and e-mail routes are displayed as being activated rather than as reachable. **Implemented.**
+
 ---
 
 # 7. Institutional Billing and Disbursement Door
