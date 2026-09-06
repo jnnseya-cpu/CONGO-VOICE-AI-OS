@@ -11,6 +11,6 @@ export default defineConfig({
     fileParallelism: false,
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "src"), "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts") },
+    alias: { "@server": path.resolve(__dirname, "src/server"), "@shared": path.resolve(__dirname, "src/shared"), "@client": path.resolve(__dirname, "src/client"), "@": path.resolve(__dirname, "src"), "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts") },
   },
 });

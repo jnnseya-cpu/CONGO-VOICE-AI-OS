@@ -3,6 +3,8 @@
  */
 import "server-only";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { env } from "./env";
@@ -24,7 +26,23 @@ const globalSecret = globalThis as unknown as { __cvaiSecret?: string };
 function secret(): string {
   if (env.sessionSecret) return env.sessionSecret;
   if (env.isProd) throw new Error("SESSION_SECRET must be set in production");
-  return (globalSecret.__cvaiSecret ??= randomBytes(32).toString("hex"));
+  if (globalSecret.__cvaiSecret) return globalSecret.__cvaiSecret;
+  if (env.isTest) return (globalSecret.__cvaiSecret = "test-secret");
+  // Development: persist a generated secret so sessions survive server restarts.
+  const file = path.resolve(process.cwd(), env.dataDir, ".session-secret");
+  try {
+    globalSecret.__cvaiSecret = fs.readFileSync(file, "utf8").trim();
+  } catch {
+    const generated = randomBytes(32).toString("hex");
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, generated, { mode: 0o600 });
+    } catch {
+      /* read-only filesystem: fall back to an in-memory secret */
+    }
+    globalSecret.__cvaiSecret = generated;
+  }
+  return globalSecret.__cvaiSecret;
 }
 
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64url");

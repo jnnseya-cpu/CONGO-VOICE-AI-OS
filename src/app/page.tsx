@@ -1,69 +1,84 @@
-import Image from "next/image";
+import fs from "node:fs";
+import path from "node:path";
+import { getSession } from "@/lib/core/auth";
+import { hasPermission } from "@/lib/core/rbac";
+import { commandStats, importantAlerts, insightOfTheDay, recentActivity } from "@/lib/ai/agents/reporting";
+import { Hero } from "@client/components/home/Hero";
+import { ModuleCards } from "@client/components/home/ModuleCards";
+import { LiveActivity } from "@client/components/home/LiveActivity";
+import { Alerts } from "@client/components/home/Alerts";
+import { QuickActions } from "@client/components/home/QuickActions";
+import { RecentActivity, type ActivityItem } from "@client/components/home/RecentActivity";
+import { Insight } from "@client/components/home/Insight";
+import { HowItWorks } from "@client/components/home/HowItWorks";
+import { Footer } from "@client/components/home/Footer";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+const WHO: Record<string, string> = { health: "un utilisateur", agriculture: "un agriculteur", education: "un élève", general: "un citoyen" };
+const PREFIX: Record<string, string> = { health: "Consultation santé", agriculture: "Question agricole", education: "Session d'apprentissage", general: "Demande" };
+
+function activityTitle(a: { module: string; channel: string; understanding: string | null; summary: string | null; intent: string | null; escalated: boolean }): string {
+  const body = (a.understanding ?? a.summary ?? a.intent ?? "").replace(/^\[[^\]]+\]\s*/, "").replace(/^(La personne signale|Le producteur décrit|L'apprenant demande|Demande générale)\s*:\s*/i, "").trim();
+  const short = body.length > 70 ? body.slice(0, 67).replace(/\s+\S*$/, "") + "…" : body;
+  if (a.escalated) return `Cas escaladé : ${short}`;
+  if (a.channel === "image") return `Photo reçue : ${short}`;
+  return `${PREFIX[a.module] ?? "Demande"} : ${short}`;
+}
+
+export default async function HomePage() {
+  const session = await getSession();
+  const institutional = !!session && hasPermission(session.role, "case:read");
+  const now = Date.now();
+  const photo = fs.existsSync(path.join(process.cwd(), "public", "hero", "congo-river.jpg"));
+
+  const [stats, activity, alerts, insight] = await Promise.all([
+    commandStats().catch(() => null),
+    recentActivity(5).catch(() => []),
+    institutional ? importantAlerts(4).catch(() => []) : Promise.resolve([]),
+    institutional ? insightOfTheDay().catch(() => null) : Promise.resolve(null),
+  ]);
+
+  const live = {
+    activeUsersToday: stats?.activeUsersToday ?? { value: 0, deltaPct: null },
+    voiceInteractionsToday: stats?.voiceInteractionsToday ?? { value: 0, deltaPct: null },
+    casesNeedingFollowUp: stats?.casesNeedingFollowUp ?? { value: 0, deltaPct: null },
+    criticalAlerts: stats?.criticalAlerts ?? { value: 0, deltaPct: null },
+  };
+  const modules = {
+    health: { today: stats?.modules.health.today ?? 0, urgent: stats?.modules.health.urgent ?? 0 },
+    agriculture: { today: stats?.modules.agriculture.today ?? 0, alerts: stats?.modules.agriculture.alerts ?? 0 },
+    education: { today: stats?.modules.education.today ?? 0, topics: stats?.modules.education.topics ?? 0 },
+  };
+  const items: ActivityItem[] = activity.map((a) => ({
+    id: a.id,
+    module: a.module,
+    channel: a.channel,
+    title: activityTitle(a),
+    who: a.escalated ? "un agent de santé" : WHO[a.module] ?? "un citoyen",
+    province: a.province,
+    escalated: a.escalated,
+    createdAt: a.createdAt.toISOString(),
+  }));
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="mx-auto max-w-[1320px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_336px]">
+        <div className="space-y-4">
+          <Hero photo={photo} />
+          <ModuleCards stats={modules} />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+            <RecentActivity items={items} now={now} href={institutional ? "/tableau-de-bord#activite" : "/historique"} />
+            {institutional && insight ? <Insight insight={insight} /> : <HowItWorks />}
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="space-y-4">
+          <LiveActivity stats={live} canOpenDashboard={institutional} />
+          {institutional ? <Alerts alerts={alerts.map((a) => ({ ...a, at: a.at.toISOString() }))} now={now} /> : null}
+          <QuickActions />
         </div>
-      </main>
+      </div>
+      <Footer />
     </div>
   );
 }
