@@ -7,7 +7,7 @@ import { IconChart, IconDownload, IconGlobe, IconMessage, IconMic, IconUsers, Ic
 export const metadata: Metadata = {
   title: "Financement et transparence",
   description:
-    "Qui paie ce service public gratuit, ce qui est payé, comment la consommation d'IA est mesurée en unités auditables, quels plafonds protègent le budget et quels engagements de sortie sont pris.",
+    "Qui paie ce service gratuit pour le citoyen, ce qui est payé, comment la consommation d'IA est mesurée et plafonnée, et quels engagements de sortie sont pris.",
   alternates: { canonical: "/financement" },
   openGraph: {
     title: "Financement et transparence — CONGO VOICE AI OS",

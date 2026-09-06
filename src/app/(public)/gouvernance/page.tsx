@@ -7,7 +7,7 @@ import { IconAlert, IconCheck, IconFile, IconShield, IconSparkle, IconUsers } fr
 export const metadata: Metadata = {
   title: "Sécurité et gouvernance",
   description:
-    "Comment les décisions de sécurité sont prises : règles déterministes versionnées, gravité décidée hors du modèle, sources approuvées obligatoires, supervision humaine et journal d'audit.",
+    "Règles déterministes versionnées, gravité décidée hors du modèle, sources approuvées obligatoires, supervision humaine, comités de revue et journal d'audit vérifié.",
   alternates: { canonical: "/gouvernance" },
   openGraph: {
     title: "Sécurité et gouvernance — CONGO VOICE AI OS",

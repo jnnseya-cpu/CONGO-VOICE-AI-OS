@@ -7,7 +7,7 @@ import { IconAlert, IconBook, IconGraduation, IconHeart, IconLeaf, IconShield, I
 export const metadata: Metadata = {
   title: "Les services",
   description:
-    "Santé, agriculture et éducation : ce que vous pouvez demander dans votre langue, ce que le service répond, ce qu'il refuse de faire, les sources qu'il cite et qui reçoit l'alerte.",
+    "Santé, agriculture et éducation : ce que vous pouvez demander dans votre langue, ce que le service répond, ce qu'il refuse de faire et qui reçoit l'alerte.",
   alternates: { canonical: "/services" },
   openGraph: {
     title: "Les services — CONGO VOICE AI OS",
@@ -28,11 +28,11 @@ const ANSWER_PARTS: Array<[string, string]> = [
 ];
 
 const SEVERITY: Array<[string, string, string, string]> = [
-  ["0", "Soins à la maison", "Pas de déplacement nécessaire", "Repos, boisson, alimentation normale, surveillance"],
-  ["1", "Surveiller à la maison", "Revoir sous 72 heures si rien ne change", "Signalement au relais communautaire si un signe apparaît"],
-  ["2", "Centre de santé sous 24 heures", "Dans les 24 heures", "Consultation au centre de santé"],
-  ["3", "Centre de santé aujourd'hui", "Le jour même", "Consultation au centre de santé le jour même"],
-  ["4", "Urgence, partir maintenant", "Immédiatement", "Référence en urgence, relais communautaire alerté"],
+  ["0", "Soins à la maison", "Aucun déplacement nécessaire", "À la maison : repos, eau propre en petites quantités, alimentation normale"],
+  ["1", "Surveiller à la maison", "Sous 72 heures si rien ne change", "Relais communautaire ; rappel de suivi au bout de 3 jours"],
+  ["2", "Centre de santé sous 24 heures", "Dans les 24 heures", "Centre de santé ; rappel de suivi au bout de 24 heures"],
+  ["3", "Centre de santé aujourd'hui", "Le jour même", "Centre de santé ; rappel de suivi au bout de 6 heures"],
+  ["4", "Urgence, partir maintenant", "Immédiatement", "Référence en urgence, relais communautaire alerté ; rappel au bout de 2 heures"],
 ];
 
 const PROTOCOLS: Array<[string, string]> = [
@@ -536,6 +536,24 @@ export default function ServicesPage() {
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section tone="white">
+        <Note>
+          Ces trois services sont les premiers ouverts, parce que ce sont ceux où l&apos;appui change le plus la vie d&apos;un ménage. L&apos;ouverture d&apos;autres domaines n&apos;est pas encore décidée. Pour comprendre pourquoi le programme existe et comment il se déploie, voir{" "}
+          <Link href="/programme" className="link">
+            le programme
+          </Link>
+          . Pour savoir dans quelle langue vous serez le mieux compris, voir{" "}
+          <Link href="/langues-nationales" className="link">
+            nos langues
+          </Link>
+          . Pour présenter le service à une institution, voir{" "}
+          <Link href="/contact" className="link">
+            contact et presse
+          </Link>
+          .
+        </Note>
       </Section>
 
       <CtaBand

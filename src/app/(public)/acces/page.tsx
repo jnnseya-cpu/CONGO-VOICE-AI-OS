@@ -9,7 +9,7 @@ import { IconAlert, IconClock, IconGlobe, IconGrid, IconMessage, IconMic, IconPh
 export const metadata: Metadata = {
   title: "Comment y accéder",
   description:
-    "Six façons de joindre le service : appel vocal, WhatsApp, USSD, SMS, application web et guichet assisté. Ce qu'il faut faire, ce que cela coûte, et comment arrêter les messages.",
+    "Six façons de joindre le service : appel vocal, WhatsApp, USSD, SMS, application web et guichet assisté. Ce qu'il faut faire, ce que cela coûte, comment arrêter.",
   alternates: { canonical: "/acces" },
   openGraph: {
     title: "Comment y accéder — CONGO VOICE AI OS",
@@ -253,6 +253,27 @@ export default function AccesPage() {
             },
           ]}
         />
+      </Section>
+
+      <Section eyebrow="Ce que vous recevez" title="À quoi ressemble une réponse" lead="Quel que soit le canal, une réponse a toujours la même forme. Sur un canal court — SMS, USSD, appel — elle est raccourcie, mais l'ordre ne change pas.">
+        <Cards cols={3}>
+          <InfoCard title="Ce qui a été compris" icon={<IconMic size={22} />}>
+            Le service redit votre situation en une phrase, dans votre langue. C&apos;est le moment de le corriger s&apos;il s&apos;est trompé&nbsp;: dites simplement «&nbsp;ce n&apos;est pas ça&nbsp;».
+          </InfoCard>
+          <InfoCard title="Ce qu'il faut faire" tone="health" icon={<IconAlert size={22} />}>
+            Le niveau de risque, puis l&apos;action&nbsp;: où aller, dans quel délai, quels gestes faire en attendant, et ce qu&apos;il ne faut surtout pas faire.
+          </InfoCard>
+          <InfoCard title="Qui est prévenu, et à quel point c'est sûr" icon={<IconUsers size={22} />}>
+            Si un humain doit intervenir, le service le nomme. Il donne aussi son degré de certitude&nbsp;: sous le seuil, il dit qu&apos;il n&apos;est pas sûr plutôt que de trancher.
+          </InfoCard>
+        </Cards>
+        <Note>
+          Le détail de ce que chaque service fait et refuse de faire est décrit dans{" "}
+          <Link href="/services" className="link">
+            les services
+          </Link>
+          .
+        </Note>
       </Section>
 
       <Section eyebrow="Arrêter, reprendre, corriger" title="Vous gardez la main">

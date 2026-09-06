@@ -7,7 +7,7 @@ import { IconBook, IconBriefcase, IconGlobe, IconGraduation, IconHeart, IconLang
 export const metadata: Metadata = {
   title: "Partenaires et intégration",
   description:
-    "Ce qu'apportent et ce que reçoivent les ministères, divisions provinciales, ONG, bailleurs, opérateurs mobiles, écoles, centres d'appel, universités et intégrateurs techniques du programme.",
+    "Ce qu'apportent et ce que reçoivent ministères, ONG, bailleurs, opérateurs, écoles, universités et intégrateurs, et comment une organisation est intégrée.",
   alternates: { canonical: "/partenaires" },
   openGraph: {
     title: "Partenaires et intégration — CONGO VOICE AI OS",
