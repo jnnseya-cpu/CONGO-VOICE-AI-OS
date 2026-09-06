@@ -4,7 +4,7 @@ import { handle } from "@/lib/core/api";
 import { forbidden, notFound } from "@/lib/core/errors";
 import { moduleScopeFor } from "@/lib/core/rbac";
 import { schema } from "@/lib/db/client";
-import { addCaseNote, assignCase, transitionCase } from "@/lib/ai/agents/workflow";
+import { FOLLOW_UP_DECISIONS, REACHABILITY_VALUES, addCaseNote, assignCase, transitionCase } from "@/lib/ai/agents/workflow";
 
 async function loadScoped(db: Parameters<Parameters<typeof handle>[1]>[0]["db"], id: string, role: Parameters<typeof moduleScopeFor>[0]) {
   const [c] = await db.select().from(schema.cases).where(eq(schema.cases.id, id));
@@ -31,20 +31,51 @@ export const GET = handle<{ id: string }>({ permission: "case:read" }, async ({ 
 });
 
 const Patch = z.object({
-  status: z.enum(["open", "assigned", "in_progress", "escalated", "resolved", "closed"]).optional(),
+  status: z
+    .enum([
+      "open",
+      "open_emergency",
+      "assigned",
+      "acknowledged",
+      "in_progress",
+      "needs_follow_up",
+      "reassigned",
+      "escalated",
+      "escalated_up",
+      "resolved",
+      "closed",
+      "cancelled",
+      "duplicate",
+    ])
+    .optional(),
   assignTo: z.string().uuid().optional(),
   note: z.string().max(4000).optional(),
+  reason: z.string().max(2000).optional(),
   outcome: z.string().max(120).optional(),
   followUpDate: z.string().datetime().optional(),
+  /** Closure quality data (CAS-006): all four are required to close a case. */
+  actionTaken: z.string().max(4000).optional(),
+  citizenReachability: z.enum(REACHABILITY_VALUES).optional(),
+  followUpDecision: z.enum(FOLLOW_UP_DECISIONS).optional(),
+  expectedVersion: z.number().int().optional(),
 });
 
 export const PATCH = handle<{ id: string }>({ permission: "case:write" }, async ({ db, user, params, json }) => {
   const body = await json(Patch);
   let c = await loadScoped(db, params.id, user.role);
   const actor = { userId: user.userId, role: user.role };
-  if (body.assignTo) c = (await assignCase(c.id, body.assignTo, actor)) ?? c;
+  if (body.assignTo) c = (await assignCase(c.id, body.assignTo, actor, { reason: body.reason, expectedVersion: body.expectedVersion })) ?? c;
   if (body.note && !body.status) await addCaseNote(c.id, actor, body.note);
-  if (body.status) c = (await transitionCase(c.id, body.status, actor, body.note)) ?? c;
+  if (body.status) {
+    c =
+      (await transitionCase(c.id, body.status, actor, body.note, {
+        reason: body.reason,
+        outcome: body.outcome,
+        actionTaken: body.actionTaken,
+        citizenReachability: body.citizenReachability,
+        followUpDecision: body.followUpDecision,
+      })) ?? c;
+  }
   if (body.outcome || body.followUpDate) {
     [c] = await db.update(schema.cases).set({ outcome: body.outcome ?? c.outcome, followUpDate: body.followUpDate ? new Date(body.followUpDate) : c.followUpDate, updatedAt: new Date() }).where(eq(schema.cases.id, c.id)).returning();
   }

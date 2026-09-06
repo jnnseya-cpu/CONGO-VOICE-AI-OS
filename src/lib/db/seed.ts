@@ -11,18 +11,57 @@ import { getDb, schema } from "./client";
 import { hashPin } from "@/lib/core/auth";
 import { runInteraction } from "@/lib/ai/agents/orchestrator";
 import { reviewSample } from "@/lib/ai/agents/learning";
+import { seedReferenceData } from "./reference";
+import { PILOT_PROVINCES, territoriesOf } from "./reference/geography";
+import { queueNameFor, slaDueFor, SEVERITY_TO_LEVEL } from "@/lib/ai/agents/workflow";
+import { ACU_CONFIG_KEY, DEFAULT_ACU_CONVERSION } from "@/lib/core/metering";
 import type { LanguageCode, ModuleType, Role } from "./schema";
 
 export const DEMO_PIN = "1234";
 
-export const DEMO_ACCOUNTS: Array<{ phone: string; name: string; role: Role; language: LanguageCode; province: string; organisation?: string }> = [
-  { phone: "+243900000001", name: "Admin Congo Voice", role: "platform_admin", language: "fr", province: "Kinshasa", organisation: "CONGO VOICE AI OS" },
-  { phone: "+243900000002", name: "Direction Programme National", role: "gov_admin", language: "fr", province: "Kinshasa", organisation: "Ministère du Numérique" },
-  { phone: "+243900000003", name: "Marie Kabongo", role: "chw", language: "ln", province: "Kinshasa", organisation: "Zone de santé de Kimbanseke" },
-  { phone: "+243900000004", name: "Jean-Pierre Mbala", role: "agri_officer", language: "kg", province: "Kongo-Central", organisation: "Inspection agricole Kwilu" },
-  { phone: "+243900000005", name: "Esther Tshibanda", role: "teacher", language: "lua", province: "Kasaï-Oriental", organisation: "École primaire Dibindi" },
-  { phone: "+243900000006", name: "Partenaire ONG", role: "ngo", language: "fr", province: "Tshopo", organisation: "ONG Santé pour tous" },
-  { phone: "+243900000007", name: "Dr Amani Bahati", role: "chw", language: "sw", province: "Nord-Kivu", organisation: "Zone de santé de Goma" },
+export const DEMO_ACCOUNTS: Array<{
+  phone: string;
+  name: string;
+  role: Role;
+  language: LanguageCode;
+  province: string;
+  organisation?: string;
+  /** Territories the worker covers — the first routing tier (FR-CS-02). */
+  territories?: string[];
+  territory?: string;
+  onDuty?: boolean;
+  /** Organisation key used to attach the account to a seeded organisation. */
+  org?: string;
+}> = [
+  { phone: "+243900000001", name: "Admin Congo Voice", role: "platform_admin", language: "fr", province: "Kinshasa", organisation: "CONGO VOICE AI OS", org: "platform", territory: "Gombe", territories: ["Gombe"] },
+  { phone: "+243900000002", name: "Direction Programme National", role: "gov_admin", language: "fr", province: "Kinshasa", organisation: "Ministère du Numérique", org: "ministry_digital", territory: "Gombe", territories: ["Gombe"] },
+  { phone: "+243900000003", name: "Marie Kabongo", role: "chw", language: "ln", province: "Kinshasa", organisation: "Zone de santé de Kimbanseke", org: "hz_kimbanseke", territory: "Kimbanseke", territories: ["Kimbanseke", "Masina"], onDuty: true },
+  { phone: "+243900000004", name: "Jean-Pierre Mbala", role: "agri_officer", language: "kg", province: "Kongo-Central", organisation: "Inspection agricole Kongo-Central", org: "agri_kongo_central", territory: "Mbanza-Ngungu", territories: ["Mbanza-Ngungu", "Songololo", "Kasangulu"], onDuty: true },
+  { phone: "+243900000005", name: "Esther Tshibanda", role: "teacher", language: "lua", province: "Kasaï-Oriental", organisation: "École primaire Dibindi", org: "school_dibindi", territory: "Mbuji-Mayi", territories: ["Mbuji-Mayi", "Tshilenge"], onDuty: true },
+  { phone: "+243900000006", name: "Partenaire ONG", role: "ngo", language: "fr", province: "Tshopo", organisation: "ONG Santé pour tous", org: "ngo_sante_pour_tous", territory: "Kisangani", territories: ["Kisangani", "Isangi"] },
+  { phone: "+243900000007", name: "Dr Amani Bahati", role: "chw", language: "sw", province: "Nord-Kivu", organisation: "Zone de santé de Goma", org: "hz_goma", territory: "Goma", territories: ["Goma", "Nyiragongo"], onDuty: true },
+  { phone: "+243900000008", name: "Pascal Ilunga", role: "chw", language: "sw", province: "Haut-Katanga", organisation: "Zone de santé de Lubumbashi", org: "hz_lubumbashi", territory: "Lubumbashi", territories: ["Lubumbashi", "Kipushi"], onDuty: false },
+];
+
+/** One national tenant; organisations are the operational units under it. */
+export const DEMO_TENANT = {
+  name: "Programme national CONGO VOICE AI OS",
+  type: "national",
+  legalName: "République Démocratique du Congo — Programme national d'IA vocale",
+  /** Monthly ACU allowance; beyond it, non-emergency answers degrade to scripted mode. */
+  acuMonthlyCap: 250_000,
+};
+
+export const DEMO_ORGANISATIONS: Array<{ key: string; name: string; type: string; provinceScope: string[]; territoryScope?: string[]; routingSkills?: string[] }> = [
+  { key: "platform", name: "CONGO VOICE AI OS — Plateforme", type: "platform", provinceScope: [] },
+  { key: "ministry_digital", name: "Ministère du Numérique", type: "ministry", provinceScope: [] },
+  { key: "ministry_health", name: "Ministère de la Santé — Direction des soins de santé primaires", type: "ministry", provinceScope: [], routingSkills: ["health"] },
+  { key: "hz_kimbanseke", name: "Zone de santé de Kimbanseke", type: "clinic_network", provinceScope: ["Kinshasa"], territoryScope: ["Kimbanseke", "Masina"], routingSkills: ["health"] },
+  { key: "hz_goma", name: "Zone de santé de Goma", type: "clinic_network", provinceScope: ["Nord-Kivu"], territoryScope: ["Goma", "Nyiragongo"], routingSkills: ["health"] },
+  { key: "hz_lubumbashi", name: "Zone de santé de Lubumbashi", type: "clinic_network", provinceScope: ["Haut-Katanga"], territoryScope: ["Lubumbashi", "Kipushi"], routingSkills: ["health"] },
+  { key: "agri_kongo_central", name: "Inspection agricole du Kongo-Central", type: "extension_service", provinceScope: ["Kongo-Central"], territoryScope: ["Mbanza-Ngungu", "Songololo", "Kasangulu"], routingSkills: ["agriculture"] },
+  { key: "school_dibindi", name: "Sous-division EPST Mbuji-Mayi", type: "school_cluster", provinceScope: ["Kasaï-Oriental"], territoryScope: ["Mbuji-Mayi", "Tshilenge"], routingSkills: ["education"] },
+  { key: "ngo_sante_pour_tous", name: "ONG Santé pour tous", type: "ngo", provinceScope: ["Tshopo"], territoryScope: ["Kisangani", "Isangi"], routingSkills: ["health", "education"] },
 ];
 
 const PROVINCES = ["Kinshasa", "Kongo-Central", "Kwilu", "Kasaï", "Kasaï-Oriental", "Tshopo", "Maï-Ndombe", "Équateur", "Nord-Kivu", "Haut-Katanga", "Tanganyika", "Ituri"];
@@ -62,23 +101,79 @@ const SAMPLES: Array<{ text: string; module: ModuleType; language: LanguageCode;
 export async function seed(options: { interactions?: number; log?: (m: string) => void } = {}) {
   const log = options.log ?? (() => {});
   const db = await getDb();
+
+  // Reference data is not demo data: it is loaded on every environment, every time.
+  await seedReferenceData(log);
+  await db
+    .insert(schema.adminConfig)
+    .values({ key: ACU_CONFIG_KEY, value: DEFAULT_ACU_CONVERSION })
+    .onConflictDoNothing();
+
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.users);
   if (n > 0) {
     log("Base déjà initialisée, seed ignoré.");
     return { seeded: false };
   }
 
-  for (const a of DEMO_ACCOUNTS) {
-    await db.insert(schema.users).values({ phone: a.phone, pinHash: hashPin(DEMO_PIN), name: a.name, role: a.role, languagePreference: a.language, province: a.province, organisation: a.organisation, consentStatus: "granted" });
+  // One national tenant and its organisations.
+  const [tenant] = await db.insert(schema.tenants).values(DEMO_TENANT).returning();
+  const orgIds = new Map<string, string>();
+  for (const o of DEMO_ORGANISATIONS) {
+    const [row] = await db
+      .insert(schema.organisations)
+      .values({
+        tenantId: tenant.id,
+        name: o.name,
+        type: o.type,
+        provinceScope: o.provinceScope,
+        territoryScope: o.territoryScope ?? [],
+        routingSkills: o.routingSkills ?? [],
+      })
+      .returning();
+    orgIds.set(o.key, row.id);
   }
-  log(`${DEMO_ACCOUNTS.length} comptes créés (PIN ${DEMO_PIN}).`);
+  log(`Tenant national « ${tenant.name} » et ${DEMO_ORGANISATIONS.length} organisations créés.`);
+
+  for (const a of DEMO_ACCOUNTS) {
+    await db.insert(schema.users).values({
+      phone: a.phone,
+      pinHash: hashPin(DEMO_PIN),
+      name: a.name,
+      role: a.role,
+      languagePreference: a.language,
+      province: a.province,
+      territory: a.territory ?? null,
+      territories: a.territories ?? (a.territory ? [a.territory] : []),
+      onDuty: a.onDuty ?? true,
+      organisation: a.organisation,
+      organisationId: a.org ? (orgIds.get(a.org) ?? null) : null,
+      tenantId: tenant.id,
+      consentStatus: "granted",
+    });
+  }
+  log(`${DEMO_ACCOUNTS.length} comptes créés (PIN ${DEMO_PIN}), territoires et tours de garde inclus.`);
 
   const citizens: Array<{ id: string; language: LanguageCode; province: string }> = [];
   for (let i = 0; i < 24; i++) {
     const language = (["fr", "ln", "sw", "kg", "lua"] as LanguageCode[])[i % 5];
     const province = PROVINCES[i % PROVINCES.length];
-    const [u] = await db.insert(schema.users).values({ isAnonymous: true, role: "citizen", languagePreference: language, province, consentStatus: "granted" }).returning();
+    const territories = territoriesOf(province);
+    const territory = territories.length ? territories[i % territories.length] : null;
+    const [u] = await db
+      .insert(schema.users)
+      .values({ isAnonymous: true, role: "citizen", languagePreference: language, province, territory, tenantId: tenant.id, consentStatus: "granted" })
+      .returning();
     citizens.push({ id: u.id, language, province });
+    // Two citizens in three opt in to reminders; the rest exercise the consent gate.
+    await db.insert(schema.consents).values({
+      userId: u.id,
+      purpose: "reminders",
+      status: i % 3 === 2 ? "revoked" : "granted",
+      version: "1.0",
+      method: i % 2 === 0 ? "voice" : "button",
+      language,
+    });
+    await db.insert(schema.consents).values({ userId: u.id, purpose: "service", status: "granted", version: "1.0", method: "voice", language });
   }
 
   const total = options.interactions ?? 90;
@@ -115,5 +210,28 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
     { language: "lua", term: "kabeela", meaningFr: "fièvre", domain: "health", verified: true },
   ]);
   log("Lexique initial ajouté.");
-  return { seeded: true };
+
+  // Operations backfill: every case gets a queue, an SLA clock and a severity level so the
+  // workflow, the queue board and the SLA sweep have realistic data from the first minute.
+  const allCases = await db.select().from(schema.cases);
+  for (const c of allCases) {
+    const severityLevel = c.severityLevel ?? SEVERITY_TO_LEVEL[c.severity];
+    const territories = territoriesOf(c.province ?? "");
+    const territory = c.territory ?? (territories.length ? territories[0] : null);
+    await db
+      .update(schema.cases)
+      .set({
+        tenantId: tenant.id,
+        territory,
+        queue: queueNameFor({ module: c.module, province: c.province, territory }),
+        severityLevel,
+        aiSeverityLevel: c.aiSeverityLevel ?? severityLevel,
+        slaDueAt: c.acknowledgedAt ? null : slaDueFor(severityLevel, c.createdAt),
+      })
+      .where(eq(schema.cases.id, c.id));
+  }
+  log(`${allCases.length} cas complétés (file, horloge SLA, niveau de gravité).`);
+  log(`Provinces pilotes : ${PILOT_PROVINCES.join(", ")}.`);
+
+  return { seeded: true, tenantId: tenant.id, cases: allCases.length };
 }

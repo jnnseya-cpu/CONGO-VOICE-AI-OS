@@ -53,6 +53,8 @@ function order(envName: string, fallback: string[]): string[] {
 
 export interface CallMeta {
   interactionId?: string | null;
+  /** Scripted / degraded mode: only the offline rules provider is used (ACU cap, provider outage policy). */
+  scripted?: boolean;
 }
 
 export class AiGateway {
@@ -118,6 +120,21 @@ export class AiGateway {
     durationMs: number;
     success: boolean;
   }) {
+    // ACU metering: every AI call is normalised into billable units and attributed to a
+    // tenant. This is the single funnel for AI usage, so it is the only correct hook point.
+    if (input.success) {
+      const { recordAcu } = await import("@/lib/core/metering");
+      await recordAcu({
+        task: input.capability,
+        model: input.model,
+        providerKey: input.providerKey,
+        interactionId: input.interactionId ?? null,
+        inputTokens: input.inputTokens,
+        outputTokens: input.outputTokens,
+        audioSeconds: input.audioSeconds,
+        images: input.capability === "vision" ? 1 : undefined,
+      });
+    }
     if (env.isTest) return;
     try {
       const rate = COST_PER_MTOK[input.model ?? ""] ?? { in: 0, out: 0 };
@@ -143,7 +160,8 @@ export class AiGateway {
   async generateJson<T>(req: LlmJsonRequest<T>, meta: CallMeta = {}): Promise<LlmJsonResult<T> & { providerKey: string }> {
     await this.ready;
     const hasImages = (req.images ?? []).length > 0;
-    const chain = (hasImages ? this.visionOrder : this.llmOrder)
+    const order = meta.scripted ? ["mock"] : hasImages ? this.visionOrder : this.llmOrder;
+    const chain = order
       .map((k) => this.registry.llm.get(k))
       .filter((p): p is LlmProvider => !!p && (!hasImages || p.supportsVision));
     if (chain.length === 0) throw new Error("No AI language provider configured");

@@ -10,7 +10,7 @@ export const GET = handle({ permission: "case:read" }, async ({ req, db, user })
   const { limit, offset } = paging(req);
   const q = req.nextUrl.searchParams;
   const status = q.get("status") as CaseStatus | null;
-  const module = q.get("module") as ModuleType | null;
+  const moduleFilter = q.get("module") as ModuleType | null;
   const scope = moduleScopeFor(user.role);
   const rows = await db
     .select()
@@ -18,7 +18,7 @@ export const GET = handle({ permission: "case:read" }, async ({ req, db, user })
     .where(
       and(
         scope ? inArray(schema.cases.module, scope) : undefined,
-        module ? eq(schema.cases.module, module) : undefined,
+        moduleFilter ? eq(schema.cases.module, moduleFilter) : undefined,
         status ? eq(schema.cases.status, status) : status === null && q.get("all") !== "1" ? inArray(schema.cases.status, ["open", "assigned", "in_progress", "escalated"]) : undefined,
         q.get("mine") === "1" ? eq(schema.cases.assignedTo, user.userId) : undefined,
       ),

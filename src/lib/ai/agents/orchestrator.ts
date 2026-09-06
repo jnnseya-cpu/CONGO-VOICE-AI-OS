@@ -23,7 +23,8 @@ import { assessHealth, attachSafeguardingCase, type HealthTriageResult } from ".
 import { assessAgriculture } from "./agriculture";
 import { assessEducation } from "./education";
 import { scoreRisk } from "./risk";
-import { openCase } from "./workflow";
+import { openCase, shouldAutoCreateCase } from "./workflow";
+import { isDegradedMode } from "@/lib/core/metering";
 import { getProfileContext, rememberLanguage } from "./personalisation";
 import { recordSample, retrieveLearningContext } from "./learning";
 import { DISCLAIMERS, EMERGENCY_MESSAGES } from "../safety";
@@ -93,6 +94,10 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     })
     .returning();
   const interactionId = row.id;
+  // ACU cap / degraded policy: non-emergency AI falls back to scripted (offline rules) mode; safeguards never switch off.
+  const tenantId = userId ? ((await db.select({ tenantId: schema.users.tenantId }).from(schema.users).where(eq(schema.users.id, userId)))[0]?.tenantId ?? null) : null;
+  const scripted = await isDegradedMode(tenantId).catch(() => false);
+  const meta = { interactionId, scripted };
   const save = (patch: Partial<typeof schema.interactions.$inferInsert>) =>
     db.update(schema.interactions).set({ ...patch, updatedAt: new Date() }).where(eq(schema.interactions.id, interactionId));
 
@@ -153,7 +158,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     else if (service === "agriculture") agriculture = await assessAgriculture(textFr, { province, history: profile?.historyText }, images, interactionId);
     else if (service === "education") education = await assessEducation(textFr, { province, history: profile?.historyText }, interactionId);
     else {
-      const r = await aiGateway().generateJson({ system: GENERAL_AGENT_SYSTEM, user: messageEnvelope(textFr, { province }), schema: GeneralSchema, schemaName: "general_assessment", maxTokens: 800 }, { interactionId });
+      const r = await aiGateway().generateJson({ system: GENERAL_AGENT_SYSTEM, user: messageEnvelope(textFr, { province }), schema: GeneralSchema, schemaName: "general_assessment", maxTokens: 800 }, meta);
       general = r.output;
     }
 
@@ -250,7 +255,15 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
     // 9. Workflow: open and escalate a case when required.
     let caseId: string | null = null;
-    if (risk.escalationRequired || risk.level === "high" || risk.level === "critical") {
+    const autoCase = shouldAutoCreateCase({
+      severity: risk.level,
+      severityLevel: risk.severityLevel ?? health?.severityLevel ?? null,
+      confidence: risk.confidence,
+      isNotifiable: (agriculture as { isNotifiable?: boolean } | null)?.isNotifiable ?? false,
+      humanRequested: /parler (à|a) (une personne|quelqu'un|un agent)|koloba na moto|kuzungumza na mtu/i.test(textFr),
+      safeguarding: health?.safeguarding ?? false,
+    });
+    if (risk.escalationRequired || risk.level === "high" || risk.level === "critical" || autoCase.create) {
       // Safeguarding cases carry no detail in ordinary titles, notes or notifications (PRD 5.6).
       const c = await openCase({
         module: service,
@@ -292,7 +305,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     }
 
     const latencyMs = Date.now() - started;
-    await save({ status: "completed", latencyMs });
+    await save({ status: "completed", latencyMs, modelRoute: scripted ? { mode: "scripted" } : {} });
     await audit({ action: "interaction.completed", actorUserId: userId, actorRole: input.user?.role, entityType: "interaction", entityId: interactionId, after: { module: service, language, risk: risk.level, escalated: risk.escalationRequired, caseId }, aiSummary: summaryFr });
 
     return {
