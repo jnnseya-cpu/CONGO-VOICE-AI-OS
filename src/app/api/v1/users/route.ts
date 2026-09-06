@@ -1,0 +1,44 @@
+import { desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { handle, paging } from "@/lib/core/api";
+import { hashPin } from "@/lib/core/auth";
+import { audit } from "@/lib/core/audit";
+import { badRequest } from "@/lib/core/errors";
+import { schema } from "@/lib/db/client";
+import { publicUser } from "@/lib/core/users";
+
+export const GET = handle({ permission: "user:manage" }, async ({ db, req }) => {
+  const { limit, offset } = paging(req);
+  const role = req.nextUrl.searchParams.get("role");
+  const rows = await db
+    .select()
+    .from(schema.users)
+    .where(role ? eq(schema.users.role, role as typeof schema.users.$inferSelect.role) : undefined)
+    .orderBy(desc(schema.users.createdAt))
+    .limit(limit)
+    .offset(offset);
+  return { users: rows.map((u) => ({ ...publicUser(u), phone: u.phone, createdAt: u.createdAt, lastActivityAt: u.lastActivityAt })) };
+});
+
+const Create = z.object({
+  phone: z.string().min(6).max(32),
+  pin: z.string().min(4).max(12),
+  name: z.string().max(160).optional(),
+  role: z.enum(["citizen", "chw", "agri_officer", "teacher", "ngo", "gov_admin", "platform_admin"]).default("citizen"),
+  language: z.enum(["fr", "ln", "kg", "sw", "lua"]).default("fr"),
+  province: z.string().max(120).optional(),
+  territory: z.string().max(120).optional(),
+  organisation: z.string().max(160).optional(),
+});
+
+export const POST = handle({ permission: "user:manage" }, async ({ db, user, json, ip }) => {
+  const body = await json(Create);
+  const [exists] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.phone, body.phone));
+  if (exists) throw badRequest("Ce numéro est déjà enregistré");
+  const [created] = await db
+    .insert(schema.users)
+    .values({ phone: body.phone, pinHash: hashPin(body.pin), name: body.name, role: body.role, languagePreference: body.language, province: body.province, territory: body.territory, organisation: body.organisation, consentStatus: "granted" })
+    .returning();
+  await audit({ action: "user.created", actorUserId: user.userId, actorRole: user.role, entityType: "user", entityId: created.id, after: { role: created.role, province: created.province }, ip });
+  return { user: publicUser(created) };
+});
