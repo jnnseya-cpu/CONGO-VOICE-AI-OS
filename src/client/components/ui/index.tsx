@@ -48,7 +48,7 @@ export function StatRow({ icon, label, value, pct, tone = "brand" }: { icon: Rea
 export function ArrowLink({ href, children, className = "" }: { href: string; children: ReactNode; className?: string }) {
   return (
     <Link href={href} className={`inline-flex items-center justify-center gap-2 text-[13.5px] font-semibold text-brand ${className}`}>
-      <span className="truncate">{children}</span>
+      <span className="min-w-0 text-[13px] leading-tight">{children}</span>
       <IconArrowRight size={16} className="shrink-0" />
     </Link>
   );

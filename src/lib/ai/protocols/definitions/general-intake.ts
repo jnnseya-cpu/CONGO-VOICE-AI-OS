@@ -1,0 +1,98 @@
+/** Fallback intake: routes a vague symptom description and still applies the danger-sign net. */
+import type { HealthProtocol } from "../types";
+import { APPROVED_BY, ASK_DURATION_DAYS, DANGER_ASK, DANGER_OPTIONS, ON_RED_FLAG, dangerRedFlags, option, outcomes, t } from "./shared";
+
+export const generalSymptomIntake: HealthProtocol = {
+  id: "general_symptom_intake",
+  version: "1.0.0",
+  title: "Accueil et orientation santé (symptôme général)",
+  approvedBy: APPROVED_BY,
+  module: "health",
+  citations: ["KB-HE-TRIAGE-01", "KB-HE-MEDS-01"],
+  selfCareContentIds: ["KB-HE-TRIAGE-01", "KB-HE-WASH-01"],
+  entry: "danger_signs",
+  defaultSeverity: 1,
+  questions: {
+    danger_signs: {
+      id: "danger_signs",
+      ask: DANGER_ASK,
+      type: "multi_yes_no",
+      options: DANGER_OPTIONS,
+      redFlags: dangerRedFlags("GEN"),
+      onRedFlag: ON_RED_FLAG,
+      next: "who",
+    },
+    who: {
+      id: "who",
+      ask: t(
+        "Pour qui appelez-vous : vous-même, un enfant de moins de 5 ans, un nouveau-né, une femme enceinte, une personne âgée ?",
+        "Ozali kobenga mpo na nani : yo moko, mwana na nse ya mibu mitano, mwana ya sika, mwasi ya zemi, mobange ?",
+        "Nge ke binga sambu na nani : nge mosi, mwana na nsi ya bamvula tanu, mwana ya mpa, nkento ya divumu, mununu ?",
+        "Unapiga simu kwa ajili ya nani: wewe mwenyewe, mtoto chini ya miaka mitano, mtoto mchanga, mjamzito, mzee ?",
+        "Udi ubikila bua nganyi: wewe muine, muana wa panshi pa bidimu bitanu, muana mupiamupia, mukaji wa difu, mukulakaje ?",
+      ),
+      type: "choice",
+      options: [
+        option("self", t("Moi-même", "Ngai moko", "Mono mosi", "Mimi mwenyewe", "Meme muine")),
+        option("child_under_5", t("Un enfant de moins de 5 ans", "Mwana na nse ya mibu mitano", "Mwana na nsi ya bamvula tanu", "Mtoto chini ya miaka mitano", "Muana wa panshi pa bidimu bitanu")),
+        option("newborn", t("Un nouveau-né", "Mwana ya sika", "Mwana ya mpa", "Mtoto mchanga", "Muana mupiamupia")),
+        option("pregnant_woman", t("Une femme enceinte", "Mwasi ya zemi", "Nkento ya divumu", "Mjamzito", "Mukaji wa difu")),
+        option("elderly", t("Une personne âgée", "Mobange", "Mununu", "Mzee", "Mukulakaje")),
+      ],
+      next: "main_symptom",
+    },
+    main_symptom: {
+      id: "main_symptom",
+      ask: t(
+        "Quel est le problème principal : fièvre, toux, diarrhée, douleur, blessure, grossesse, peau, tristesse ou angoisse, autre ?",
+        "Likambo ya liboso ezali nini : fièvre, kosukola, pulupulu, mpasi, mpota, zemi, loposo, mawa to bobangi, mosusu ?",
+        "Diambu ya ntete kele nki : mwini, kosukumuna, pulupulu, mpasi, mputa, divumu, nkanda, mawa to boma, ya nkaka ?",
+        "Tatizo kuu ni lipi: homa, kikohozi, kuhara, maumivu, jeraha, ujauzito, ngozi, huzuni au wasiwasi, jingine ?",
+        "Bualu bunene mmbualu kayi: luya, tshikosolo, tuvi tua mâyi, makenga, mputa, difu, tshiseba, kanyinganyinga anyi buôwa, bukuabu ?",
+      ),
+      type: "choice",
+      options: [
+        option("fever", t("Fièvre", "Fièvre", "Mwini ya nitu", "Homa", "Luya")),
+        option("cough", t("Toux ou respiration", "Kosukola to kopema", "Kosukumuna to kupema", "Kikohozi au kupumua", "Tshikosolo anyi kupetesha lupepele")),
+        option("diarrhoea", t("Diarrhée ou vomissements", "Pulupulu to kosanza", "Pulupulu to kuluka", "Kuhara au kutapika", "Tuvi tua mâyi anyi kulua")),
+        option("pain", t("Douleur", "Mpasi", "Mpasi", "Maumivu", "Makenga")),
+        option("wound", t("Blessure ou brûlure", "Mpota to kozika", "Mputa to kuyoka", "Jeraha au kuungua", "Mputa anyi kuosha")),
+        option("pregnancy", t("Grossesse ou accouchement", "Zemi to kobota", "Divumu to kubuta", "Ujauzito au kujifungua", "Difu anyi kulela")),
+        option("skin", t("Problème de peau", "Likambo ya loposo", "Diambu ya nkanda", "Tatizo la ngozi", "Bualu bua tshiseba")),
+        option("mental_distress", t("Tristesse, angoisse, sommeil", "Mawa, bobangi, mpongi", "Mawa, boma, mpongi", "Huzuni, wasiwasi, usingizi", "Kanyinganyinga, buôwa, tulu")),
+        option("other", t("Autre", "Mosusu", "Ya nkaka", "Jingine", "Bukuabu")),
+      ],
+      next: "duration_days",
+    },
+    duration_days: {
+      id: "duration_days",
+      ask: ASK_DURATION_DAYS,
+      type: "days",
+      next: "getting_worse",
+    },
+    getting_worse: {
+      id: "getting_worse",
+      ask: t(
+        "Est-ce que cela empire depuis hier ?",
+        "Ezali kobeba banda lobi ?",
+        "Yo ke beba banda mazono ?",
+        "Hali inazidi kuwa mbaya tangu jana ?",
+        "Bualu budi bunyanguka katshia makelela ?",
+      ),
+      type: "yes_no",
+      next: null,
+    },
+  },
+  rules: [
+    { id: "R-GEN-NEWBORN", when: { q: "who", op: "eq", value: "newborn" }, severity: 3 },
+    { id: "R-GEN-CHILD-U5", when: { q: "who", op: "eq", value: "child_under_5" }, severity: 2 },
+    { id: "R-GEN-PREGNANT", when: { q: "who", op: "eq", value: "pregnant_woman" }, severity: 2 },
+    { id: "R-GEN-ELDERLY", when: { q: "who", op: "eq", value: "elderly" }, severity: 2 },
+    { id: "R-GEN-WORSENING", when: { q: "getting_worse", op: "eq", value: true }, severity: 3 },
+    { id: "R-GEN-PROLONGED-14D", when: { q: "duration_days", op: "gte", value: 14 }, severity: 2 },
+    { id: "R-GEN-PREGNANCY-TOPIC", when: { q: "main_symptom", op: "eq", value: "pregnancy" }, severity: 2 },
+    { id: "R-GEN-WOUND-TOPIC", when: { q: "main_symptom", op: "eq", value: "wound" }, severity: 2 },
+    { id: "R-GEN-MENTAL-DISTRESS", when: { q: "main_symptom", op: "eq", value: "mental_distress" }, severity: 2 },
+  ],
+  outcomes: outcomes(),
+};

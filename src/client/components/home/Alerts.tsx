@@ -24,7 +24,7 @@ export function Alerts({ alerts, now }: { alerts: AlertItem[]; now: number }) {
   const { t, lang } = useLanguage();
   return (
     <Card className="p-0">
-      <CardHeader title={t("importantAlerts")} action={t("viewAll")} href="/tableau-de-bord#alertes" icon={<span className="icon-tile h-7 w-7 shrink-0 bg-danger-soft text-danger"><IconFlame size={15} /></span>} />
+      <CardHeader title={t("importantAlerts")} action={t("viewAll")} href="/tableau-de-bord#alertes" />
       <div className="space-y-1 px-3 pb-3 pt-3">
         {alerts.length === 0 && <EmptyState title="Aucune alerte active" hint="Les alertes apparaissent dès qu'une tendance ou un cas critique est détecté." />}
         {alerts.map((a) => (

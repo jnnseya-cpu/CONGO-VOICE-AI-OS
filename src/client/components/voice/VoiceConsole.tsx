@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InteractionResult, LanguageCode, ModuleType } from "@shared/types";
 import { LANGUAGES } from "@shared/types";
@@ -314,9 +315,9 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
       <div className="flex items-center gap-2 text-[11.5px] text-muted">
         <IconVolume size={14} />
         {t("privacyNote")}
-        <a href="/cas/nouveau?humain=1" className="link ml-auto whitespace-nowrap">
+        <Link href="/cas/nouveau?humain=1" className="link ml-auto whitespace-nowrap">
           {t("talkToHuman")}
-        </a>
+        </Link>
       </div>
       <span className="sr-only">
         <IconThumbUp size={1} />

@@ -15,11 +15,11 @@ import { audit } from "@/lib/core/audit";
 import { storeUpload } from "@/lib/core/storage";
 import { aiGateway } from "../gateway";
 import type { ImageInput } from "../types";
-import type { FinalAnswer, HealthAssessment, AgricultureAssessment, EducationAssessment, GeneralAssessment } from "../schemas";
+import type { FinalAnswer, AgricultureAssessment, EducationAssessment, GeneralAssessment } from "../schemas";
 import { GeneralAssessment as GeneralSchema } from "../schemas";
 import { GENERAL_AGENT_SYSTEM, messageEnvelope } from "../prompts";
 import { analyseLanguage, localise } from "./language";
-import { assessHealth } from "./health";
+import { assessHealth, attachSafeguardingCase, type HealthTriageResult } from "./health";
 import { assessAgriculture } from "./agriculture";
 import { assessEducation } from "./education";
 import { scoreRisk } from "./risk";
@@ -124,14 +124,14 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       return failedOutput(interactionId, language, msg[language], started);
     }
 
-    // 3. Language analysis + module classification.
+    // 3. Language analysis + service classification.
     const learning = await retrieveLearningContext(transcript || "", input.user?.language ?? null);
     const lang = await analyseLanguage(transcript || "(image seulement)", { preferredLanguage: input.user?.language, moduleHint: input.moduleHint, learning }, interactionId);
     const language: LanguageCode = lang.language;
     const languageConfidence = sttLanguage && sttLanguage === language && sttConfidence ? Math.max(lang.confidence, sttConfidence) : lang.confidence;
-    const module: ModuleType = input.moduleHint && input.moduleHint !== "general" ? input.moduleHint : lang.module;
-    await save({ language, languageConfidence, translationFr: lang.translationFr, intent: lang.intent, module });
-    if (transcript) await recordSample({ interactionId, audioFileId, language, sourceText: transcript, translationFr: lang.translationFr, province, intent: lang.intent, module, confidence: languageConfidence });
+    const service: ModuleType = input.moduleHint && input.moduleHint !== "general" ? input.moduleHint : lang.module;
+    await save({ language, languageConfidence, translationFr: lang.translationFr, intent: lang.intent, module: service });
+    if (transcript) await recordSample({ interactionId, audioFileId, language, sourceText: transcript, translationFr: lang.translationFr, province, intent: lang.intent, module: service, confidence: languageConfidence });
 
     // 4. Personalisation context.
     const profile = await getProfileContext(userId);
@@ -140,13 +140,18 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     // 5. Specialist agent.
     const textFr = lang.translationFr || transcript;
     const images: ImageInput[] = (input.images ?? []).map((i) => ({ data: i.data, mimeType: i.mimeType }));
-    let health: (HealthAssessment & { safetyViolations: string[] }) | null = null;
+    let health: HealthTriageResult | null = null;
     let agriculture: AgricultureAssessment | null = null;
     let education: EducationAssessment | null = null;
     let general: GeneralAssessment | null = null;
-    if (module === "health") health = await assessHealth(textFr, { province, history: profile?.historyText }, interactionId);
-    else if (module === "agriculture") agriculture = await assessAgriculture(textFr, { province, history: profile?.historyText }, images, interactionId);
-    else if (module === "education") education = await assessEducation(textFr, { province, history: profile?.historyText }, interactionId);
+    if (service === "health")
+      health = await assessHealth(
+        textFr,
+        { province, history: profile?.historyText, language, languageConfidence, transcriptionConfidence: sttConfidence },
+        interactionId,
+      );
+    else if (service === "agriculture") agriculture = await assessAgriculture(textFr, { province, history: profile?.historyText }, images, interactionId);
+    else if (service === "education") education = await assessEducation(textFr, { province, history: profile?.historyText }, interactionId);
     else {
       const r = await aiGateway().generateJson({ system: GENERAL_AGENT_SYSTEM, user: messageEnvelope(textFr, { province }), schema: GeneralSchema, schemaName: "general_assessment", maxTokens: 800 }, { interactionId });
       general = r.output;
@@ -154,7 +159,21 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
     // 6. Risk scoring (deterministic).
     const domainConfidence = health?.confidence ?? agriculture?.confidence ?? education?.confidence ?? general?.confidence ?? 0.5;
-    const risk = scoreRisk({ module, health, agriculture, education, languageConfidence, domainConfidence, safetyViolations: health?.safetyViolations, lowConfidenceThreshold: env.ai.lowConfidenceThreshold });
+    const risk = scoreRisk({
+      module: service,
+      health,
+      agriculture,
+      education,
+      languageConfidence,
+      domainConfidence,
+      safetyViolations: health?.safetyViolations,
+      lowConfidenceThreshold: env.ai.lowConfidenceThreshold,
+      severityLevel: health?.severityLevel ?? null,
+      riskBand: health?.riskBand ?? null,
+      citations: health?.citations,
+      safeguarding: health?.safeguarding,
+      humanReviewRequired: health?.humanReviewRequired,
+    });
 
     // 7. Compose the seven-part answer (French), then localise.
     const understanding = health?.understanding ?? agriculture?.understanding ?? education?.understanding ?? general?.understanding ?? textFr;
@@ -165,8 +184,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     if (risk.lowConfidence) actionFr += " Je ne suis pas certain d'avoir bien compris : pouvez-vous préciser ?";
     if (health) actionFr += ` ${DISCLAIMERS.fr}`;
     const followUps = (health?.followUpQuestions ?? agriculture?.followUpQuestions ?? education?.followUpQuestions ?? []).slice(0, 3);
-    const escalationTo = risk.escalationRequired ? ROLE_LABEL[module] : null;
-    const summaryFr = `[${MODULE_LABEL[module]}] ${lang.intent.replace(/_/g, " ")} — risque ${risk.level}${risk.escalationRequired ? ", escaladé" : ""}. ${understanding.slice(0, 140)}`;
+    const escalationTo = risk.escalationRequired ? ROLE_LABEL[service] : null;
+    const summaryFr = `[${MODULE_LABEL[service]}] ${lang.intent.replace(/_/g, " ")} — risque ${risk.level}${risk.escalationRequired ? ", escaladé" : ""}. ${understanding.slice(0, 140)}`;
     const answer: FinalAnswer = {
       asking: textFr,
       understanding,
@@ -195,9 +214,34 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       severity: risk.level,
       escalationRequired: risk.escalationRequired,
       summary: summaryFr,
+      citations: health?.citations ?? [],
+      confidenceDimensions: health?.confidenceDimensions ?? {},
+      protocolVersion: health ? `${health.protocolId}@${health.protocolVersion}` : null,
+      safeguarding: health?.safeguarding ?? false,
     });
     if (health) {
-      await db.insert(schema.healthTriageRecords).values({ interactionId, symptoms: health.symptoms, ageGroup: health.ageGroup, pregnancyStatus: health.pregnancyStatus, emergencyFlags: health.emergencyFlags, topic: health.topic, recommendation: health.guidance, referralStatus: health.clinicReferral, province });
+      await db.insert(schema.healthTriageRecords).values({
+        interactionId,
+        symptoms: health.symptoms,
+        ageGroup: health.ageGroup,
+        pregnancyStatus: health.pregnancyStatus,
+        emergencyFlags: health.emergencyFlags,
+        topic: health.topic,
+        recommendation: health.guidance,
+        referralStatus: health.clinicReferral,
+        province,
+        protocolId: health.protocolId,
+        protocolVersion: health.protocolVersion,
+        answers: health.answers as Record<string, unknown>,
+        severityLevel: health.severityLevel,
+        riskBand: health.riskBand,
+        triggeredRuleIds: health.triggeredRuleIds,
+        timeToAction: health.timeToAction,
+        careDestinationType: health.careDestinationType,
+        referralFacilityId: health.facility?.id ?? null,
+        followUpAt: health.followUpAt,
+        safeguarding: health.safeguarding,
+      });
     } else if (agriculture) {
       await db.insert(schema.agricultureReports).values({ interactionId, cropType: agriculture.cropType, issueType: agriculture.issueType, evidenceFileIds: (input.images ?? []).map((i) => i.fileId), province, aiDiagnosis: agriculture.likelyDiagnosis, recommendation: agriculture.recommendation, confidence: agriculture.confidence, urgent: agriculture.urgent });
     } else if (education) {
@@ -207,9 +251,33 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     // 9. Workflow: open and escalate a case when required.
     let caseId: string | null = null;
     if (risk.escalationRequired || risk.level === "high" || risk.level === "critical") {
-      const c = await openCase({ module, userId, interactionId, title: `${understanding.slice(0, 120)}`, severity: risk.level, province, notes: summaryFr, escalate: risk.escalationRequired, escalationReason: risk.escalationReason });
+      // Safeguarding cases carry no detail in ordinary titles, notes or notifications (PRD 5.6).
+      const c = await openCase({
+        module: service,
+        userId,
+        interactionId,
+        title: health?.safeguardingNotice?.title ?? `${understanding.slice(0, 120)}`,
+        severity: risk.level,
+        province,
+        notes: health?.safeguardingNotice?.body ?? summaryFr,
+        escalate: risk.escalationRequired,
+        escalationReason: health?.safeguarding ? "Dossier protégé" : risk.escalationReason,
+      });
       caseId = c.id;
       await save({ caseId });
+      if (health) {
+        await db
+          .update(schema.cases)
+          .set({
+            severityLevel: risk.severityLevel ?? health.severityLevel,
+            aiSeverityLevel: health.severityLevel,
+            safeguarding: health.safeguarding,
+            followUpDate: health.followUpAt,
+          })
+          .where(eq(schema.cases.id, caseId));
+        await db.update(schema.healthTriageRecords).set({ caseId }).where(eq(schema.healthTriageRecords.interactionId, interactionId));
+        if (health.safeguarding) await attachSafeguardingCase(interactionId, caseId);
+      }
     }
 
     // 10. Text to speech (optional, falls back to on-device synthesis).
@@ -225,12 +293,12 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
     const latencyMs = Date.now() - started;
     await save({ status: "completed", latencyMs });
-    await audit({ action: "interaction.completed", actorUserId: userId, actorRole: input.user?.role, entityType: "interaction", entityId: interactionId, after: { module, language, risk: risk.level, escalated: risk.escalationRequired, caseId }, aiSummary: summaryFr });
+    await audit({ action: "interaction.completed", actorUserId: userId, actorRole: input.user?.role, entityType: "interaction", entityId: interactionId, after: { module: service, language, risk: risk.level, escalated: risk.escalationRequired, caseId }, aiSummary: summaryFr });
 
     return {
       interactionId,
       status: "completed",
-      module,
+      module: service,
       language,
       languageConfidence: Number(languageConfidence.toFixed(2)),
       transcript,

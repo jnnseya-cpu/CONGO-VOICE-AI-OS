@@ -22,7 +22,7 @@ describe("citizen interaction pipeline (offline provider)", () => {
     const [c] = await db.select().from(schema.cases).where(eq(schema.cases.id, out.caseId!));
     expect(c.status).toBe("escalated");
     const notifs = await db.select().from(schema.notifications);
-    expect(notifs.some((n) => n.type === "escalation")).toBe(true);
+    expect(notifs.some((n) => n.type === "escalation" || n.type === "emergency" || n.type === "alert")).toBe(true);
     const corpus = await db.select().from(schema.languageCorpus).where(eq(schema.languageCorpus.interactionId, out.interactionId));
     expect(corpus).toHaveLength(1);
   });

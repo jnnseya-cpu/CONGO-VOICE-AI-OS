@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import "./globals.css";
 import { AppShell } from "@client/components/shell/AppShell";
 import { LanguageProvider } from "@client/components/shell/LanguageProvider";
+import { ServiceWorker } from "@client/components/shell/ServiceWorker";
 import { isLanguageCode, LANG_COOKIE } from "@shared/i18n";
 import type { LanguageCode, SessionUser } from "@shared/types";
 import { getSession } from "@/lib/core/auth";
@@ -37,6 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <AppShell user={user} unread={unread}>
             {children}
           </AppShell>
+          <ServiceWorker />
         </LanguageProvider>
       </body>
     </html>
