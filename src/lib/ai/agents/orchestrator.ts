@@ -15,13 +15,14 @@ import { audit } from "@/lib/core/audit";
 import { storeUpload } from "@/lib/core/storage";
 import { aiGateway } from "../gateway";
 import type { ImageInput } from "../types";
-import type { FinalAnswer, AgricultureAssessment, EducationAssessment, GeneralAssessment } from "../schemas";
+import type { FinalAnswer, GeneralAssessment } from "../schemas";
 import { GeneralAssessment as GeneralSchema } from "../schemas";
 import { GENERAL_AGENT_SYSTEM, messageEnvelope } from "../prompts";
 import { analyseLanguage, localise } from "./language";
 import { assessHealth, attachSafeguardingCase, type HealthTriageResult } from "./health";
-import { assessAgriculture } from "./agriculture";
-import { assessEducation } from "./education";
+import { assessAgriculture, type AgricultureAssessmentPlus } from "./agriculture";
+import { assessEducation, type EducationAssessmentPlus } from "./education";
+import { detectClusters } from "./clusters";
 import { scoreRisk } from "./risk";
 import { openCase, shouldAutoCreateCase } from "./workflow";
 import { isDegradedMode } from "@/lib/core/metering";
@@ -146,8 +147,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     const textFr = lang.translationFr || transcript;
     const images: ImageInput[] = (input.images ?? []).map((i) => ({ data: i.data, mimeType: i.mimeType }));
     let health: HealthTriageResult | null = null;
-    let agriculture: AgricultureAssessment | null = null;
-    let education: EducationAssessment | null = null;
+    let agriculture: AgricultureAssessmentPlus | null = null;
+    let education: EducationAssessmentPlus | null = null;
     let general: GeneralAssessment | null = null;
     if (service === "health")
       health = await assessHealth(
@@ -155,8 +156,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
         { province, history: profile?.historyText, language, languageConfidence, transcriptionConfidence: sttConfidence },
         interactionId,
       );
-    else if (service === "agriculture") agriculture = await assessAgriculture(textFr, { province, history: profile?.historyText }, images, interactionId);
-    else if (service === "education") education = await assessEducation(textFr, { province, history: profile?.historyText }, interactionId);
+    else if (service === "agriculture") agriculture = await assessAgriculture(textFr, { province, history: profile?.historyText, userId }, images, interactionId);
+    else if (service === "education") education = await assessEducation(textFr, { province, history: profile?.historyText, userId, language }, interactionId);
     else {
       const r = await aiGateway().generateJson({ system: GENERAL_AGENT_SYSTEM, user: messageEnvelope(textFr, { province }), schema: GeneralSchema, schemaName: "general_assessment", maxTokens: 800 }, meta);
       general = r.output;
@@ -176,7 +177,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       severityLevel: health?.severityLevel ?? null,
       riskBand: health?.riskBand ?? null,
       citations: health?.citations,
-      safeguarding: health?.safeguarding,
+      safeguarding: health?.safeguarding ?? education?.safeguarding,
       humanReviewRequired: health?.humanReviewRequired,
     });
 
@@ -219,10 +220,10 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       severity: risk.level,
       escalationRequired: risk.escalationRequired,
       summary: summaryFr,
-      citations: health?.citations ?? [],
+      citations: health?.citations ?? agriculture?.citations ?? education?.citations ?? [],
       confidenceDimensions: health?.confidenceDimensions ?? {},
       protocolVersion: health ? `${health.protocolId}@${health.protocolVersion}` : null,
-      safeguarding: health?.safeguarding ?? false,
+      safeguarding: (health?.safeguarding ?? false) || (education?.safeguarding ?? false),
     });
     if (health) {
       await db.insert(schema.healthTriageRecords).values({
@@ -248,9 +249,62 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
         safeguarding: health.safeguarding,
       });
     } else if (agriculture) {
-      await db.insert(schema.agricultureReports).values({ interactionId, cropType: agriculture.cropType, issueType: agriculture.issueType, evidenceFileIds: (input.images ?? []).map((i) => i.fileId), province, aiDiagnosis: agriculture.likelyDiagnosis, recommendation: agriculture.recommendation, confidence: agriculture.confidence, urgent: agriculture.urgent });
+      await db.insert(schema.agricultureReports).values({
+        interactionId,
+        cropType: agriculture.cropType,
+        issueType: agriculture.issueType,
+        evidenceFileIds: (input.images ?? []).map((i) => i.fileId),
+        province,
+        aiDiagnosis: agriculture.likelyDiagnosis,
+        recommendation: agriculture.recommendation,
+        confidence: agriculture.confidence,
+        urgent: agriculture.urgent,
+        territory: agriculture.territory,
+        season: agriculture.seasonCode,
+        growthStage: agriculture.growthStage,
+        affectedProportion: agriculture.affectedProportion,
+        recentInputs: agriculture.recentInputs,
+        candidates: agriculture.candidates.map((c) => ({ label: c.label, prob: c.probability, evidenceFor: c.evidenceFor, evidenceAgainst: c.evidenceAgainst })),
+        topProb: agriculture.topProb,
+        isNotifiable: agriculture.isNotifiable,
+        evidenceQuality: {
+          visionUsed: agriculture.evidenceQuality.visionUsed,
+          attachments: agriculture.evidenceQuality.attachments,
+          usable: agriculture.evidenceQuality.usable,
+          videoOnly: agriculture.evidenceQuality.videoOnly,
+          summary: agriculture.evidenceQuality.summary,
+          recaptureGuidance: agriculture.evidenceQuality.recaptureGuidance,
+          exifNotes: agriculture.evidenceQuality.exifNotes,
+        },
+        missingEvidence: agriculture.missingEvidence,
+        actionsToAvoid: agriculture.actionsToAvoid,
+        tieredActions: agriculture.tieredActions,
+      });
+      // Cluster watch (FR-AG-08): similar reports in one territory/province inside the rolling window
+      // open an unverified cluster, emit agri.cluster.detected and alert the extension network.
+      await detectClusters({ province }).catch((e) => console.error("[orchestrator] cluster detection", e));
     } else if (education) {
-      await db.insert(schema.educationSessions).values({ interactionId, learnerAgeGroup: education.learnerAgeGroup, subject: education.subject, topic: education.topic, difficultyLevel: education.difficultyLevel, explanation: education.explanation, quiz: education.quiz, progressSignal: education.learningDifficulty === "none" ? "on_track" : "needs_support", province });
+      await db.insert(schema.educationSessions).values({
+        interactionId,
+        learnerAgeGroup: education.learnerAgeGroup,
+        subject: education.subject,
+        topic: education.topic,
+        difficultyLevel: education.difficultyLevel,
+        explanation: education.explanation,
+        quiz: education.quiz,
+        progressSignal: education.learningDifficulty === "none" ? "on_track" : "needs_support",
+        province,
+        mode: education.mode,
+        objective: education.objective,
+        score: education.score,
+        steps: education.steps,
+        masterySignal: education.masterySignal,
+        userId,
+      });
+      if (education.safeguarding) {
+        // Restricted pathway for disclosures made by learners (EDU-005 / PRD 5.6).
+        await db.insert(schema.safeguardingRecords).values({ interactionId, category: education.safety?.categories?.[0] ?? "disclosure", isChild: true, ownerRole: "teacher" });
+      }
     }
 
     // 9. Workflow: open and escalate a case when required.
@@ -261,7 +315,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       confidence: risk.confidence,
       isNotifiable: (agriculture as { isNotifiable?: boolean } | null)?.isNotifiable ?? false,
       humanRequested: /parler (à|a) (une personne|quelqu'un|un agent)|koloba na moto|kuzungumza na mtu/i.test(textFr),
-      safeguarding: health?.safeguarding ?? false,
+      safeguarding: (health?.safeguarding ?? false) || (education?.safeguarding ?? false),
     });
     if (risk.escalationRequired || risk.level === "high" || risk.level === "critical" || autoCase.create) {
       // Safeguarding cases carry no detail in ordinary titles, notes or notifications (PRD 5.6).
@@ -291,6 +345,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
         await db.update(schema.healthTriageRecords).set({ caseId }).where(eq(schema.healthTriageRecords.interactionId, interactionId));
         if (health.safeguarding) await attachSafeguardingCase(interactionId, caseId);
       }
+      if (education?.safeguarding) await attachSafeguardingCase(interactionId, caseId);
     }
 
     // 10. Text to speech (optional, falls back to on-device synthesis).

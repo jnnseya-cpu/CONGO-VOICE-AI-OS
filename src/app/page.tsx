@@ -15,6 +15,11 @@ import { Footer } from "@client/components/home/Footer";
 
 export const dynamic = "force-dynamic";
 
+/** Server render time, passed to client components so relative times hydrate identically. */
+function serverNow(): number {
+  return Date.now();
+}
+
 const WHO: Record<string, string> = { health: "un utilisateur", agriculture: "un agriculteur", education: "un élève", general: "un citoyen" };
 const PREFIX: Record<string, string> = { health: "Consultation santé", agriculture: "Question agricole", education: "Session d'apprentissage", general: "Demande" };
 
@@ -29,7 +34,7 @@ function activityTitle(a: { module: string; channel: string; understanding: stri
 export default async function HomePage() {
   const session = await getSession();
   const institutional = !!session && hasPermission(session.role, "case:read");
-  const now = Date.now();
+  const now = serverNow();
   const photo = fs.existsSync(path.join(process.cwd(), "public", "hero", "congo-river.jpg"));
 
   const [stats, activity, alerts, insight] = await Promise.all([

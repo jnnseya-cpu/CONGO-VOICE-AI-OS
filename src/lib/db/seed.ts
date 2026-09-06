@@ -11,6 +11,8 @@ import { getDb, schema } from "./client";
 import { hashPin } from "@/lib/core/auth";
 import { runInteraction } from "@/lib/ai/agents/orchestrator";
 import { reviewSample } from "@/lib/ai/agents/learning";
+import { seedAgricultureReference } from "./reference/agriculture";
+import { seedStories } from "./reference/stories";
 import { seedReferenceData } from "./reference";
 import { PILOT_PROVINCES, territoriesOf } from "./reference/geography";
 import { queueNameFor, slaDueFor, SEVERITY_TO_LEVEL } from "@/lib/ai/agents/workflow";
@@ -209,6 +211,9 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
     { language: "kg", term: "kimbeefo", meaningFr: "maladie", domain: "health", verified: true },
     { language: "lua", term: "kabeela", meaningFr: "fièvre", domain: "health", verified: true },
   ]);
+  await seedAgricultureReference();
+  await seedStories();
+  log("Calendriers agricoles, registre des intrants, prix et histoires ajoutés.");
   log("Lexique initial ajouté.");
 
   // Operations backfill: every case gets a queue, an SLA clock and a severity level so the

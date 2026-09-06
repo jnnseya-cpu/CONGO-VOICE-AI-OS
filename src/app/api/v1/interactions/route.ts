@@ -77,12 +77,12 @@ export const POST = handle({ permission: "interaction:create", limit: "ai" }, as
 
 export const GET = handle({ permission: "interaction:read_own" }, async ({ req, db, user }) => {
   const { limit, offset } = paging(req);
-  const module = req.nextUrl.searchParams.get("module") as ModuleType | null;
+  const moduleFilter = req.nextUrl.searchParams.get("module") as ModuleType | null;
   const all = hasPermission(user.role, "interaction:read_all") && req.nextUrl.searchParams.get("scope") === "all";
   const rows = await db
     .select({ id: schema.interactions.id, createdAt: schema.interactions.createdAt, module: schema.interactions.module, channel: schema.interactions.channel, language: schema.interactions.language, province: schema.interactions.province, intent: schema.interactions.intent, transcript: schema.interactions.transcript, response: schema.interactions.response, summary: schema.interactions.summary, severity: schema.interactions.severity, confidence: schema.interactions.confidence, escalated: schema.interactions.escalationRequired, status: schema.interactions.status, caseId: schema.interactions.caseId })
     .from(schema.interactions)
-    .where(and(all ? undefined : eq(schema.interactions.userId, user.userId), module ? eq(schema.interactions.module, module) : undefined))
+    .where(and(all ? undefined : eq(schema.interactions.userId, user.userId), moduleFilter ? eq(schema.interactions.module, moduleFilter) : undefined))
     .orderBy(desc(schema.interactions.createdAt))
     .limit(limit)
     .offset(offset);

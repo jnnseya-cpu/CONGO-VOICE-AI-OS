@@ -404,7 +404,6 @@ export class MockProvider implements LlmProvider, SttProvider, TtsProvider {
 
   private teachingSession(text: string, user: string) {
     const t = text.toLowerCase();
-    const mode = extractField(user, "mode") ?? "explain";
     const level = extractField(user, "niveau") ?? "primaire_4";
     const subject = /fraction|math|calcul|divis|multipli|addition|soustr|hesabu|mituya|table/.test(t)
       ? "maths"
