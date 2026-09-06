@@ -1,3 +1,5 @@
+import { LANGUAGES } from "./types";
+
 /**
  * Public identity of the programme. Single source of truth for the marketing surface,
  * metadata, structured data and the service directory shown to citizens.
@@ -39,13 +41,8 @@ export const SITE = {
   contactsActive: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
   contactsNote:
     "Les adresses du programme sont en cours d'activation avec l'hébergement. En attendant, passez par votre relais communautaire, votre agent agricole ou votre enseignant référent.",
-  languages: [
-    { code: "fr", label: "Français", native: "Français" },
-    { code: "ln", label: "Lingala", native: "Lingála" },
-    { code: "kg", label: "Kikongo", native: "Kikongo" },
-    { code: "sw", label: "Kiswahili", native: "Kiswahili" },
-    { code: "lua", label: "Tshiluba", native: "Tshilubà" },
-  ],
+  /** Derived from the shared language list so the public site and the product cannot disagree. */
+  languages: LANGUAGES,
 } as const;
 
 /** Public pages, used by the header, the footer and the sitemap. */

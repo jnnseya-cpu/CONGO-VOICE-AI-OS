@@ -99,7 +99,7 @@ export default function ServicesPage() {
     <>
       <PageIntro
         eyebrow="Les trois services"
-        title="Santé, agriculture, éducation : ce que le service fait, et ce qu&apos;il refuse de faire"
+        title="Santé, agriculture, éducation : ce que le service fait, et ce qu'il refuse de faire"
         lead="Une seule conversation, trois services. Vous parlez de ce que vous vivez — un enfant qui a de la fièvre, un champ qui jaunit, une leçon que votre fille ne comprend pas — et le service répond toujours de la même manière : ce qu'il a entendu, ce qu'il a compris, le risque, ce qu'il faut faire, qui est prévenu, et à quel point il est sûr de lui."
         meta={
           <>
@@ -218,7 +218,7 @@ export default function ServicesPage() {
           <InfoCard title="Les sources citées" icon={<IconBook size={22} />}>
             <p>Chaque réponse cite au moins un document approuvé, par son identifiant, ainsi que le protocole et sa version. Vous pouvez demander de qui vient l&apos;information.</p>
           </InfoCard>
-          <InfoCard title="Qui reçoit l&apos;escalade" tone="health" icon={<IconUsers size={22} />}>
+          <InfoCard title="Qui reçoit l'escalade" tone="health" icon={<IconUsers size={22} />}>
             <p>
               L&apos;<strong>agent de santé communautaire</strong> du territoire, avec le résumé, l&apos;enregistrement d&apos;origine, la traduction, la gravité et les règles déclenchées. Un délai de prise en charge est suivi ; en cas de dépassement, le cas remonte au niveau supérieur. Pour les cas critiques, la coordination provinciale est prévenue en même temps.
             </p>
@@ -241,7 +241,7 @@ export default function ServicesPage() {
       <Section
         id="agriculture"
         eyebrow="Service 2 — Agriculture et élevage"
-        title="Des hypothèses honnêtes, des actions gratuites d&apos;abord, aucun produit chimique inventé"
+        title="Des hypothèses honnêtes, des actions gratuites d'abord, aucun produit chimique inventé"
         lead="Le service écoute une description, regarde une photo si vous pouvez en envoyer une, et propose au plus trois hypothèses classées, chacune avec ce qui plaide pour elle et ce qui plaide contre. Il commence toujours par ce que vous pouvez faire sans dépenser un franc."
       >
         <Cards cols={2}>
@@ -324,9 +324,9 @@ export default function ServicesPage() {
         </Prose>
       </Section>
 
-      <Section eyebrow="Agriculture — la règle du registre" title="Aucun produit n&apos;est nommé s&apos;il n&apos;est pas homologué">
+      <Section eyebrow="Agriculture — la règle du registre" title="Aucun produit n'est nommé s'il n'est pas homologué">
         <Cards cols={2}>
-          <InfoCard title="La règle, telle qu&apos;elle est appliquée" tone="agri" icon={<IconShield size={22} />}>
+          <InfoCard title="La règle, telle qu'elle est appliquée" tone="agri" icon={<IconShield size={22} />}>
             <p>
               Toute phrase qui mentionne un pesticide, un herbicide, un fongicide, un engrais minéral, un antibiotique, un vermifuge ou un vaccin est confrontée au registre officiel des intrants. Le produit n&apos;est conservé que si le registre le classe <strong>homologué</strong>. Dans ce cas, la réponse ajoute obligatoirement&nbsp;:
             </p>
@@ -377,7 +377,7 @@ export default function ServicesPage() {
           <InfoCard title="Les sources citées" icon={<IconBook size={22} />}>
             <p>Chaque recommandation cite au moins un document approuvé. Les prix, la météo et les calendriers culturaux viennent de données référencées, jamais du modèle&nbsp;: le marché, la date du relevé et la source sont dits avec le chiffre.</p>
           </InfoCard>
-          <InfoCard title="Qui reçoit l&apos;escalade" tone="agri" icon={<IconUsers size={22} />}>
+          <InfoCard title="Qui reçoit l'escalade" tone="agri" icon={<IconUsers size={22} />}>
             <p>
               L&apos;<strong>agent agricole du secteur</strong>, avec le motif de l&apos;escalade&nbsp;: maladie ou ravageur à déclarer, signes pouvant concerner la santé humaine, plus de la moitié de la parcelle ou du troupeau touchée, propagation rapide ou mortalité, diagnostic trop incertain, ou produit évoqué sans correspondance homologuée.
             </p>
@@ -397,7 +397,7 @@ export default function ServicesPage() {
         id="education"
         tone="white"
         eyebrow="Service 3 — Éducation"
-        title="Enseigner, vérifier, adapter — à l&apos;oral, sans manuel"
+        title="Enseigner, vérifier, adapter — à l'oral, sans manuel"
         lead="Le service accompagne des élèves, des parents et des enseignants, presque toujours à l'oral, souvent sans cahier ni livre à la maison. Il enseigne une notion à la fois, vérifie qu'elle est comprise, et change d'approche quand elle ne l'est pas."
       >
         <Cards cols={2}>
@@ -454,12 +454,12 @@ export default function ServicesPage() {
         <DataTable head={["Étape", "Ce qui se passe"]} rows={EDU_STEPS.map(([a, b]) => [a, b])} />
       </Section>
 
-      <Section tone="white" eyebrow="Éducation — les usages" title="Six manières d&apos;utiliser le service scolaire">
+      <Section tone="white" eyebrow="Éducation — les usages" title="Six manières d'utiliser le service scolaire">
         <Cards>
           <InfoCard title="Expliquer" tone="edu" icon={<IconGraduation size={22} />}>
             Une micro-explication d&apos;une notion, quatre-vingt-dix secondes maximum, un seul concept, avec un exemple pris dans la vie congolaise.
           </InfoCard>
-          <InfoCard title="Interroger à l&apos;oral" tone="edu" icon={<IconGraduation size={22} />}>
+          <InfoCard title="Interroger à l'oral" tone="edu" icon={<IconGraduation size={22} />}>
             Jusqu&apos;à trois questions de vérification. En cas d&apos;erreur, le service nomme l&apos;erreur, explique pourquoi elle est fréquente et donne le geste qui la corrige. Jamais un simple «&nbsp;faux&nbsp;».
           </InfoCard>
           <InfoCard title="Aider sur un devoir" tone="edu" icon={<IconGraduation size={22} />}>
@@ -493,12 +493,12 @@ export default function ServicesPage() {
 
       <Section tone="white" eyebrow="Éducation — sources, protection et escalade">
         <Cards cols={2}>
-          <InfoCard title="Protection de l&apos;enfance" tone="danger" icon={<IconShield size={22} />}>
+          <InfoCard title="Protection de l'enfance" tone="danger" icon={<IconShield size={22} />}>
             <p>
               Un dépistage de sécurité passe <strong>avant</strong> tout enseignement. Si un enfant évoque des violences, une exploitation, un mariage forcé, une négligence ou l&apos;envie de se faire du mal, le service ne pose aucune question sur les détails&nbsp;: il répond avec bienveillance, ne promet pas le secret, et ouvre un dossier protégé accessible aux seules personnes habilitées. Les notifications ordinaires n&apos;en portent aucun détail.
             </p>
           </InfoCard>
-          <InfoCard title="Qui reçoit l&apos;escalade" tone="edu" icon={<IconUsers size={22} />}>
+          <InfoCard title="Qui reçoit l'escalade" tone="edu" icon={<IconUsers size={22} />}>
             <p>
               L&apos;<strong>enseignant référent</strong> pour les difficultés d&apos;apprentissage. Pour une révélation relevant de la protection de l&apos;enfance, c&apos;est le dispositif de protection qui prend le relais, par une voie séparée et restreinte.
             </p>
