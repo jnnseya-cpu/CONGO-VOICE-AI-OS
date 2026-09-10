@@ -90,6 +90,11 @@ export interface LinkOptions {
  * code and figures is left untouched, so the document keeps one link per idea and
  * headings stay clean for search engines and screen readers.
  */
+interface Chunk {
+  text: string;
+  frozen: boolean;
+}
+
 export function injectLinks(html: string, index: LinkTarget[], opts: LinkOptions): { html: string; injected: number } {
   const max = opts.max ?? 24;
   const maxPerTarget = opts.maxPerTarget ?? 2;
@@ -108,7 +113,9 @@ export function injectLinks(html: string, index: LinkTarget[], opts: LinkOptions
     }
     if (depth > 0 || !part.trim()) continue;
 
-    let segment = part;
+    // Anchors already injected in this segment become frozen chunks: a later term
+    // must never match inside an href or a title attribute we just wrote.
+    let chunks: Chunk[] = [{ text: part, frozen: false }];
     for (const target of index) {
       if (injected >= max) break;
       if (target.href === opts.selfHref) continue;
@@ -116,17 +123,33 @@ export function injectLinks(html: string, index: LinkTarget[], opts: LinkOptions
       if (usedTerm.has(termKey)) continue;
       if ((perTarget.get(target.href) ?? 0) >= maxPerTarget) continue;
       const re = new RegExp(`(^|[^\\p{L}\\p{N}-])(${escapeRe(target.term)})(?=[^\\p{L}\\p{N}-]|$)`, "iu");
-      const m = re.exec(segment);
-      if (!m) continue;
-      const before = segment.slice(0, m.index + m[1].length);
-      const matched = segment.slice(m.index + m[1].length, m.index + m[1].length + m[2].length);
-      const after = segment.slice(m.index + m[1].length + m[2].length);
-      segment = `${before}<a href="${target.href}" title="${escapeAttr(target.title)}">${matched}</a>${after}`;
+      const next: Chunk[] = [];
+      let done = false;
+      for (const chunk of chunks) {
+        if (done || chunk.frozen) {
+          next.push(chunk);
+          continue;
+        }
+        const m = re.exec(chunk.text);
+        if (!m) {
+          next.push(chunk);
+          continue;
+        }
+        const start = m.index + m[1].length;
+        const end = start + m[2].length;
+        const anchor = `<a href="${target.href}" title="${escapeAttr(target.title)}">${chunk.text.slice(start, end)}</a>`;
+        next.push({ text: chunk.text.slice(0, start), frozen: false });
+        next.push({ text: anchor, frozen: true });
+        next.push({ text: chunk.text.slice(end), frozen: false });
+        done = true;
+      }
+      if (!done) continue;
+      chunks = next;
       usedTerm.add(termKey);
       perTarget.set(target.href, (perTarget.get(target.href) ?? 0) + 1);
       injected++;
     }
-    parts[i] = segment;
+    parts[i] = chunks.map((c) => c.text).join("");
   }
   return { html: parts.join(""), injected };
 }

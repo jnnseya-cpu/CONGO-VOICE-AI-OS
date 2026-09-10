@@ -51,6 +51,12 @@ export function parseFrontMatter(raw: string, file: string): { meta: PostFrontMa
       }
       continue;
     }
+    // Indented continuation of the current list item: `  - q: …` then `    a: …`.
+    const cont = line.match(/^\s+([a-zA-Z][a-zA-Z0-9_]*):\s*(.*)$/);
+    if (cont && key && list !== null && pair) {
+      pair[cont[1]] = unquote(cont[2]);
+      continue;
+    }
     const kv = line.match(/^([a-zA-Z][a-zA-Z0-9_]*):\s*(.*)$/);
     if (!kv) continue;
     flush();
@@ -129,12 +135,54 @@ export function renderMarkdown(markdown: string): { html: string; headings: Head
   return { html, headings };
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  hellip: "\u2026",
+  laquo: "\u00ab",
+  raquo: "\u00bb",
+  rsquo: "\u2019",
+  lsquo: "\u2018",
+  ldquo: "\u201c",
+  rdquo: "\u201d",
+  ndash: "\u2013",
+  mdash: "\u2014",
+  eacute: "\u00e9",
+  egrave: "\u00e8",
+  agrave: "\u00e0",
+  ccedil: "\u00e7",
+  ocirc: "\u00f4",
+  ecirc: "\u00ea",
+  icirc: "\u00ee",
+  ugrave: "\u00f9",
+};
+
+/**
+ * Decodes the entities `marked` emits. Numeric entities matter for measurement:
+ * an apostrophe is escaped to `&#39;`, so a target query containing one would
+ * never match the rendered text if entities were merely dropped.
+ */
+export function decodeEntities(text: string): string {
+  return text.replace(/&(#x?[0-9a-f]+|[a-z][a-z0-9]*);/gi, (whole, body: string) => {
+    if (body.startsWith("#")) {
+      const code = body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : " ";
+    }
+    return NAMED_ENTITIES[body.toLowerCase()] ?? " ";
+  });
+}
+
 export function stripTags(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&[a-z]+;/gi, " ")
+  return decodeEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
     .replace(/\s+/g, " ")
     .trim();
 }
