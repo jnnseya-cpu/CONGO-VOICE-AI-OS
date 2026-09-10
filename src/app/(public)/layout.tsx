@@ -7,6 +7,20 @@ import { SITE } from "@shared/site";
  * A serif face is loaded here only, so the operating system itself stays on one font.
  */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
+  const website = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${SITE.url}#website`,
+    name: SITE.name,
+    url: SITE.url,
+    inLanguage: ["fr-CD", "ln", "kg", "sw", "lua"],
+    publisher: { "@type": "Organization", name: SITE.operator },
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${SITE.url}/recherche?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
+    },
+  };
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "GovernmentService",
@@ -31,6 +45,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </main>
         <PublicFooter year={new Date().getUTCFullYear()} />
       </div>
+      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(website) }} />
       <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
     </>
   );

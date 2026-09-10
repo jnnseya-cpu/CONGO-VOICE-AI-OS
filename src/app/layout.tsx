@@ -34,6 +34,7 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   },
+  other: { "ai-content-declaration": "human-reviewed" },
   icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/favicon.ico" }], apple: "/icons/icon-512.svg" },
   formatDetection: { telephone: true, address: false, email: false },
 };

@@ -49,11 +49,16 @@ tests/                Vitest suites (protocol coverage, red-flag recall, workflo
 
 The programme has a public, indexable surface separate from the operating system: `/programme` (front door for ministries, donors and press), `/services`, `/acces` (how to reach the service by call, WhatsApp, USSD, SMS or web), `/urgence` (danger signs and what to do, in all five languages), `/aide`, `/langues-nationales`, `/gouvernance`, `/financement`, `/partenaires`, `/confidentialite`, `/accessibilite`, `/conditions` and `/contact`. Set `NEXT_PUBLIC_SITE_URL` so canonical links, the sitemap and the social preview point at the real domain. Public identity, access channels and contact routes live in one file, `src/shared/site.ts`.
 
+## Blog and search
+
+`content/blog/*.md` holds the articles. The engine in `src/server/blog/` renders them, injects a dynamic internal link graph, and scores each article out of 100 against the rubric in `src/server/blog/seo.ts`. `npm run seo:report` prints every score with the checks that lost points, and `tests/blog-seo.test.ts` fails the build if any article drops below 90. Feeds, `llms.txt` for answer engines, per-article social cards and structured data are generated from the same content. What this does and does not guarantee is set out in `docs/SEO.md`.
+
 ## Documentation
 - `docs/MASTER_SPECIFICATION.md` — the complete developer-ready specification (vision, users, command centres, agents, modules, data model, APIs, security, funding model, roadmap) with the requirement → implementation map.
 - `docs/ARCHITECTURE.md` — how a citizen turn flows through the system; provider routing; degraded modes.
 - `docs/API.md` — endpoint reference for `/api/v1` and the channel webhooks.
 - `docs/DEPLOYMENT.md` — Google Cloud / any Node host, PostgreSQL, storage, telephony and WhatsApp configuration.
+- `docs/SEO.md` — search and answer-engine machinery, the scoring rubric, and the off-site work no codebase can do.
 - `docs/LANGUAGES.md` — language coverage, learning loop, quality gates.
 - `docs/PROJECT_REQUIREMENTS.md` — the founding brief, preserved.
 

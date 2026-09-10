@@ -12,13 +12,15 @@
     "test:watch": "vitest",
     "seed": "node --import tsx --conditions=react-server scripts/seed.ts",
     "db:generate": "drizzle-kit generate",
-    "workflow:run": "node --import tsx --conditions=react-server scripts/workflow.ts"
+    "workflow:run": "node --import tsx --conditions=react-server scripts/workflow.ts",
+    "seo:report": "node --import tsx --conditions=react-server scripts/seo-report.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@electric-sql/pglite": "^0.5.8",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
+    "marked": "^18.0.12",
     "next": "16.3.4",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.0",

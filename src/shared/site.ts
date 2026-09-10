@@ -49,6 +49,7 @@ export const SITE = {
 export const PUBLIC_PAGES = [
   { href: "/programme", label: "Le programme", group: "programme", description: "Le problème, la réponse, la couverture et les résultats attendus." },
   { href: "/services", label: "Les services", group: "programme", description: "Santé, agriculture et éducation : ce que le service fait et ne fait pas." },
+  { href: "/blog", label: "Blog", group: "programme", description: "Recherche appliquée et retours de terrain sur l'IA vocale en langues congolaises." },
   { href: "/acces", label: "Comment y accéder", group: "citoyen", description: "Appel, WhatsApp, USSD, SMS, web et guichet assisté." },
   { href: "/urgence", label: "En cas d'urgence", group: "citoyen", description: "Que faire immédiatement devant un signe de danger." },
   { href: "/aide", label: "Questions fréquentes", group: "citoyen", description: "Ce que les citoyens demandent le plus souvent." },

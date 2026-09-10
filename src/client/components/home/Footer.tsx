@@ -6,6 +6,7 @@ import { SITE } from "@shared/site";
 
 const LINKS = [
   { href: "/programme", label: "Le programme" },
+  { href: "/blog", label: "Blog" },
   { href: "/acces", label: "Comment y accéder" },
   { href: "/urgence", label: "En cas d'urgence" },
   { href: "/aide", label: "Questions fréquentes" },
