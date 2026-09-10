@@ -16,6 +16,12 @@ export const metadata: Metadata = {
 export default async function BlogIndexPage() {
   const [posts, cats, allTags, groups] = await Promise.all([allPosts(), categories(), tags(), clusters()]);
   const [featured, ...rest] = posts;
+  // A dossier needs more than one article to read as a dossier; a cluster still
+  // being written keeps its article visible in a single closing section.
+  const dossiers = groups.filter((g) => (g.pillar ? 1 : 0) + g.spokes.length > 1);
+  const singles = groups
+    .filter((g) => (g.pillar ? 1 : 0) + g.spokes.length === 1)
+    .flatMap((g) => (g.pillar ? [g.pillar, ...g.spokes] : g.spokes));
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -46,7 +52,7 @@ export default async function BlogIndexPage() {
           <>
             <span>{posts.length} articles</span>
             <span aria-hidden="true">·</span>
-            <span>{groups.length} dossiers</span>
+            <span>{dossiers.length} dossiers</span>
             <span aria-hidden="true">·</span>
             <a href="/blog/rss.xml" className="link">
               Flux RSS
@@ -68,8 +74,8 @@ export default async function BlogIndexPage() {
         </Section>
       )}
 
-      {groups.map((g) => (
-        <Section key={g.id} eyebrow="Dossier" title={g.pillar?.title ?? g.id} lead={g.pillar?.description} tone={g.id === groups[0]?.id ? "ground" : "white"}>
+      {dossiers.map((g, i) => (
+        <Section key={g.id} eyebrow="Dossier" title={g.pillar?.title ?? g.id} lead={g.pillar?.description} tone={i % 2 === 0 ? "ground" : "white"}>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {g.pillar && <PostCard post={g.pillar} />}
             {g.spokes.map((p) => (
@@ -78,6 +84,21 @@ export default async function BlogIndexPage() {
           </div>
         </Section>
       ))}
+
+      {singles.length > 0 && (
+        <Section
+          eyebrow="Hors dossier"
+          title="Autres analyses"
+          lead="Articles isolés dont le dossier est encore en cours d'écriture."
+          tone={dossiers.length % 2 === 0 ? "ground" : "white"}
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {singles.map((p) => (
+              <PostCard key={p.slug} post={p} />
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section eyebrow="Explorer" title="Par catégorie et par sujet">
         <div className="flex flex-wrap gap-2">

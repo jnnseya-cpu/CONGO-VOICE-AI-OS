@@ -43,3 +43,6 @@ next-env.d.ts
 # runtime data (embedded database, uploads, test artefacts)
 /data
 /.test-data
+
+# local screenshot output
+/screenshots-blog/
