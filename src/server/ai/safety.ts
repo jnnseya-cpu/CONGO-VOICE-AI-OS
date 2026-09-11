@@ -4,11 +4,41 @@
  */
 import type { LanguageCode } from "@server/db/schema";
 
+/**
+ * Matching normalisation.
+ *
+ * A caregiver types on a phone keyboard, in a hurry, about a child who is
+ * convulsing. They will not produce the accents, and their keyboard will turn
+ * an apostrophe into a curly one. Matching on the raw string meant a danger
+ * sign was recognised or missed depending on whether a diacritic survived, and
+ * the keyword lists had begun to carry both spellings of the same phrase to
+ * work around it. Folding once, here, is what makes the lists mean what they
+ * say.
+ */
+export function normaliseForMatching(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Keyword lists are folded once at load, so every comparison is like for like. */
+function folded(list: string[]): string[] {
+  return list.map(normaliseForMatching);
+}
+
 export const HEALTH_EMERGENCY_TERMS: string[] = [
   // French
   "convulsion", "convulsions", "inconscient", "ne respire", "difficulté à respirer", "saignement", "saigne beaucoup",
   "hémorragie", "sang", "grossesse saignement", "accouchement", "raide", "nuque raide", "coma", "empoisonn", "morsure de serpent",
   "brûlure", "ne peut pas boire", "vomit tout", "fièvre très élevée", "yeux enfoncés", "peau très chaude",
+  // Conjugated forms: a caregiver says "il convulse", not "il a des convulsions".
+  "convulse", "convulsent", "convulsait", "convulsé",
+  "ne peut plus téter", "ne peut pas téter", "n'arrive pas à téter", "n'arrive pas à boire", "ne veut plus téter",
+  "ne tète pas", "ne boit plus", "ne boit rien", "refuse le sein", "ne se réveille pas", "ne réagit plus", "ne bouge plus",
   // Lingala
   "akoki kopema te", "makila", "azali kolela te", "abungisi mayele", "kobota", "nzoto ekangami", "nyoka aswi",
   // Swahili
@@ -34,14 +64,17 @@ const FORBIDDEN_OUTPUT_PATTERNS: RegExp[] = [
   /\bje diagnostique\b/i,
 ];
 
+const HEALTH_EMERGENCY_FOLDED = folded(HEALTH_EMERGENCY_TERMS);
+const AGRI_URGENT_FOLDED = folded(AGRI_URGENT_TERMS);
+
 export function detectEmergencyTerms(text: string): string[] {
-  const t = text.toLowerCase();
-  return HEALTH_EMERGENCY_TERMS.filter((k) => t.includes(k));
+  const t = normaliseForMatching(text);
+  return HEALTH_EMERGENCY_TERMS.filter((_, i) => t.includes(HEALTH_EMERGENCY_FOLDED[i]));
 }
 
 export function detectAgriUrgentTerms(text: string): string[] {
-  const t = text.toLowerCase();
-  return AGRI_URGENT_TERMS.filter((k) => t.includes(k));
+  const t = normaliseForMatching(text);
+  return AGRI_URGENT_TERMS.filter((_, i) => t.includes(AGRI_URGENT_FOLDED[i]));
 }
 
 export interface SafetyCheck {
@@ -70,6 +103,38 @@ export const DISCLAIMERS: Record<LanguageCode, string> = {
   lua: "Mudimu eu udi ufila mibelu ; kawena upingana munganga.",
 };
 
+/**
+ * Appends the disclaimer once, whoever asks.
+ *
+ * Two layers were each appending it — the health agent to its guidance, the
+ * orchestrator to the composed answer — so a citizen heard the same sentence
+ * twice. In a spoken interface that is not a cosmetic flaw: it is an extra
+ * sentence read aloud over a bad line while someone waits to hear what to do.
+ */
+export function withDisclaimer(text: string, language: LanguageCode = "fr"): string {
+  const disclaimer = DISCLAIMERS[language];
+  const trimmed = text.trim();
+  return normaliseForMatching(trimmed).includes(normaliseForMatching(disclaimer)) ? trimmed : `${trimmed} ${disclaimer}`.trim();
+}
+
+/**
+ * Drops a sentence that repeats one already said. Composition passes through
+ * several layers, each of which may restate the instruction; the citizen should
+ * hear each thing once.
+ */
+export function dedupeSentences(text: string): string {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    const key = normaliseForMatching(sentence).replace(/[.!?;:,]/g, "");
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(sentence.trim());
+  }
+  return kept.join(" ").trim();
+}
+
 export const EMERGENCY_MESSAGES: Record<LanguageCode, string> = {
   fr: "Signes de danger détectés : allez au centre de santé le plus proche maintenant, sans attendre.",
   ln: "Bilembo ya likama emonani : kende na lopitalo to centre de santé sikoyo, kozela te.",
@@ -87,7 +152,8 @@ export const EMERGENCY_MESSAGES: Record<LanguageCode, string> = {
 /** Option value of a danger-sign question → spoken triggers in the five platform languages. */
 export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   convulsions: [
-    "convulsion", "convulsions", "crise", "tremble", "raidit", "spasme",
+    "convulsion", "convulsions", "convulse", "convulsent", "convulsait", "convulsé", "crise", "crises",
+    "tremble", "raidit", "se raidit", "spasme", "spasmes",
     "kobeta nzoto", "abeti nzoto", "nzoto ekangami",
     "degedege", "kifafa", "anatetemeka",
     "kunikana", "ke nikana",
@@ -95,6 +161,7 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   ],
   unconscious: [
     "inconscient", "inconsciente", "ne réagit", "ne repond", "ne répond", "coma", "évanoui", "evanoui", "somnolent", "très endormi", "sans connaissance", "perte de connaissance",
+    "ne se réveille pas", "ne bouge plus", "ne me reconnaît pas",
     "abungisi mayele", "azali koyanola te", "alali makasi", "akufi mayele",
     "kupoteza fahamu", "kuzimia", "amezimia", "hajibu", "usingizi mzito",
     "kele ve na mayele", "kufwa mayele", "ke vutula ve",
@@ -102,6 +169,8 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   ],
   cannot_drink: [
     "ne peut pas boire", "ne peut plus boire", "refuse de boire", "ne tète plus", "ne tete plus", "refuse de téter", "impossible de boire",
+    "ne peut plus téter", "ne peut pas téter", "n'arrive pas à téter", "n'arrive pas à boire", "ne veut plus téter",
+    "ne tète pas", "ne boit plus", "ne boit rien", "refuse le sein", "impossible de téter",
     "akoki komela te", "aboyi komela", "akomela te",
     "hawezi kunywa", "anakataa kunywa", "hanyonyi",
     "ke nwa ve", "ke buya kunwa",
@@ -116,6 +185,7 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   ],
   breathing_difficulty: [
     "ne respire", "difficulté à respirer", "difficulte a respirer", "respire mal", "respire vite", "essoufflé", "essouffle", "étouffe", "etouffe", "manque d'air", "respiration rapide",
+    "a du mal à respirer", "respire difficilement", "respire très fort",
     "akoki kopema te", "kopema mpasi", "azali kopema mbangu",
     "hapumui", "anapumua kwa shida", "shida ya kupumua", "kupumua haraka",
     "ke pema mpasi", "ke pema ve",
@@ -130,6 +200,7 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   ],
   heavy_bleeding: [
     "saigne beaucoup", "saignement abondant", "hémorragie", "hemorragie", "perd du sang", "beaucoup de sang", "sang qui coule",
+    "saigne énormément", "saigne sans arrêt", "n'arrête pas de saigner",
     "makila mingi", "makila ebimi mingi",
     "damu nyingi", "anavuja damu",
     "menga mingi",
@@ -144,12 +215,12 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   ],
 };
 
+const DANGER_SIGN_FOLDED: Array<[string, string[]]> = Object.entries(DANGER_SIGN_KEYWORDS).map(([value, keys]) => [value, folded(keys)]);
+
 /** Danger-sign option values recognised in a free-text message. */
 export function detectDangerSigns(text: string): string[] {
-  const t = text.toLowerCase();
-  return Object.entries(DANGER_SIGN_KEYWORDS)
-    .filter(([, keys]) => keys.some((k) => t.includes(k)))
-    .map(([value]) => value);
+  const t = normaliseForMatching(text);
+  return DANGER_SIGN_FOLDED.filter(([, keys]) => keys.some((k) => t.includes(k))).map(([value]) => value);
 }
 
 /* ==========================================================================================

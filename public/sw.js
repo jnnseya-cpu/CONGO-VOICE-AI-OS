@@ -9,7 +9,7 @@
  *  · the queue is replayed by the "cvos-sync" background sync, on reconnection, or on
  *    demand from the page, each item carrying its own Idempotency-Key.
  *
- * Keep the constants below in sync with src/lib/channels/offline-queue.ts.
+ * Keep the constants below in sync with src/server/channels/offline-queue.ts.
  */
 
 const VERSION = "v1";
@@ -20,7 +20,18 @@ const QUEUE_DB_VERSION = 1;
 const QUEUE_STORE = "outbox";
 const SYNC_TAG = "cvos-sync";
 
-const SHELL_ASSETS = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.svg", "/icons/icon-512.svg"];
+// The fonts are precached deliberately: they are served from this origin, so
+// offline the interface keeps its own typeface instead of falling back.
+const SHELL_ASSETS = [
+  "/",
+  "/manifest.webmanifest",
+  "/icons/icon.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/fonts/inter.css",
+  "/fonts/inter-latin.woff2",
+  "/fonts/inter-latin-ext.woff2",
+];
 
 const OFFLINE_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">

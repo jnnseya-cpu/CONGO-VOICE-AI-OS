@@ -36,7 +36,7 @@ import {
   type PromptQuestion,
 } from "../prompts";
 import {
-  DISCLAIMERS,
+  withDisclaimer,
   EMERGENCY_INSTRUCTIONS,
   FACILITY_UNKNOWN_NOTE,
   SAFEGUARDING_EMERGENCY_CATEGORIES,
@@ -448,7 +448,7 @@ export async function assessHealth(textFr: string, ctx: HealthContext, interacti
     understanding = SAFEGUARDING_NOTIFICATION_BODY;
     explanationSummary = SAFEGUARDING_NOTIFICATION_BODY;
   }
-  guidanceFr = `${guidanceFr} ${DISCLAIMERS.fr}`.trim();
+  guidanceFr = withDisclaimer(guidanceFr, "fr");
 
   // 11. Confidence vector and human review.
   const totalQuestions = Object.keys(protocol.questions).length;

@@ -28,7 +28,7 @@ import { openCase, shouldAutoCreateCase } from "./workflow";
 import { isDegradedMode } from "@server/core/metering";
 import { getProfileContext, rememberLanguage } from "./personalisation";
 import { recordSample, retrieveLearningContext } from "./learning";
-import { DISCLAIMERS, EMERGENCY_MESSAGES } from "../safety";
+import { dedupeSentences, EMERGENCY_MESSAGES, withDisclaimer } from "../safety";
 
 export interface InteractionInput {
   user: { userId: string; role: Role; language: LanguageCode; province?: string | null } | null;
@@ -188,7 +188,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     if (education?.quiz?.length) actionFr += ` Petit exercice : ${education.quiz.map((q, i) => `${i + 1}) ${q.question}`).join(" ")}`;
     if (agriculture?.lowCostInterventions?.length) actionFr += ` Options à faible coût : ${agriculture.lowCostInterventions.join(", ")}.`;
     if (risk.lowConfidence) actionFr += " Je ne suis pas certain d'avoir bien compris : pouvez-vous préciser ?";
-    if (health) actionFr += ` ${DISCLAIMERS.fr}`;
+    if (health) actionFr = withDisclaimer(actionFr, "fr");
+    actionFr = dedupeSentences(actionFr);
     const followUps = (health?.followUpQuestions ?? agriculture?.followUpQuestions ?? education?.followUpQuestions ?? []).slice(0, 3);
     const escalationTo = risk.escalationRequired ? ROLE_LABEL[service] : null;
     const summaryFr = `[${MODULE_LABEL[service]}] ${lang.intent.replace(/_/g, " ")} — risque ${risk.level}${risk.escalationRequired ? ", escaladé" : ""}. ${understanding.slice(0, 140)}`;
