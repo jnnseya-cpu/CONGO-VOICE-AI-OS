@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files: real values never, the contract always
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -46,3 +47,6 @@ next-env.d.ts
 
 # local screenshot output
 /screenshots-blog/
+
+# build output
+/.next-standalone

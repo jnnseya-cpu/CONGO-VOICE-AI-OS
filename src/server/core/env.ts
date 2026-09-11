@@ -34,20 +34,16 @@ export const env = {
   sessionSecret: process.env.SESSION_SECRET,
   sessionTtlHours: num("SESSION_TTL_HOURS", 24 * 14),
 
-  /** AI gateway configuration. Provider names are internal and never returned to clients. */
+  /**
+   * AI settings that are not provider selection. Which vendor answers a call is
+   * decided in one place only — the gateway's registry and its `AI_*_ORDER`
+   * chains. Duplicating that choice here produced two competing answers, so the
+   * provider fields were removed rather than kept in sync.
+   */
   ai: {
-    llmProvider: process.env.AI_LLM_PROVIDER ?? (process.env.ANTHROPIC_API_KEY ? "anthropic" : "mock"),
     llmModel: process.env.AI_LLM_MODEL ?? "claude-opus-5",
     llmEffort: (process.env.AI_LLM_EFFORT ?? "medium") as "low" | "medium" | "high" | "xhigh" | "max",
-    sttProvider: process.env.AI_STT_PROVIDER ?? (process.env.STT_API_KEY ? "whisper" : "mock"),
-    sttBaseUrl: process.env.STT_BASE_URL ?? "https://api.openai.com/v1",
-    sttApiKey: process.env.STT_API_KEY,
-    sttModel: process.env.STT_MODEL ?? "whisper-1",
-    ttsProvider: process.env.AI_TTS_PROVIDER ?? (process.env.GOOGLE_TTS_API_KEY ? "google" : "browser"),
-    googleTtsApiKey: process.env.GOOGLE_TTS_API_KEY,
-    googleSttApiKey: process.env.GOOGLE_STT_API_KEY,
     lowConfidenceThreshold: num("AI_LOW_CONFIDENCE_THRESHOLD", 0.55),
-    escalationThreshold: num("AI_ESCALATION_THRESHOLD", 0.7),
   },
 
   storage: {
