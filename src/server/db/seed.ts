@@ -21,6 +21,37 @@ import type { LanguageCode, ModuleType, Role } from "./schema";
 
 export const DEMO_PIN = "1234";
 
+/**
+ * The seed exists to make every dashboard legible on a developer's machine. It
+ * writes eight institutional accounts — one of them a platform administrator —
+ * all sharing a printed PIN. Run against a live database that is a
+ * publicly-guessable superuser, so it refuses to run in production.
+ *
+ * Setting SEED_ALLOW_PRODUCTION is deliberately not enough on its own: a PIN
+ * must also be supplied, so nobody can end up with 1234 on a real deployment
+ * by exporting one flag.
+ */
+export class SeedRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SeedRefused";
+  }
+}
+
+export function seedPin(): string {
+  if (process.env.NODE_ENV !== "production") return DEMO_PIN;
+  if (process.env.SEED_ALLOW_PRODUCTION !== "true") {
+    throw new SeedRefused(
+      "Refusing to seed demonstration data into a production database. It creates a platform administrator with a known PIN. Set SEED_ALLOW_PRODUCTION=true and SEED_PIN if this is a staging environment wearing a production label.",
+    );
+  }
+  const pin = process.env.SEED_PIN;
+  if (!pin || pin.length < 6) {
+    throw new SeedRefused("SEED_PIN must be set to at least six digits when seeding with SEED_ALLOW_PRODUCTION=true.");
+  }
+  return pin;
+}
+
 export const DEMO_ACCOUNTS: Array<{
   phone: string;
   name: string;
@@ -117,6 +148,8 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
     return { seeded: false };
   }
 
+  const pin = seedPin();
+
   // One national tenant and its organisations.
   const [tenant] = await db.insert(schema.tenants).values(DEMO_TENANT).returning();
   const orgIds = new Map<string, string>();
@@ -139,7 +172,7 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
   for (const a of DEMO_ACCOUNTS) {
     await db.insert(schema.users).values({
       phone: a.phone,
-      pinHash: hashPin(DEMO_PIN),
+      pinHash: hashPin(pin),
       name: a.name,
       role: a.role,
       languagePreference: a.language,
@@ -153,7 +186,7 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
       consentStatus: "granted",
     });
   }
-  log(`${DEMO_ACCOUNTS.length} comptes créés (PIN ${DEMO_PIN}), territoires et tours de garde inclus.`);
+  log(`${DEMO_ACCOUNTS.length} comptes créés (PIN ${pin}), territoires et tours de garde inclus.`);
 
   const citizens: Array<{ id: string; language: LanguageCode; province: string }> = [];
   for (let i = 0; i < 24; i++) {

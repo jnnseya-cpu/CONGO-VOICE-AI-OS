@@ -10,6 +10,7 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
+import { decryptIfEncrypted, encryptValue } from "./crypto";
 import { forbidden } from "./errors";
 import type { Role } from "@server/db/schema";
 import type { Session } from "./auth";
@@ -107,7 +108,9 @@ export function mfaRequiredFor(role: Role): boolean {
 export async function beginEnrolment(userId: string, account: string) {
   const db = await getDb();
   const secret = generateSecret();
-  await db.update(schema.users).set({ mfaSecret: secret, mfaEnabled: false }).where(eq(schema.users.id, userId));
+  // The seed is a standing second factor: a database dump containing it in the
+  // clear would let an attacker generate valid codes for every enrolled account.
+  await db.update(schema.users).set({ mfaSecret: encryptValue(secret, "mfa"), mfaEnabled: false }).where(eq(schema.users.id, userId));
   return { secret, otpauthUri: otpauthUri(secret, account) };
 }
 
@@ -123,7 +126,10 @@ export async function verifyCode(userId: string, token: string, at: Date = new D
   const db = await getDb();
   const [u] = await db.select({ mfaSecret: schema.users.mfaSecret, mfaEnabled: schema.users.mfaEnabled, preferences: schema.users.preferences }).from(schema.users).where(eq(schema.users.id, userId));
   if (!u?.mfaSecret) return { ok: false, enabled: false, verifiedAt: null, reason: "not_enrolled" };
-  if (!verifyTotp(u.mfaSecret, token, at)) return { ok: false, enabled: u.mfaEnabled, verifiedAt: null, reason: "invalid_code" };
+  // Seeds enrolled before encryption was introduced are still plain text; they
+  // are read as they are and re-encrypted the next time enrolment is run.
+  const secret = decryptIfEncrypted(u.mfaSecret, "mfa");
+  if (!secret || !verifyTotp(secret, token, at)) return { ok: false, enabled: u.mfaEnabled, verifiedAt: null, reason: "invalid_code" };
   const prefs = { ...(u.preferences ?? {}), mfaVerifiedAt: at.toISOString() };
   await db.update(schema.users).set({ mfaEnabled: true, preferences: prefs }).where(eq(schema.users.id, userId));
   return { ok: true, enabled: true, verifiedAt: at.toISOString() };

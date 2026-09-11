@@ -115,8 +115,16 @@ export const users = pgTable(
     ageBand: varchar("age_band", { length: 16 }),
     sex: varchar("sex", { length: 16 }),
     mfaEnabled: boolean("mfa_enabled").default(false).notNull(),
+    /** TOTP seed, encrypted at rest. See core/crypto.ts. */
     mfaSecret: text("mfa_secret"),
     status: varchar("status", { length: 16 }).default("active").notNull(),
+    /**
+     * Sessions are signed tokens, not rows, so a logout cannot delete them.
+     * Every token carries the moment it was issued; a token issued before this
+     * instant is refused. Logging out, changing role, suspending an account or
+     * resetting a PIN moves it forward and invalidates what is already out there.
+     */
+    sessionEpoch: timestamp("session_epoch", { withTimezone: true }).defaultNow().notNull(),
     ...timestamps,
   },
   (t) => [index("users_role_idx").on(t.role), index("users_province_idx").on(t.province), index("users_org_idx").on(t.organisationId)],
@@ -1114,3 +1122,39 @@ export type Session = typeof sessions.$inferSelect;
 export type KbDocument = typeof kbDocuments.$inferSelect;
 export type ProtocolVersion = typeof protocolVersions.$inferSelect;
 export type LexiconEntry = typeof languageLexicon.$inferSelect;
+
+/**
+ * Failed sign-in counter. Keyed by what is being attacked — an account, or an
+ * address trying many accounts — so one citizen locking themselves out of a
+ * shared handset cannot lock out the rest of the village.
+ */
+export const authAttempts = pgTable(
+  "auth_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** "phone:+243…" or "ip:41.…" — never the PIN, never the full secret. */
+    subject: varchar("subject", { length: 160 }).notNull().unique(),
+    failures: integer("failures").default(0).notNull(),
+    firstFailureAt: timestamp("first_failure_at", { withTimezone: true }).defaultNow().notNull(),
+    lastFailureAt: timestamp("last_failure_at", { withTimezone: true }).defaultNow().notNull(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  },
+  (t) => [index("auth_attempts_locked_idx").on(t.lockedUntil)],
+);
+
+/**
+ * Rate-limit counters shared by every instance. The in-process limiter was
+ * correct on one server and meaningless behind an autoscaler, where the real
+ * ceiling was the configured limit multiplied by the instance count.
+ */
+export const rateLimitCounters = pgTable(
+  "rate_limit_counters",
+  {
+    bucket: varchar("bucket", { length: 200 }).primaryKey(),
+    windowStart: timestamp("window_start", { withTimezone: true }).defaultNow().notNull(),
+    hits: integer("hits").default(0).notNull(),
+  },
+  (t) => [index("rate_limit_window_idx").on(t.windowStart)],
+);
+
+export type AuthAttempt = typeof authAttempts.$inferSelect;

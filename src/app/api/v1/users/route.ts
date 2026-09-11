@@ -2,12 +2,13 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { handle, paging } from "@server/core/api";
 import { hashPin } from "@server/core/auth";
+import { isWeakPin } from "@server/core/lockout";
 import { audit } from "@server/core/audit";
 import { badRequest } from "@server/core/errors";
 import { schema } from "@server/db/client";
 import { publicUser } from "@server/core/users";
 
-export const GET = handle({ permission: "user:manage" }, async ({ db, req }) => {
+export const GET = handle({ permission: "user:manage" }, async ({ db, req, user, ip }) => {
   const { limit, offset } = paging(req);
   const role = req.nextUrl.searchParams.get("role");
   const rows = await db
@@ -17,6 +18,9 @@ export const GET = handle({ permission: "user:manage" }, async ({ db, req }) => 
     .orderBy(desc(schema.users.createdAt))
     .limit(limit)
     .offset(offset);
+  // This response carries phone numbers. Reading the directory is itself an
+  // event worth keeping: it is the cheapest way to exfiltrate citizen contacts.
+  await audit({ action: "user.directory_read", actorUserId: user.userId, actorRole: user.role, after: { count: rows.length, role: role ?? "all" }, ip });
   return { users: rows.map((u) => ({ ...publicUser(u), phone: u.phone, createdAt: u.createdAt, lastActivityAt: u.lastActivityAt })) };
 });
 
@@ -33,6 +37,7 @@ const Create = z.object({
 
 export const POST = handle({ permission: "user:manage" }, async ({ db, user, json, ip }) => {
   const body = await json(Create);
+  if (isWeakPin(body.pin)) throw badRequest("Ce code PIN est trop courant. Choisissez-en un autre.");
   const [exists] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.phone, body.phone));
   if (exists) throw badRequest("Ce numéro est déjà enregistré");
   const [created] = await db

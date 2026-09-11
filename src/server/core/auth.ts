@@ -19,6 +19,8 @@ export interface Session {
   name?: string | null;
   province?: string | null;
   anonymous: boolean;
+  /** Issued at, in milliseconds. Compared against the account's session epoch so a signed token can be revoked. */
+  iat: number;
   exp: number;
 }
 
@@ -49,9 +51,9 @@ const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64url");
 const unb64 = (s: string) => Buffer.from(s, "base64url").toString("utf8");
 const sign = (payload: string) => createHmac("sha256", secret()).update(payload).digest("base64url");
 
-export function encodeSession(session: Omit<Session, "exp">): string {
-  const exp = Date.now() + env.sessionTtlHours * 3600 * 1000;
-  const payload = b64(JSON.stringify({ ...session, exp }));
+export function encodeSession(session: Omit<Session, "exp" | "iat">, now = Date.now()): string {
+  const exp = now + env.sessionTtlHours * 3600 * 1000;
+  const payload = b64(JSON.stringify({ ...session, iat: now, exp }));
   return `${payload}.${sign(payload)}`;
 }
 
@@ -67,6 +69,9 @@ export function decodeSession(token: string | undefined | null): Session | null 
   try {
     const parsed = JSON.parse(unb64(payload)) as Session;
     if (!parsed.userId || !parsed.role || parsed.exp < Date.now()) return null;
+    // Tokens minted before `iat` existed are treated as issued at the start of
+    // their own lifetime, so they expire normally rather than being revoked en masse.
+    if (typeof parsed.iat !== "number") parsed.iat = parsed.exp - env.sessionTtlHours * 3600 * 1000;
     return parsed;
   } catch {
     return null;
@@ -95,17 +100,48 @@ export function cookieOptions() {
   };
 }
 
-export function hashPin(pin: string): string {
+/**
+ * PIN hashing. The cost is written into the stored value, so raising it later
+ * does not invalidate the PINs already set: an old hash keeps verifying at the
+ * cost it was created with, and is rewritten at the new cost on next change.
+ *
+ * Format: `scrypt$<N>$<salt hex>$<hash hex>`. The original `salt:hash` form is
+ * still accepted and read at the cost that produced it.
+ */
+const LEGACY_COST = 16384;
+
+function derive(pin: string, salt: string, cost: number): Buffer {
+  // 128 * N * r bytes are needed; the default 32 MB ceiling is too low above N=16384.
+  return scryptSync(pin, salt, 32, { N: cost, r: 8, p: 1, maxmem: 256 * cost * 8 });
+}
+
+export function hashPin(pin: string, cost = env.auth.scryptCost): string {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(pin, salt, 32).toString("hex");
-  return `${salt}:${hash}`;
+  return `scrypt$${cost}$${salt}$${derive(pin, salt, cost).toString("hex")}`;
 }
 
 export function verifyPin(pin: string, stored: string | null | undefined): boolean {
   if (!stored) return false;
-  const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const candidate = scryptSync(pin, salt, 32);
+  let salt: string, hash: string, cost: number;
+  if (stored.startsWith("scrypt$")) {
+    const [, n, s, h] = stored.split("$");
+    cost = Number(n);
+    salt = s;
+    hash = h;
+    if (!Number.isFinite(cost) || !salt || !hash) return false;
+  } else {
+    [salt, hash] = stored.split(":");
+    cost = LEGACY_COST;
+    if (!salt || !hash) return false;
+  }
+  const candidate = derive(pin, salt, cost);
   const expected = Buffer.from(hash, "hex");
   return candidate.length === expected.length && timingSafeEqual(candidate, expected);
+}
+
+/** True when a stored hash was made at a lower cost than the one now configured. */
+export function needsRehash(stored: string | null | undefined): boolean {
+  if (!stored) return false;
+  if (!stored.startsWith("scrypt$")) return true;
+  return Number(stored.split("$")[1]) < env.auth.scryptCost;
 }

@@ -5,6 +5,7 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { decryptBytes, encryptBytes, looksEncryptedBytes } from "./crypto";
 import { env } from "./env";
 
 export interface StoredFile {
@@ -69,9 +70,37 @@ class GcsStorage implements StorageDriver {
   }
 }
 
+/**
+ * Encrypts everything on the way down and decrypts on the way up, so no caller
+ * has to remember to. What lands on disk or in the bucket is AES-256-GCM
+ * ciphertext: a recording of a citizen describing a sick child is unreadable to
+ * anyone holding the volume, the backup or the bucket without the key.
+ *
+ * Objects written before this wrapper existed have no container header and are
+ * returned as they are, so an upgrade needs no migration window.
+ */
+class EncryptedStorage implements StorageDriver {
+  constructor(private readonly inner: StorageDriver) {}
+  async put(key: string, data: Buffer, mimeType: string) {
+    await this.inner.put(key, encryptBytes(data, "storage"), mimeType);
+  }
+  async get(key: string) {
+    const raw = await this.inner.get(key);
+    return looksEncryptedBytes(raw) ? decryptBytes(raw, "storage") : raw;
+  }
+  async delete(key: string) {
+    await this.inner.delete(key);
+  }
+}
+
 let driver: StorageDriver | undefined;
 export function storage(): StorageDriver {
-  return (driver ??= env.storage.driver === "gcs" ? new GcsStorage() : new LocalStorage());
+  return (driver ??= new EncryptedStorage(env.storage.driver === "gcs" ? new GcsStorage() : new LocalStorage()));
+}
+
+/** Test hook: forget the cached driver so a changed configuration takes effect. */
+export function resetStorage() {
+  driver = undefined;
 }
 
 const EXT: Record<string, string> = {

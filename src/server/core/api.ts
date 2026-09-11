@@ -6,10 +6,11 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
+import { eq } from "drizzle-orm";
 import { ApiError, badRequest, forbidden, tooMany, unauthorized } from "./errors";
 import { sessionFromRequest, type Session } from "./auth";
 import { hasPermission, type Permission } from "./rbac";
-import { checkRateLimit } from "./rate-limit";
+import { checkSharedRateLimit } from "./rate-limit";
 import { env } from "./env";
 import { getDb, schema, type Database } from "@server/db/client";
 
@@ -29,19 +30,31 @@ export interface HandleOptions {
   permission?: Permission;
   /** Require a session but no specific permission. */
   auth?: boolean;
-  /** Rate-limit class: AI routes are more expensive. */
-  limit?: "default" | "ai" | "none";
+  /** Rate-limit class: AI routes are more expensive, sign-in routes far stricter. */
+  limit?: "default" | "ai" | "auth" | "none";
 }
 
 type RouteParams = { params: Promise<Record<string, string>> };
 type Handler<P> = (ctx: ApiContext<P>) => Promise<Response | object>;
 
+/**
+ * The caller's address, read from the right of X-Forwarded-For.
+ *
+ * Taking the left-most entry trusts whatever the caller wrote, which lets an
+ * attacker put a new address in the header on every request and walk straight
+ * past any per-address limit. Only the hops we put there ourselves can be
+ * trusted, so the address is read `TRUSTED_PROXY_HOPS` positions from the end.
+ */
 export function clientIp(req: NextRequest): string | null {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    null
-  );
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const chain = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
+    if (chain.length > 0) {
+      const index = Math.max(0, chain.length - Math.max(1, env.trustedProxyHops));
+      return chain[index] ?? chain[chain.length - 1];
+    }
+  }
+  return req.headers.get("x-real-ip") ?? null;
 }
 
 export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Handler<P>) {
@@ -60,10 +73,27 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
 
       const limitClass = opts.limit ?? "default";
       if (limitClass !== "none") {
-        const key = `${limitClass}:${session?.userId ?? ip ?? "anon"}`;
-        const max = limitClass === "ai" ? env.rateLimit.maxAiRequests : env.rateLimit.maxRequests;
-        const rl = checkRateLimit(key, max, env.rateLimit.windowSeconds);
+        // Sign-in is counted by address, not by session: there is no session yet,
+        // and an attacker would otherwise get a fresh allowance per guess.
+        const identity = limitClass === "auth" ? (ip ?? "anon") : (session?.userId ?? ip ?? "anon");
+        const max =
+          limitClass === "ai" ? env.rateLimit.maxAiRequests : limitClass === "auth" ? env.rateLimit.maxAuthRequests : env.rateLimit.maxRequests;
+        const rl = await checkSharedRateLimit(db, `${limitClass}:${identity}`, max, env.rateLimit.windowSeconds);
         if (!rl.allowed) throw tooMany();
+      }
+
+      // A session is a signed token, so the only way to withdraw one is to check
+      // the account it names on every request: an epoch moved forward by logout,
+      // a role change or a suspension, and a status that is no longer active.
+      if (session && !session.anonymous) {
+        const [account] = await db
+          .select({ epoch: schema.users.sessionEpoch, status: schema.users.status, role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, session.userId));
+        if (!account) throw unauthorized("Session expirée");
+        if (account.status !== "active") throw forbidden("Compte suspendu");
+        if (account.epoch && session.iat < account.epoch.getTime()) throw unauthorized("Session révoquée");
+        if (account.role !== session.role) throw unauthorized("Session révoquée");
       }
 
       const params = (route ? await route.params : {}) as P;
@@ -75,10 +105,19 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
         params,
         ip,
         async json<T>(zschema: ZodType<T>): Promise<T> {
+          const declared = Number(req.headers.get("content-length") ?? 0);
+          if (Number.isFinite(declared) && declared > env.maxJsonBodyBytes) {
+            throw new ApiError(413, "Corps de requête trop volumineux", "payload_too_large");
+          }
           let body: unknown;
           try {
-            body = await req.json();
-          } catch {
+            const raw = await req.text();
+            if (Buffer.byteLength(raw) > env.maxJsonBodyBytes) {
+              throw new ApiError(413, "Corps de requête trop volumineux", "payload_too_large");
+            }
+            body = JSON.parse(raw);
+          } catch (err) {
+            if (err instanceof ApiError) throw err;
             throw badRequest("Corps JSON invalide");
           }
           const parsed = zschema.safeParse(body);

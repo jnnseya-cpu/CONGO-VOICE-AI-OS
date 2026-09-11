@@ -37,7 +37,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   };
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+      <link rel="stylesheet" href="/fonts/source-serif.css" />
       <div className="flex min-h-screen flex-col bg-bg">
         <PublicHeader />
         <main id="contenu" className="flex-1">

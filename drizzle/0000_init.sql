@@ -136,6 +136,16 @@ CREATE TABLE "audit_logs" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "auth_attempts" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"subject" varchar(160) NOT NULL,
+	"failures" integer DEFAULT 0 NOT NULL,
+	"first_failure_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_failure_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"locked_until" timestamp with time zone,
+	CONSTRAINT "auth_attempts_subject_unique" UNIQUE("subject")
+);
+--> statement-breakpoint
 CREATE TABLE "autosave_drafts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid,
@@ -661,6 +671,12 @@ CREATE TABLE "provinces" (
 	CONSTRAINT "provinces_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
+CREATE TABLE "rate_limit_counters" (
+	"bucket" varchar(200) PRIMARY KEY NOT NULL,
+	"window_start" timestamp with time zone DEFAULT now() NOT NULL,
+	"hits" integer DEFAULT 0 NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "report_definitions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(160) NOT NULL,
@@ -852,6 +868,7 @@ CREATE TABLE "users" (
 	"mfa_enabled" boolean DEFAULT false NOT NULL,
 	"mfa_secret" text,
 	"status" varchar(16) DEFAULT 'active' NOT NULL,
+	"session_epoch" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "users_phone_unique" UNIQUE("phone"),
@@ -885,6 +902,7 @@ CREATE INDEX "acu_ledger_tenant_idx" ON "acu_ledger" USING btree ("tenant_id","o
 CREATE INDEX "api_logs_created_idx" ON "api_request_logs" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "audit_created_idx" ON "audit_logs" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "audit_entity_idx" ON "audit_logs" USING btree ("entity_type","entity_id");--> statement-breakpoint
+CREATE INDEX "auth_attempts_locked_idx" ON "auth_attempts" USING btree ("locked_until");--> statement-breakpoint
 CREATE INDEX "autosave_user_key_idx" ON "autosave_drafts" USING btree ("user_id","client_key");--> statement-breakpoint
 CREATE INDEX "cases_queue_idx" ON "cases" USING btree ("queue");--> statement-breakpoint
 CREATE INDEX "cases_sla_idx" ON "cases" USING btree ("sla_due_at");--> statement-breakpoint
@@ -912,6 +930,7 @@ CREATE INDEX "notifications_user_idx" ON "notifications" USING btree ("user_id",
 CREATE INDEX "notifications_scheduled_idx" ON "notifications" USING btree ("scheduled_for");--> statement-breakpoint
 CREATE INDEX "prompt_versions_idx" ON "prompt_versions" USING btree ("name","version");--> statement-breakpoint
 CREATE INDEX "protocol_versions_idx" ON "protocol_versions" USING btree ("protocol_id","version");--> statement-breakpoint
+CREATE INDEX "rate_limit_window_idx" ON "rate_limit_counters" USING btree ("window_start");--> statement-breakpoint
 CREATE INDEX "schedules_due_idx" ON "schedules" USING btree ("status","scheduled_for");--> statement-breakpoint
 CREATE INDEX "service_directory_geo_idx" ON "service_directory" USING btree ("province","type");--> statement-breakpoint
 CREATE INDEX "sessions_channel_ref_idx" ON "sessions" USING btree ("channel","channel_ref");--> statement-breakpoint

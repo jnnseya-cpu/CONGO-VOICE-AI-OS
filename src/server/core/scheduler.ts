@@ -22,6 +22,8 @@ import { emitEvent } from "./events";
 import { hasReminderConsent, notifyRole, notifyTemplate, sendDueNotifications } from "./notifications";
 import { checkAcuCaps } from "./metering";
 import { overdueDataRequests } from "./privacy";
+import { pruneAuthAttempts } from "./lockout";
+import { pruneRateLimitCounters } from "./rate-limit";
 import { safeLog } from "./redact";
 import { detectBlockedCases, detectSlaBreaches } from "@server/ai/agents/workflow";
 import { expireReports, runDueReportDefinitions } from "@server/reports";
@@ -268,6 +270,7 @@ export interface SchedulerReport {
   auditChain: { date: string; ok: boolean; checked: number; brokenAt: unknown } | null;
   acuAlerts: number;
   overdueDataRequests: number;
+  securityCountersPruned: number;
   errors: Array<{ step: string; message: string }>;
 }
 
@@ -294,6 +297,20 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
   const expired = await step("expire_reports", errors, () => expireReports(now), 0);
   const acuAlerts = await step("acu_caps", errors, () => checkAcuCaps(now), []);
   const overdue = await step("data_requests", errors, () => overdueDataRequests(now), []);
+
+  // Security counters are unbounded otherwise: one row per address that ever
+  // mistyped a PIN, one per rate-limit bucket that ever filled.
+  const pruned = await step(
+    "prune_security_counters",
+    errors,
+    async () => {
+      const db = await getDb();
+      const attempts = await pruneAuthAttempts(db, 86_400_000, now.getTime());
+      const buckets = await pruneRateLimitCounters(db, 3_600_000, now.getTime());
+      return attempts + buckets;
+    },
+    0,
+  );
 
   // Daily integrity check of yesterday's audit chain (a closed day cannot change any more).
   const yesterday = new Date(now.getTime() - 24 * 3600 * 1000);
@@ -336,6 +353,7 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
     auditChain: chain,
     acuAlerts: acuAlerts.length,
     overdueDataRequests: overdue.length,
+    securityCountersPruned: pruned,
     errors,
   };
   await emitEvent({ type: "scheduler.run.completed", aggregateType: "scheduler", aggregateId: now.toISOString().slice(0, 10), payload: { ...report, errors: errors.length } });

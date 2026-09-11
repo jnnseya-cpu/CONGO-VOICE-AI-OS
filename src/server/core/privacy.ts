@@ -149,7 +149,7 @@ export async function tombstoneUser(userId: string, actor: { userId: string; rol
   // 5. The account itself becomes a tombstone.
   await db
     .update(schema.users)
-    .set({ name: null, phone: null, pinHash: null, isAnonymous: true, status: "erased", preferences: { tombstone: token }, mfaSecret: null, mfaEnabled: false, pseudoId: token })
+    .set({ name: null, phone: null, pinHash: null, isAnonymous: true, status: "erased", preferences: { tombstone: token }, mfaSecret: null, mfaEnabled: false, pseudoId: token, sessionEpoch: new Date() })
     .where(eq(schema.users.id, userId));
 
   const auditRows = await db.select({ id: schema.auditLogs.id }).from(schema.auditLogs).where(eq(schema.auditLogs.actorUserId, userId));
