@@ -7,8 +7,11 @@ const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-await page.goto(url, { waitUntil: "networkidle", timeout: 120000 });
-await page.waitForTimeout(800);
+// "networkidle" never settles once the service worker is registered, so wait
+// for the document and then give the page a moment to paint.
+await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
+await page.waitForLoadState("load", { timeout: 30000 }).catch(() => undefined);
+await page.waitForTimeout(1500);
 await page.screenshot({ path: out, fullPage: process.env.FULL === "1" });
 console.log("saved", out, errors.length ? "errors: " + errors.slice(0, 5).join(" | ") : "no console errors");
 await browser.close();

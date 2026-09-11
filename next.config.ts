@@ -43,6 +43,15 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Self-contained server bundle, so the container copies one directory.
   output: "standalone",
+  /**
+   * The tracer walks the working directory and pulled the whole runtime data
+   * directory into the bundle — on a developer machine that is a 60 MB embedded
+   * database holding the seeded platform administrator whose PIN is printed in
+   * the source. Building on a laptop would have shipped it to production.
+   */
+  outputFileTracingExcludes: {
+    "*": ["data/**", ".test-data/**", "screenshots-blog/**"],
+  },
   headers: async () => [
     {
       source: "/(.*)",

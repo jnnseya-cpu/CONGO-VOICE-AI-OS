@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+.next
+data
+.test-data
+screenshots-blog
+docs
+tests
+*.md
+!README.md
+.env
+.env.*
+!.env.example

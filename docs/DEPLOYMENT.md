@@ -2,13 +2,52 @@
 
 CONGO VOICE AI OS is a single Next.js 16 application (frontend + API) with an embedded or external PostgreSQL database. It runs on any Node.js 22 host; the reference target is Google Cloud (Cloud Run or GKE + Cloud SQL + Cloud Storage), which matches the programme's portfolio conventions.
 
+## 0. What this platform is not built on
+
+Two products get assumed onto any project hosted on Google infrastructure, and
+adding them here would be a mistake rather than an upgrade:
+
+- **Firestore is not used.** The data model is relational PostgreSQL, defined
+  once in `src/server/db/schema.ts` with a single migration in `drizzle/`.
+  Cases, audit chains, SLA clocks and reporting all depend on joins and
+  transactions.
+- **Firebase Authentication is not used.** Sessions are signed cookies this
+  application issues, with roles and permissions in `src/server/core/rbac.ts`.
+  Citizens sign in with a phone number and a PIN, or with no account at all.
+
+It follows that **there are no Firestore or Storage security rules to write**.
+Access control is enforced server-side on every `/api/v1` route by `handle()`.
+Anyone auditing this platform should read `src/server/core/rbac.ts` and
+`docs/SECURITY.md`, not look for a `firestore.rules` file.
+
+Firebase **App Hosting** itself is fine: it runs a Next.js server on Cloud Run.
+`apphosting.yaml` at the repository root configures it, and needs Cloud SQL for
+the database and a bucket for uploads, exactly as §2 describes.
+
 ## 1. Minimal (pilot / demo)
 ```bash
 npm ci
 npm run build
-SESSION_SECRET=$(openssl rand -hex 32) DATA_DIR=/var/lib/cvos npm start
+SESSION_SECRET=$(openssl rand -hex 32) \
+DATA_ENCRYPTION_KEY=$(openssl rand -hex 32) \
+DATA_DIR=/var/lib/cvos npm start
 ```
-The embedded PGlite database and uploads live under `DATA_DIR`. Suitable for a single instance.
+The embedded PGlite database and uploads live under `DATA_DIR`. Suitable for a
+single instance. Both secrets are required in production and the server refuses
+to start without them. **Record `DATA_ENCRYPTION_KEY` somewhere durable before
+the first upload**: it is what makes stored recordings readable, and there is no
+recovery path if it is lost.
+
+### As a container
+
+```bash
+docker build -t congovoice:latest .
+docker run --rm -p 8080:8080 \
+  -e SESSION_SECRET=… -e DATA_ENCRYPTION_KEY=… -e DATABASE_URL=… \
+  -v congovoice-data:/data congovoice:latest
+```
+The image is built from `output: "standalone"`, runs as an unprivileged user and
+carries a health check against `/api/v1/system/health`.
 
 ## 2. Production (Google Cloud)
 | Component | Setting |
@@ -39,8 +78,32 @@ Set any subset; routing order is configurable (`AI_LLM_ORDER`, `AI_VISION_ORDER`
 ## 5. Data residency and sovereignty
 Primary region `europe-west1` for latency to Kinshasa, with a documented path to a Kinshasa-hosted node (Phase 5): the stack is portable (PostgreSQL, object storage, Node). All citizen data is exportable (`/api/v1/reports/*`, `/api/v1/language/export`).
 
+## 5b. Verifying a deployment before announcing it
+
+```bash
+node scripts/smoke.mjs https://your-host
+```
+
+Thirty-seven checks against the running server: probes and security headers, an
+anonymous citizen asking an ordinary question and then reporting a danger sign,
+the danger sign graded critical by rule and present in a health worker's queue,
+a worker refused platform administration, a token that stops working the moment
+its owner signs out, an account that locks after repeated wrong PINs and stays
+locked from a different address, and the public surface. It exits non-zero on
+any failure, so it belongs in the release pipeline rather than in a runbook.
+
 ## 6. Hardening checklist
-- `SESSION_SECRET` ≥ 32 random bytes; rotate on incident.
+- `SESSION_SECRET` and `DATA_ENCRYPTION_KEY` ≥ 32 random bytes, from a secret
+  manager with versioning. Rotating the session secret signs everyone out;
+  rotating the data key requires re-encrypting what is already stored.
+- `TRUSTED_PROXY_HOPS` must match the number of proxies in front of the app.
+  The platform must not be exposed directly: `X-Forwarded-For` is then
+  caller-controlled and per-address limits become advisory. Account lockout is
+  unaffected either way.
+- Never set `SEED_ALLOW_PRODUCTION`. The seed writes a platform administrator
+  whose PIN is printed in the source; the endpoint and the script both refuse
+  in production, and the override exists only for a staging environment that
+  carries a production label.
 - MFA enabled for admin and supervisor roles; break-glass access reviewed weekly.
 - Retention: raw audio 90 days (configurable), agri media 12 months, structured records per programme policy; erasure requests honoured within 30 days.
 - Quarterly penetration test; dependency scanning in CI; backups restore-tested.

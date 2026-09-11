@@ -1,0 +1,71 @@
+# Firebase App Hosting.
+#
+# App Hosting runs a Next.js server on Cloud Run. That part fits this platform.
+# What does NOT apply, and must not be added on the assumption that it does:
+#
+#   - Firestore. The data model is relational PostgreSQL (Drizzle, one migration
+#     in ./drizzle). Point DATABASE_URL at Cloud SQL for PostgreSQL.
+#   - Firebase Authentication. Sessions are signed cookies issued by this
+#     application, with roles and permissions in src/server/core/rbac.ts.
+#   - Firestore or Storage security rules. There are none to write, because
+#     neither product is used. Access control is enforced server-side on every
+#     /api/v1 route by handle() in src/server/core/api.ts.
+#
+# Set every secret in Secret Manager first, then grant the App Hosting service
+# account roles/secretmanager.secretAccessor on each.
+
+runConfig:
+  runtime: nodejs22
+  cpu: 1
+  memoryMiB: 1024
+  minInstances: 0
+  maxInstances: 10
+  concurrency: 80
+
+env:
+  - variable: NODE_ENV
+    value: production
+    availability: [BUILD, RUNTIME]
+
+  - variable: NEXT_PUBLIC_SITE_URL
+    value: https://congovoice.cd
+    availability: [BUILD, RUNTIME]
+
+  # Uploads must go to a bucket: a Cloud Run instance's disk does not survive it.
+  - variable: STORAGE_DRIVER
+    value: gcs
+    availability: [RUNTIME]
+  - variable: GCS_BUCKET
+    value: REPLACE_WITH_BUCKET_NAME
+    availability: [RUNTIME]
+
+  # Behind Google's front end there is one proxy hop in front of the app.
+  - variable: TRUSTED_PROXY_HOPS
+    value: "1"
+    availability: [RUNTIME]
+
+  - variable: SESSION_SECRET
+    secret: congovoice-session-secret
+    availability: [RUNTIME]
+  # Losing this makes every stored recording and second-factor seed unreadable.
+  - variable: DATA_ENCRYPTION_KEY
+    secret: congovoice-data-encryption-key
+    availability: [RUNTIME]
+  - variable: DATABASE_URL
+    secret: congovoice-database-url
+    availability: [RUNTIME]
+  - variable: CRON_SECRET
+    secret: congovoice-cron-secret
+    availability: [RUNTIME]
+
+  # AI providers. Omit them all and the platform still runs, on the offline
+  # rules provider, with every deterministic safety rule intact.
+  - variable: ANTHROPIC_API_KEY
+    secret: congovoice-anthropic-key
+    availability: [RUNTIME]
+  - variable: GEMINI_API_KEY
+    secret: congovoice-gemini-key
+    availability: [RUNTIME]
+  - variable: OPENAI_API_KEY
+    secret: congovoice-openai-key
+    availability: [RUNTIME]

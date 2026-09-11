@@ -9,6 +9,9 @@ export async function GET() {
     await db.execute(sql`select 1`);
     return NextResponse.json({ status: "ok", time: new Date().toISOString() });
   } catch (err) {
-    return NextResponse.json({ status: "degraded", error: err instanceof Error ? err.message : "db" }, { status: 503 });
+    // The message can carry a connection string, so it stays in the logs.
+    console.error("[health]", err);
+    const detail = process.env.NODE_ENV === "production" ? "database_unreachable" : err instanceof Error ? err.message : "db";
+    return NextResponse.json({ status: "degraded", error: detail }, { status: 503 });
   }
 }
