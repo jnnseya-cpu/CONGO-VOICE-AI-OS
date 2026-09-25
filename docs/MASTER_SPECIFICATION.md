@@ -128,7 +128,7 @@ Digital public services in the DRC assume the citizen can read, write, search, u
 | Code-switching is the norm | Token-level language tags, French pivot, no forced language choice | `LanguageAnalysis.mixedLanguages`, `interactions.transcriptTags` |
 | Shared phones in households | Identity ≠ phone number; lightweight per-session confirmation; anonymous mode | `identifyCitizen()`, `shouldConfirmSharedPhone()`, `sessions.proxy` |
 | Trust in institutions varies | The system identifies itself, states what it is not, and offers a human path one utterance away | `DISCLAIMERS` in `src/server/ai/safety.ts`; `shouldAutoCreateCase({humanRequested})` |
-| Data sovereignty expectations | Portable stack, exportable data, no provider exposure, documented residency path | `docs/DEPLOYMENT.md` §5, `GET /api/v1/language/export`, `SEC-08` enforcement |
+| Data sovereignty expectations | Portable stack, exportable data, no provider exposure, and an enforced list of permitted jurisdictions | `docs/DATA_RESIDENCY.md`, `src/server/core/residency.ts`, `GET /api/v1/language/export`, `SEC-08` enforcement |
 
 ## 2.3 Against existing chatbot and IVR platforms
 
@@ -2473,7 +2473,7 @@ Every open decision from both PRDs, consolidated. Items marked **blocking** prev
 |---|----------|-------|-----------|----------|--------------------------------------|
 | D-01 | Pilot provinces, and therefore the MVP languages | FDSU + operator | Phase 0 week 2 | **yes** | Kinshasa and Kongo-Central (fr, ln, kg) **or** Kinshasa and Kasaï-Oriental (fr, ln, lua). The code carries all five languages and the 26 provinces; only the go-live gate is per language. |
 | D-02 | Telephony provider: MNO SIP trunk versus aggregator | operator + MNOs | Phase 0 week 4 | **yes** | Twilio adapter implemented; the abstraction is one file, so a switch is a configuration and an adapter, not a rewrite. |
-| D-03 | Data residency and the timing of a Kinshasa node | FDSU | Phase 0 week 4 | **yes** | `europe-west1` primary with a documented, portable path to a Kinshasa-hosted node in Phase 5 (`docs/DEPLOYMENT.md` §5). |
+| D-03 | Data residency and the timing of a Kinshasa node | FDSU | Phase 0 week 4 | **partly settled** | Intent is the DRC; no cloud region exists there, so the pilot runs from `africa-south1` (Johannesburg) and migrates when one does. The posture is now enforced rather than documented: `DATA_RESIDENCY` names the permitted jurisdictions and a destination outside them is never registered (`docs/DATA_RESIDENCY.md`, `src/server/core/residency.ts`). What remains open is the legal question — whether the Code du numérique requires localisation or conditions on transfer — and the timing of an in-country node. |
 | D-04 | Corpus ownership and licensing | FDSU + legal | Phase 0 week 4 | **yes** | Proposed: the programme owns the corpus; the operator holds a licence for model improvement in service of that programme; the corpus must never be privatised (§12.7). |
 | D-05 | Identity provider for staff: Google Workspace versus Keycloak | operator | Phase 0 week 3 | no | Keycloak recommended for sovereignty. Phone + PIN with TOTP MFA works today; federation is additive. |
 | D-06 | StudYear component-reuse boundary | operator | Phase 1 week 2 | no | Implemented natively (`src/server/ai/education/**`). A shared package can be extracted later without changing behaviour. |

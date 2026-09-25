@@ -22,6 +22,7 @@ import { getDb, schema } from "@server/db/client";
 import { env } from "./env";
 import { readPhone } from "./phone";
 import { emitEvent } from "./events";
+import { permits } from "./residency";
 import { safeLog, maskPhone } from "./redact";
 import { NOTIFICATION_TEMPLATES } from "@server/db/reference/notification-templates";
 import type { LanguageCode, Role } from "@server/db/schema";
@@ -182,8 +183,27 @@ export interface DispatchResult {
   provider: string;
 }
 
+/**
+ * A destination the deployment's residency policy forbids is not called.
+ *
+ * Refusing here reads as unhelpful until you consider the alternative: a
+ * programme that has told a ministry citizen data does not leave a named set of
+ * jurisdictions, and a message to a carrier outside them that nobody sees. The
+ * refusal is a delivery failure like any other, so the escalation path reports
+ * it and the readiness probe degrades — which is the argument for changing the
+ * policy or the carrier, made at the right moment.
+ */
+function residencyRefusal(providerId: string, channel: string): DispatchResult | null {
+  const verdict = permits(providerId);
+  if (verdict.permitted) return null;
+  safeLog.info(`notify:${channel}`, `refused: ${providerId} is outside the data residency policy (${verdict.offending.join(", ")})`);
+  return { ok: false, failureReason: `${channel}_provider_outside_residency_policy`, provider: providerId };
+}
+
 async function sendSms(to: string, text: string): Promise<DispatchResult> {
   const provider = env.notifications.smsProvider;
+  const refused = residencyRefusal(provider, "sms");
+  if (refused) return refused;
   if (provider === "africastalking") {
     const username = process.env.AFRICASTALKING_USERNAME;
     const apiKey = process.env.AFRICASTALKING_API_KEY;
@@ -210,6 +230,8 @@ async function sendSms(to: string, text: string): Promise<DispatchResult> {
 
 async function sendWhatsapp(to: string, text: string): Promise<DispatchResult> {
   const provider = env.notifications.whatsappProvider;
+  const refused = residencyRefusal(provider, "whatsapp");
+  if (refused) return refused;
   if (provider === "twilio") return twilio(to, text, "whatsapp");
   if (provider === "meta") {
     const token = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -252,6 +274,9 @@ function logOnlyDispatch(channel: string, to: string, text: string): DispatchRes
 }
 
 async function twilio(to: string, text: string, kind: "sms" | "whatsapp"): Promise<DispatchResult> {
+  // Reached through two callers; checked again here so neither can bypass it.
+  const refused = residencyRefusal("twilio", kind);
+  if (refused) return refused;
   const { twilioAccountSid, twilioAuthToken, twilioFrom } = env.notifications;
   if (!twilioAccountSid || !twilioAuthToken || !twilioFrom) return { ok: false, failureReason: "twilio_not_configured", provider: "twilio" };
   const prefix = kind === "whatsapp" ? "whatsapp:" : "";

@@ -3,7 +3,12 @@
 
 project_id  = "congovoice-pilot"
 environment = "pilot"          # dev | staging | pilot | prod — changes platform behaviour, see docs/GO_LIVE.md §6
-region      = "europe-west1"
+region      = "africa-south1"   # Johannesburg: nearest available to Kinshasa, no DRC region exists
+
+# Where citizen data may go. See docs/DATA_RESIDENCY.md for every destination.
+# ["CD"] is the strictest setting and puts the platform in offline rules mode.
+deployment_jurisdiction = "ZA"
+data_residency          = ["ZA", "US"]
 
 # The origin citizens type. Must match the domain below and the value the image
 # was BUILT with, or the browser bundle and the telephony callbacks disagree
@@ -17,7 +22,7 @@ dns_zone_name = ""             # e.g. "congovoice-cd" when manage_dns = true
 
 # By digest, so a redeploy is the same bytes. The repository is created by this
 # Terraform (google_artifact_registry_repository.app, id "cvos").
-image = "europe-west1-docker.pkg.dev/congovoice-pilot/cvos/app@sha256:REPLACE"
+image = "africa-south1-docker.pkg.dev/congovoice-pilot/cvos/app@sha256:REPLACE"
 
 # Never zero where calls are answered: a cold start is a citizen waiting.
 min_instances = 1

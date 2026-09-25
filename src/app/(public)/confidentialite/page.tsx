@@ -312,7 +312,13 @@ export default function ConfidentialitePage() {
             .
           </p>
           <p>
-            L&apos;hébergement primaire se situe aujourd&apos;hui hors du pays, pour des raisons de latence, avec un chemin documenté vers un nœud hébergé à Kinshasa. Le calendrier de ce transfert est une décision de programme.
+            L&apos;objectif du programme est que tout reste en République Démocratique du Congo. Il n&apos;existe aujourd&apos;hui aucune région d&apos;hébergement dans le pays&nbsp;: le pilote fonctionne donc depuis la plus proche disponible, et migrera dès qu&apos;une option nationale existera. Le calendrier de ce transfert est une décision de programme.
+          </p>
+          <p>
+            Cette limite n&apos;est pas seulement documentée, elle est appliquée par la plateforme. Chaque déploiement déclare la liste des juridictions vers lesquelles les données d&apos;un citoyen peuvent être envoyées&nbsp;; une destination hors de cette liste n&apos;est jamais activée, de sorte qu&apos;aucun ordre de priorité, aucune reprise et aucun repli ne peut l&apos;atteindre. Le contrôle de disponibilité signale l&apos;écart entre ce qui est déclaré et ce qui est configuré.
+          </p>
+          <p>
+            Déplacer le serveur ne déplace pas le modèle&nbsp;: un enregistrement vocal envoyé à un service de transcription établi à l&apos;étranger a quitté le pays, que le serveur soit à Johannesburg ou à Kinshasa. Sous la politique la plus stricte, la plateforme refuse tout fournisseur distant et continue de fonctionner en mode hors ligne&nbsp;— le tri par protocole, la détection des signes de danger et les scripts d&apos;urgence n&apos;ont jamais utilisé de modèle&nbsp;— mais elle cesse de comprendre la parole libre.
           </p>
         </Prose>
       </Section>

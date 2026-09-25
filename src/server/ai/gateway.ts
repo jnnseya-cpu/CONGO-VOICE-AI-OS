@@ -16,6 +16,7 @@ import { env } from "@server/core/env";
 import { getDb, schema } from "@server/db/client";
 import type { LanguageCode } from "@server/db/schema";
 import { MockProvider } from "./providers/mock";
+import { permits, residencyPolicy } from "@server/core/residency";
 import {
   ProviderError,
   type Capability,
@@ -69,30 +70,49 @@ export class AiGateway {
     this.ready = this.register();
   }
 
+  /** Destinations a configured provider was refused because of the residency policy. */
+  readonly refusedByResidency: string[] = [];
+
+  /**
+   * A provider is only registered if the deployment's residency policy permits
+   * its jurisdiction. Refusing here rather than at the call site is deliberate:
+   * a provider that is never in the registry has no code path that reaches it,
+   * so there is no ordering, retry or fallback that can send data to it by
+   * accident.
+   */
+  private allowed(key: string): boolean {
+    if (permits(key, residencyPolicy()).permitted) return true;
+    if (!this.refusedByResidency.includes(key)) {
+      this.refusedByResidency.push(key);
+      console.warn(`[ai] ${key} is configured but outside the data residency policy; it will not be used.`);
+    }
+    return false;
+  }
+
   private async register() {
     const mock = new MockProvider();
-    if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) {
+    if (this.allowed("anthropic") && (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)) {
       const { AnthropicProvider } = await import("./providers/anthropic");
       this.registry.llm.set("anthropic", new AnthropicProvider());
     }
-    if (process.env.GEMINI_API_KEY) {
+    if (this.allowed("gemini") && process.env.GEMINI_API_KEY) {
       const { GeminiProvider } = await import("./providers/gemini");
       const g = new GeminiProvider(process.env.GEMINI_API_KEY);
       this.registry.llm.set("gemini", g);
       this.registry.stt.set("gemini", g);
     }
-    if (process.env.OPENAI_API_KEY) {
+    if (this.allowed("openai") && process.env.OPENAI_API_KEY) {
       const { OpenAiProvider } = await import("./providers/openai");
       const o = new OpenAiProvider(process.env.OPENAI_API_KEY);
       this.registry.llm.set("openai", o);
       this.registry.stt.set("openai", o);
       this.registry.tts.set("openai", o);
     }
-    if (process.env.GOOGLE_TTS_API_KEY) {
+    if (this.allowed("google_tts") && process.env.GOOGLE_TTS_API_KEY) {
       const { GoogleTtsProvider } = await import("./providers/google-speech");
       this.registry.tts.set("google_tts", new GoogleTtsProvider(process.env.GOOGLE_TTS_API_KEY));
     }
-    if (process.env.AI_ALLOW_MOCK !== "false") {
+    if (this.allowed("mock") && process.env.AI_ALLOW_MOCK !== "false") {
       this.registry.llm.set("mock", mock);
       this.registry.stt.set("mock", mock);
     }
@@ -106,7 +126,14 @@ export class AiGateway {
       stt: this.sttOrder.filter((k) => this.registry.stt.has(k)),
       tts: this.ttsOrder.filter((k) => this.registry.tts.has(k)),
       offlineMode: this.llmOrder.filter((k) => this.registry.llm.has(k)).every((k) => k === "mock"),
+      refusedByResidency: [...this.refusedByResidency],
     };
+  }
+
+  /** Every provider actually registered, for the residency report. */
+  async activeProviders(): Promise<string[]> {
+    await this.ready;
+    return [...new Set([...this.registry.llm.keys(), ...this.registry.stt.keys(), ...this.registry.tts.keys()])].sort();
   }
 
   private async log(input: {

@@ -259,6 +259,17 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "DEPLOYMENT_STAGE"
         value = var.environment
       }
+      # What this deployment may send citizen data to, and where it is. Both are
+      # declared rather than inferred from the region: the platform refuses to
+      # guess a jurisdiction from a region name (docs/DATA_RESIDENCY.md).
+      env {
+        name  = "DATA_RESIDENCY"
+        value = join(",", var.data_residency)
+      }
+      env {
+        name  = "DEPLOYMENT_JURISDICTION"
+        value = var.deployment_jurisdiction
+      }
       # So the maintenance endpoint can tell the scheduler's own identity token
       # from anybody else's. Without these it refuses every scheduled run.
       env {

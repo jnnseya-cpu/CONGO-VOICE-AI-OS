@@ -11,6 +11,7 @@
 import "server-only";
 import { env } from "@server/core/env";
 import { safeLog } from "@server/core/redact";
+import { permits } from "@server/core/residency";
 
 export interface BridgedCallInput {
   caseId: string;
@@ -31,6 +32,13 @@ function maskTail(number: string): string {
 
 export async function placeBridgedCall(input: BridgedCallInput): Promise<BridgedCallResult> {
   const provider = process.env.VOICE_PROVIDER ?? "log";
+
+  // A carrier outside the deployment's residency policy is not dialled: the
+  // citizen's number and the call itself would travel with it.
+  const verdict = permits(provider === "twilio" ? "twilio" : provider);
+  if (!verdict.permitted) {
+    return { ok: false, provider, failureReason: `voice_provider_outside_residency_policy` };
+  }
 
   if (provider === "twilio") {
     const { twilioAccountSid, twilioAuthToken, twilioFrom } = env.notifications;

@@ -3,6 +3,9 @@ import { getDb } from "@server/db/client";
 import { readiness } from "@server/core/status";
 import { clinicalReadiness } from "@server/ai/review/gate";
 import { SCHEDULER_STALE_AFTER_MS, schedulerHealth } from "@server/core/scheduler";
+import { residencyReadiness } from "@server/core/residency";
+import { deploymentStage } from "@server/core/status";
+import { aiGateway } from "@server/ai/gateway";
 import { sql } from "drizzle-orm";
 
 /** When this process came up, so a fresh deployment is not reported as stale. */
@@ -31,7 +34,17 @@ export async function GET() {
         }]
       : [];
 
-    const checks = [...ready.checks, ...schedulerCheck, ...(await clinicalReadiness().catch(() => []))];
+    // What the deployment says about where citizen data may go, against what it
+    // is actually configured to reach.
+    const configured = [
+      ...(await aiGateway().activeProviders().catch(() => [] as string[])),
+      process.env.SMS_PROVIDER ?? "log",
+      process.env.WHATSAPP_PROVIDER ?? "log",
+      process.env.VOICE_PROVIDER ?? "log",
+    ];
+    const residency = residencyReadiness(configured, deploymentStage());
+
+    const checks = [...ready.checks, ...schedulerCheck, ...residency, ...(await clinicalReadiness().catch(() => []))];
     const failing = checks.filter((c) => !c.ok);
     if (failing.length > 0) {
       return NextResponse.json({ status: "degraded", time: new Date().toISOString(), failing }, { status: 503 });

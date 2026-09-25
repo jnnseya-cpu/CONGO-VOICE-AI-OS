@@ -1500,8 +1500,8 @@
    "section": "Security, privacy and consent (§16)",
    "requirement": "Encryption in transit (TLS 1.3, mTLS between services); at rest (CMEK via Cloud KMS for Cloud SQL, GCS, Kafka); field-level encryption for Class A columns with per-tenant keys.",
    "status": "Hosting",
-   "evidence": "src/server/core/crypto.ts · src/server/core/phone.ts · tests/security.test.ts",
-   "note": "AES-256-GCM with per-purpose derived keys over second-factor seeds, stored media and phone numbers, with a keyed blind index so an encrypted number is still findable. Customer-managed keys and service-to-service mutual TLS are configured at the platform that hosts this."
+   "evidence": "src/server/core/crypto.ts · src/server/core/residency.ts · tests/security.test.ts",
+   "note": "AES-256-GCM with per-purpose derived keys over second-factor seeds, stored media and phone numbers, a keyed blind index so an encrypted number is still findable, and a declared list of jurisdictions outside which no destination is ever registered. Customer-managed keys and mutual TLS are configured at the platform that hosts this."
   },
   {
    "id": "SEC-06",

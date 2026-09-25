@@ -5,8 +5,43 @@ variable "project_id" {
 
 variable "region" {
   type        = string
-  default     = "europe-west1"
-  description = "Primary region. Chosen for latency to Kinshasa; revisit when a residency decision is taken."
+  default     = "africa-south1"
+  description = <<-EOT
+    Primary region.
+
+    The programme's intent is that citizen data stays in the Democratic Republic
+    of the Congo. There is no cloud region in the country, so the pilot runs from
+    the nearest available one — Johannesburg — and migrates when an in-country
+    option exists. Same continent, materially better latency to Kinshasa than
+    Europe, and an easier transfer argument to make.
+
+    Whatever is chosen here, set data_residency and deployment_jurisdiction to
+    match: a region is not a jurisdiction, and the platform will not infer one
+    from the other.
+  EOT
+}
+
+variable "deployment_jurisdiction" {
+  type        = string
+  default     = "ZA"
+  description = "ISO 3166-1 alpha-2 country the region above is in. Declared, never guessed."
+}
+
+variable "data_residency" {
+  type        = list(string)
+  default     = ["ZA", "US"]
+  description = <<-EOT
+    Jurisdictions this deployment may send citizen data to.
+
+    A destination outside this list is never registered, so no ordering, retry or
+    fallback can reach it. The default is the pilot's honest posture: hosted in
+    South Africa, with AI providers and telephony in the United States.
+
+    ["CD"] is the strictest setting. It refuses every remote provider: the
+    platform still triages by protocol, detects danger signs, grades severity and
+    speaks the fixed emergency scripts — none of that ever used a model — but it
+    stops understanding free speech. See docs/DATA_RESIDENCY.md.
+  EOT
 }
 
 variable "environment" {

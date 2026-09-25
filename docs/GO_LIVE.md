@@ -80,6 +80,44 @@ operator's rather than the platform's; it does not pay it.
 **What does not change.** Whichever is chosen, it is the same container image
 and the same application. Steps 4 to 10 below are identical.
 
+## 0c. Where citizen data may go
+
+Decide this before §1, because it constrains the region, the providers and the
+carriers all at once. `docs/DATA_RESIDENCY.md` is the full inventory — every
+destination, what it receives, and what is lost by refusing it.
+
+The programme's intent is that everything stays in the DRC. No cloud region
+exists in the country, so the pilot runs from the nearest available one and
+migrates when one does. The platform is told this explicitly rather than
+inferring it:
+
+```hcl
+region                  = "africa-south1"   # Johannesburg
+deployment_jurisdiction = "ZA"
+data_residency          = ["ZA", "US"]      # hosting in ZA, AI and telephony in US
+```
+
+A destination outside `data_residency` is **never registered** — it has no code
+path, so no ordering, retry or fallback can reach it. A message carrier outside
+it returns a delivery failure, which the escalation path reports and the
+readiness probe degrades on.
+
+Two things worth knowing before the ministry asks:
+
+- **Moving the container does not move the model.** A voice recording sent to a
+  transcription service abroad has left the country whether the server is in
+  Johannesburg or Kinshasa. The providers are the residency question.
+- **`data_residency = ["CD"]` works today** and puts the platform in offline
+  rules mode: it still triages by protocol, detects danger signs, grades
+  severity and speaks the fixed emergency scripts — none of that ever used a
+  model — but it stops understanding free speech. That is a different product,
+  and under a strict localisation requirement it is the honest one.
+
+```bash
+# What a deployment would have to admit if asked:
+curl -s https://congovoice.cd/api/v1/system/health | jq '.failing'
+```
+
 ## 1. Decide the four inputs
 
 Write these down before touching anything. Everything else follows from them.
