@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@server/core/auth";
 import { hasPermission } from "@server/core/rbac";
 import { AccessNotice } from "@client/components/dashboard/Common";
+import { moduleDashboard } from "@server/ai/agents/reporting";
 import { ModuleDashboard } from "@client/components/dashboard/ModuleDashboard";
 
 export const metadata = { title: "Tableau de bord Agriculture" };
@@ -12,5 +13,5 @@ export default async function AgriDashboardPage() {
   if (!session) redirect("/connexion?next=/tableau-de-bord/agriculture");
   if (!hasPermission(session.role, "dashboard:agri"))
     return <AccessNotice title="Tableau de bord Agriculture" hint="Cet écran est réservé aux agents agricoles, aux ONG partenaires et aux administrations agricoles." />;
-  return <ModuleDashboard module="agriculture" />;
+  return <ModuleDashboard module="agriculture" data={await moduleDashboard("agriculture")} />;
 }

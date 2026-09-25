@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { Post } from "@server/blog/types";
-import { slugifyTerm } from "@server/blog/index";
+import { slugifyTerm, type Post } from "@shared/blog";
 import { IconArrowRight, IconClock, IconFile, IconShield, IconSparkle } from "../icons";
 
 export function PostCard({ post, featured = false }: { post: Post; featured?: boolean }) {

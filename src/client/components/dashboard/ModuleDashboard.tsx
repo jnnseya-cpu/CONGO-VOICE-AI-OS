@@ -1,11 +1,19 @@
 /**
- * Module command view (health / agriculture / education) — server component.
- * Reads the reporting agent directly; the health province table applies the
- * k-anonymity rule (cells under 10 are never published).
+ * Module command view (health / agriculture / education).
+ *
+ * Presentational: the page fetches and this renders. It used to call the
+ * reporting agent itself, which put a database query inside the component
+ * layer and made the client/server boundary a suggestion rather than a line.
+ * The health province table still applies the k-anonymity rule here, because
+ * that is a property of how the figures are *shown* (cells under 10 are never
+ * published), not of how they are read.
  */
 import Link from "next/link";
-import { moduleDashboard } from "@server/ai/agents/reporting";
+import type { moduleDashboard } from "@server/ai/agents/reporting";
 import type { ModuleType } from "@server/db/schema";
+
+/** Exactly what the reporting agent returns, without importing it. */
+export type ModuleDashboardData = Awaited<ReturnType<typeof moduleDashboard>>;
 import { PageHeader } from "../ui";
 import {
   BarList,
@@ -67,8 +75,8 @@ const META: Record<string, { title: string; subtitle: string; tone: "health" | "
   },
 };
 
-export async function ModuleDashboard({ module }: { module: Exclude<ModuleType, "general"> }) {
-  const d = await moduleDashboard(module);
+export function ModuleDashboard({ module, data }: { module: Exclude<ModuleType, "general">; data: ModuleDashboardData }) {
+  const d = data;
   const meta = META[module];
   const now = nowMs();
   const anonymise = module === "health";

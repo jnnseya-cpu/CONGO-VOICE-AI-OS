@@ -1,3 +1,4 @@
+import { slugifyTerm } from "@shared/blog";
 import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -136,17 +137,12 @@ function overlap(a: string[], b: string[]): number {
   return a.filter((x) => set.has(x.toLowerCase())).length;
 }
 
-export function slugifyTerm(term: string): string {
-  return term
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 export function postUrl(slug: string): string {
   return `${SITE.url}/blog/${slug}`;
 }
 
 export type { Post } from "./types";
+
+/** Re-exported: the helper itself lives in @shared/blog, where the browser can reach it. */
+export { slugifyTerm };

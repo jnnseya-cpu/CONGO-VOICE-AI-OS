@@ -87,11 +87,36 @@ a small team pays that cost long before it collects the benefit — and the part
 that actually needs to scale independently, the AI providers, is already behind
 one interface (`src/server/ai/gateway.ts`) and runs somewhere else entirely.
 
-The boundaries the split would have enforced are enforced here instead: server
-modules are marked `import "server-only"`, `src/shared` may not import from
-`src/server`, every AI vendor is reachable only through the gateway, and every
-API route goes through `handle()`. When a service genuinely needs to scale or
-fail on its own, those boundaries are where it will be cut out.
+The boundaries the split would have enforced are enforced here instead — and
+until recently that sentence was aspirational, which is worth admitting because
+it is the usual fate of a boundary nobody checks. The directories existed; by
+the time anyone looked, four imports had crossed the line, including a component
+that called a reporting agent and opened a database connection of its own.
+
+The rule now, in one direction only:
+
+| Layer | May import | May not |
+|---|---|---|
+| `src/shared` | nothing from the platform | `@server/*`, `@client/*` — it is the contract both sides depend on |
+| `src/client` | `@shared/*`, and **types** from `@server/*` | any server **value** |
+| `src/server` | `@shared/*` | `@client/*` |
+
+Type-only imports across the client/server line are allowed deliberately: a type
+is erased at build time and creates no runtime coupling, so a component may name
+the shape of what a page hands it without being able to reach the database that
+produced it. `ModuleDashboard` is the worked example — it declares
+`Awaited<ReturnType<typeof moduleDashboard>>` and the page does the fetching.
+
+Three things enforce it, because one is not enough:
+
+1. **ESLint** (`no-restricted-imports`, with `allowTypeImports`) — fails the lint.
+2. **`tests/layering.test.ts`** — fails the suite, because a lint rule is
+   skippable and a failing test is not.
+3. **`import "server-only"`** on server modules — fails the build if one is ever
+   pulled into a browser bundle despite the first two.
+
+When a service genuinely needs to scale or fail on its own, this is the line it
+gets cut along, and it is now a real line rather than a naming convention.
 
 ### DO-05 — no event bus, therefore no schema registry
 
