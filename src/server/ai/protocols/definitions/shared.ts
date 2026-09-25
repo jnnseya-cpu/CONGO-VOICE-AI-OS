@@ -28,6 +28,13 @@ export const DANGER_OPTIONS: ProtocolOption[] = [
   option("stiff_neck", t("Nuque raide", "Nkingo ekangami", "Nsingu me kangama", "Shingo ngumu", "Nshingu mukole")),
   option("heavy_bleeding", t("Saignement abondant", "Makila ebimi mingi", "Menga mingi ke basika", "Damu nyingi inatoka", "Mashi a bungi adi apatuka")),
   option("very_cold", t("Corps très froid ou très chaud", "Nzoto ya malili makasi to moto makasi", "Nitu ya madidi mingi to mwini mingi", "Mwili baridi sana au moto sana", "Mubidi wa mashika bikole anyi wa luya bikole")),
+  // Detected from what the citizen says rather than read out as menu items.
+  option("blood_in_stool", t("Sang dans les selles", "Makila na nzoto ya kobima", "Menga na tuvi", "Choo cha damu", "Mashi mu bisukudi")),
+  option("severe_pallor", t("Paumes très pâles", "Maboko ya mpembe makasi", "Maboko ya mpembe mingi", "Viganja vyeupe sana", "Bianza bitoke bikole")),
+  option("bulging_fontanelle", t("Fontanelle bombée", "Fontanelle evimbi", "Fontanelle me vimba", "Utosi umevimba", "Fontanele mutue")),
+  option("severe_burn", t("Brûlure étendue", "Kozika makasi", "Kuyoka ngolo", "Kuungua sana", "Kuosha bikole")),
+  option("head_injury", t("Coup à la tête", "Kobeta na moto", "Kubula na ntu", "Kugongwa kichwani", "Kukuma ku mutu")),
+  option("jaundice", t("Corps ou yeux jaunes", "Nzoto to miso ya mondondo", "Nitu to meso ya nzenza", "Mwili au macho ya njano", "Mubidi anyi mesu a lutoke")),
   option("none", t("Aucun de ces signes", "Elembo moko te", "Ata kidimbu mosi ve", "Hakuna dalili yoyote", "Katshina tshimanyinu")),
 ];
 
@@ -158,9 +165,27 @@ const DANGER_LABELS: Record<string, string> = {
   very_cold: "Hypothermie ou hyperthermie",
 };
 
-/** The eight IMCI general danger signs as red-flag rules, prefixed per protocol. */
+/**
+ * Emergency signs that are not among the eight IMCI general danger signs, kept
+ * in their own table so the provenance of each rule stays readable. They are
+ * here because the adversarial corpus showed each of them arriving in a message
+ * a parent would plausibly send, and being graded as something less than an
+ * emergency. They are detected from what the citizen says; the spoken danger
+ * question still asks about the eight, because a menu of fourteen read down a
+ * telephone is a menu nobody answers.
+ */
+const ADDITIONAL_EMERGENCY_LABELS: Record<string, string> = {
+  blood_in_stool: "Sang dans les selles",
+  severe_pallor: "Pâleur palmaire sévère",
+  bulging_fontanelle: "Fontanelle bombée",
+  severe_burn: "Brûlure étendue",
+  head_injury: "Traumatisme crânien",
+  jaundice: "Ictère",
+};
+
+/** Every emergency sign as a red-flag rule, prefixed per protocol. */
 export function dangerRedFlags(prefix: string, questionId = "danger_signs") {
-  return Object.entries(DANGER_LABELS).map(([value, label]) => ({
+  return Object.entries({ ...DANGER_LABELS, ...ADDITIONAL_EMERGENCY_LABELS }).map(([value, label]) => ({
     id: `RF-${prefix}-${value.toUpperCase().replace(/_/g, "-")}`,
     when: { q: questionId, op: "includes" as const, value },
     label,

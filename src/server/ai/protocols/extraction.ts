@@ -207,8 +207,8 @@ const SIGN_KEYWORDS: Record<string, Record<string, string[]>> = {
   },
   head_injury_signs: {
     loss_of_consciousness: ["perdu connaissance", "perte de connaissance", "évanoui", "evanoui", "kupoteza fahamu", "kokufa mayele", "kufwa mayele", "kujimija meji"],
-    repeated_vomiting: ["vomit plusieurs fois", "vomit beaucoup", "vomissements répétés", "anatapika mara kwa mara", "kosanza mbala mingi"],
-    confusion: ["confus", "ne sait plus où", "désorienté", "desoriente", "kuchanganyikiwa", "kobunga makanisi", "kuvulakana"],
+    repeated_vomiting: ["vomit plusieurs fois", "vomit beaucoup", "vomissements répétés", "vomi deux fois", "vomi trois fois", "vomi plusieurs fois", "a vomi deux", "anatapika mara kwa mara", "kosanza mbala mingi"],
+    confusion: ["confus", "ne sait plus où", "désorienté", "desoriente", "dit des choses qui n'ont pas de sens", "dit n'importe quoi", "ne me reconnaît plus", "parle bizarrement", "kuchanganyikiwa", "kobunga makanisi", "kuvulakana"],
     clear_fluid: ["liquide par le nez", "liquide par l'oreille", "coule du nez", "coule de l'oreille", "maji puani", "mai na zolo"],
     seizure: ["convulsion", "degedege", "kobeta nzoto", "kunikana", "kutshinguluka"],
   },

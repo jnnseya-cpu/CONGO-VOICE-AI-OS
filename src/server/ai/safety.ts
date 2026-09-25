@@ -107,13 +107,26 @@ export function sanitiseHealthGuidance(text: string): SafetyCheck {
  * true, or what to do about a court summons is a different and far more
  * dangerous product than the one being funded.
  */
-export type BoundaryTopic = "political" | "religious" | "legal" | "financial";
+export type BoundaryTopic =
+  | "political"
+  | "religious"
+  | "legal"
+  | "financial"
+  /** Visas, passports, residence papers — and the bribes that get attached to them. */
+  | "administrative"
+  /** How to make something that hurts people, however the request is dressed. */
+  | "dangerous_instructions"
+  /** Sexual content, which this service does not produce for anyone, least of all a pupil. */
+  | "sexual_content";
 
 const BOUNDARY_PATTERNS: Array<{ topic: BoundaryTopic; re: RegExp }> = [
   { topic: "political", re: /\b(pour qui (?:je )?(?:dois|doit|devrais) voter|quel parti|voter pour|candidat|[ée]lections?|opposition politique|president(?:e|ielle)?\b)/i },
   { topic: "religious", re: /\b(quelle [ée]glise|quelle religion|est-ce que dieu|le vrai dieu|prier pour gu[ée]rir|p[ée]ch[ée]|pasteur dit)/i },
-  { topic: "legal", re: /\b(porter plainte|avocat|tribunal|proc[èe]s|convocation (?:au|de la) police|mes droits? l[ée]gaux)/i },
-  { topic: "financial", re: /\b(dois-je (?:investir|emprunter)|cr[ée]dit bancaire|pr[êe]t (?:bancaire|[àa] int[ée]r[êe]t)|placer mon argent|cryptomonnaie)/i },
+  { topic: "legal", re: /\b(porter plainte|r[ée]dige(?:r|z)? ma plainte|ma plainte|avocat|tribunal|proc[èe]s|convocation (?:au|de la) police|mes droits? l[ée]gaux|article de loi|quel juge|corrompre|soudoyer|pot-de-vin)/i },
+  { topic: "financial", re: /\b(dois-je (?:investir|emprunter)|combien (?:je )?(?:dois|devrais) investir|cr[ée]dit bancaire|pr[êe]t (?:bancaire|[àa] int[ée]r[êe]t)|placer mon argent|cryptomonnaie)/i },
+  { topic: "administrative", re: /\b(visa|passeport|carte de s[ée]jour|papiers pour (?:l'|la |le )?(?:europe|[ée]tranger)|[ée]migrer|immigration)/i },
+  { topic: "dangerous_instructions", re: /\b(fabriquer (?:un|de l'|des) (?:explosif|explosifs|bombe|arme|armes|poison)|comment faire (?:une bombe|un explosif)|fabrication d'(?:explosif|arme)|poison pour tuer)/i },
+  { topic: "sexual_content", re: /\b(sc[èe]ne sexuelle|contenu sexuel|d[ée]cris?-moi une sc[èe]ne (?:sexuelle|[ée]rotique)|pornograph|histoire [ée]rotique)/i },
 ];
 
 export function detectBoundaryTopics(text: string): BoundaryTopic[] {
@@ -150,6 +163,27 @@ export const BOUNDARY_RESPONSES: Record<BoundaryTopic, Record<LanguageCode, stri
     kg: "Kisalu yai ke pesa ndongisila ya mbongo ve. Mono lenda sadisa nge na mavimpi, bilanga to nzo-nkanda.",
     sw: "Huduma hii haitoi ushauri wa kifedha. Naweza kukusaidia kuhusu afya, kilimo au shule.",
     lua: "Mudimu eu kawena ufila mibelu ya makuta. Ndi mua kukuambuluisha ku bukole, madimi anyi kalasa.",
+  },
+  administrative: {
+    fr: "Ce service ne donne pas de conseil sur les visas, les passeports ou les démarches d'immigration, et n'aide jamais à payer quelqu'un pour les obtenir. Je peux vous aider sur la santé, l'agriculture ou l'école.",
+    ln: "Service oyo epesaka toli te na oyo etali visa, passeport to komata na mboka mosusu, mpe esalisaka te mpo na kofuta moto. Nakoki kosalisa yo na santé, bilanga to kelasi.",
+    kg: "Kisalu yai ke pesa ndongisila ve na yina ke tala visa, passeport to kukwenda na nsi ya nkaka, mpi ke sadisa ve sambu na kufuta muntu. Mono lenda sadisa nge na mavimpi, bilanga to nzo-nkanda.",
+    sw: "Huduma hii haitoi ushauri kuhusu visa, pasipoti au uhamiaji, wala haisaidii kumlipa mtu ili kuzipata. Naweza kukusaidia kuhusu afya, kilimo au shule.",
+    lua: "Mudimu eu kawena ufila mibelu bua visa, pasipoti anyi luendu lua ku ditunga dikuabu, ne kawena wambuluisha bua kufuta muntu to. Ndi mua kukuambuluisha ku bukole, madimi anyi kalasa.",
+  },
+  dangerous_instructions: {
+    fr: "Ce service ne donne pas d'explications sur la fabrication d'explosifs, d'armes ou de poisons, même pour un devoir. Je peux vous aider autrement sur votre cours de chimie, la santé ou l'agriculture.",
+    ln: "Service oyo epesaka ndimbola te ya kosala bisaleli ya koboma, ata mpo na devoir. Nakoki kosalisa yo na ndenge mosusu na kelasi ya chimie, santé to bilanga.",
+    kg: "Kisalu yai ke pesa ntendula ve ya kusala bima ya kufwa bantu, ata sambu na devoir. Mono lenda sadisa nge na mutindu ya nkaka na kelasi ya chimie, mavimpi to bilanga.",
+    sw: "Huduma hii haitoi maelezo ya kutengeneza vilipuzi, silaha au sumu, hata kwa kazi ya shule. Naweza kukusaidia kwa njia nyingine katika somo la kemia, afya au kilimo.",
+    lua: "Mudimu eu kawena ufila mêyi a kuenza bintu bia kushipa bantu, nansha bua mudimu wa kalasa. Ndi mua kukuambuluisha mu mushindu mukuabu ku kalasa ka chimie, bukole anyi madimi.",
+  },
+  sexual_content: {
+    fr: "Ce service ne donne pas de contenu sexuel ou explicite, et jamais à un élève. Je peux vous aider sur votre rédaction avec un autre sujet, ou sur la santé et l'école.",
+    ln: "Service oyo epesaka makambo ya kosangisa nzoto te, mingi mingi na moyekoli. Nakoki kosalisa yo na rédaction na likambo mosusu, to na santé mpe kelasi.",
+    kg: "Kisalu yai ke pesa mambu ya kuvukana nitu ve, mingi-mingi na mulongoki. Mono lenda sadisa nge na rédaction na diambu ya nkaka, to na mavimpi mpi nzo-nkanda.",
+    sw: "Huduma hii haitoi maudhui ya ngono, hasa si kwa mwanafunzi. Naweza kukusaidia insha yako kwa mada nyingine, au kuhusu afya na shule.",
+    lua: "Mudimu eu kawena ufila malu a masandi to, nangananga kudi mulongi. Ndi mua kukuambuluisha mufundu webe ne tshiena-bualu tshikuabu, anyi bua bukole ne kalasa.",
   },
 };
 
@@ -304,12 +338,18 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   unconscious: [
     "inconscient", "inconsciente", "ne réagit", "ne repond", "ne répond", "coma", "évanoui", "evanoui", "somnolent", "très endormi", "sans connaissance", "perte de connaissance",
     "ne se réveille pas", "ne bouge plus", "ne me reconnaît pas",
+    // How lethargy and confusion are actually described, which is never with
+    // the word "léthargie".
+    "dort tout le temps", "n'arrive pas à le réveiller", "n'arrive pas à la réveiller", "difficile à réveiller",
+    "je n'arrive pas à le reveiller", "ne se réveille plus", "reste endormi", "toujours endormi",
+    "dit des choses qui n'ont pas de sens", "ne sait plus où il est", "ne sait plus ou elle est", "délire", "il délire", "elle délire", "confus", "confuse",
     "abungisi mayele", "azali koyanola te", "alali makasi", "akufi mayele",
     "kupoteza fahamu", "kuzimia", "amezimia", "hajibu", "usingizi mzito",
     "kele ve na mayele", "kufwa mayele", "ke vutula ve",
     "kujimija meji", "kena wandamuna",
   ],
   cannot_drink: [
+    "komela mabele te", "alingi komela te", "aboyi mabele",
     "ne peut pas boire", "ne peut plus boire", "refuse de boire", "ne tète plus", "ne tete plus", "refuse de téter", "impossible de boire",
     "ne peut plus téter", "ne peut pas téter", "n'arrive pas à téter", "n'arrive pas à boire", "ne veut plus téter",
     "ne tète pas", "ne boit plus", "ne boit rien", "refuse le sein", "impossible de téter",
@@ -328,6 +368,10 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
   breathing_difficulty: [
     "ne respire", "difficulté à respirer", "difficulte a respirer", "respire mal", "respire vite", "essoufflé", "essouffle", "étouffe", "etouffe", "manque d'air", "respiration rapide",
     "a du mal à respirer", "respire difficilement", "respire très fort",
+    // Chest indrawing: the sign a parent describes without ever naming it.
+    "respire très vite", "respire tres vite", "respiration très rapide", "côtes se creusent", "cotes se creusent",
+    "creuse les côtes", "la peau rentre entre les côtes", "tirage", "ventre qui se creuse en respirant",
+    "anapumua haraka", "mbavu zinaingia", "upetesha lupepele bikole",
     "akoki kopema te", "kopema mpasi", "azali kopema mbangu",
     "hapumui", "anapumua kwa shida", "shida ya kupumua", "kupumua haraka",
     "ke pema mpasi", "ke pema ve",
@@ -347,6 +391,34 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
     "damu nyingi", "anavuja damu",
     "menga mingi",
     "mashi a bungi",
+  ],
+  /**
+   * Signs below are not among the eight IMCI general danger signs. They are
+   * added because every one of them turned up in the adversarial corpus as a
+   * message a parent would plausibly send, and none of them was being caught.
+   */
+  blood_in_stool: [
+    "sang dans les selles", "du sang dans les selles", "selles avec du sang", "diarrhée sanglante", "diarrhee sanglante", "selles noires",
+    "makila na nzoto ya kobima", "choo cha damu", "damu kwenye kinyesi",
+  ],
+  severe_pallor: [
+    "paumes des mains blanches", "mains toutes blanches", "paumes blanches", "très pâle", "tres pale", "pâleur", "paleur", "blanc comme du papier",
+    "viganja vyeupe", "rangi imeisha",
+  ],
+  bulging_fontanelle: [
+    "fontanelle bombée", "fontanelle bombee", "fontanelle gonflée", "fontanelle qui gonfle", "le dessus de la tête est bombé", "le dessus de la tete est bombe",
+  ],
+  severe_burn: [
+    "eau bouillante", "brûlure grave", "brulure grave", "brûlé sur", "brule sur", "la peau est partie", "la peau s'est décollée", "ébouillanté", "ebouillante",
+    "maji ya moto yamemwagika", "amechomwa sana",
+  ],
+  head_injury: [
+    "coup à la tête", "coup a la tete", "tombé sur la tête", "tombe sur la tete", "choc à la tête", "frappé à la tête",
+    "amegongwa kichwani", "ameanguka kichwa",
+  ],
+  jaundice: [
+    "tout jaune", "toute jaune", "yeux jaunes", "peau jaune", "jaunisse", "paumes et plantes jaunes",
+    "macho ya njano", "ngozi ya njano",
   ],
   very_cold: [
     "corps très froid", "corps tres froid", "glacé", "glace comme", "hypothermie", "fièvre très élevée", "fievre tres elevee", "peau très chaude", "brûlant", "brulant",
@@ -395,6 +467,9 @@ export const SAFEGUARDING_KEYWORDS: Record<SafeguardingCategory, string[]> = {
     "udi ungumisha", "badi bangumisha",
   ],
   violence_sexuelle: [
+    // What is actually said, which is rarely the word "viol".
+    "m'a forcée", "m'a forcee", "m'a forcé", "il m'a forcée", "m'a prise de force", "m'a obligée à coucher",
+    "vient dans ma chambre la nuit", "entre dans ma chambre la nuit", "me touche la nuit",
     "viol", "violée", "violee", "violé", "abus sexuel", "attouchement", "touché mes parties", "touche mes parties", "forcée à coucher", "forcee a coucher", "forcé à coucher", "relations forcées", "il a abusé",
     "abandaki ngai na makasi", "asalaki ngai makambo ya nsoni",
     "amenibaka", "ubakaji", "kunilazimisha kulala", "unyanyasaji wa kingono",
@@ -420,17 +495,25 @@ export const SAFEGUARDING_KEYWORDS: Record<SafeguardingCategory, string[]> = {
     "ne dis rien à tes parents", "ne dis pas à tes parents", "ne le dis pas à tes parents", "ne rien dire à mes parents", "sans que mes parents le sachent",
     "sans le dire à mes parents", "ne le dites à personne mais", "c'est notre secret", "notre secret", "garde le secret", "garder le secret",
     "tu peux garder le secret", "m'a demandé de ne rien dire", "il m'a dit de ne rien dire", "elle m'a dit de ne rien dire",
+    "dit de ne rien dire", "de ne rien dire à mes parents", "sans le dire à personne",
+    // Moving a child from a screen to a place, and adults asking the platform
+    // where a child will be.
+    "veut me rencontrer", "veut qu'on se voie", "veut qu'on se rencontre", "me donne rendez-vous",
+    "heure de sortie de l'élève", "adresse de l'élève", "où habite l'élève", "ou habite l'eleve",
     // Isolation and contact outside any legitimate setting.
     "rester seul avec lui", "rester seule avec lui", "rester seul avec elle", "rester seule avec elle",
     "seul avec moi après les cours", "seule avec moi après les cours", "me demande de venir chez lui", "me demande de venir chez elle",
     "m'écrit la nuit", "m'envoie des messages la nuit", "me demande des photos", "envoie-moi une photo de toi", "m'a offert de l'argent pour",
     "kobomba sekele", "koloba na baboti na yo te", "azali kosenga ngai bafoto",
+    "nayebisa baboti te", "natikala ye moko", "alobi natikala ye moko",
     "usimwambie mzazi", "ni siri yetu", "anataka nibaki naye peke yangu", "ananiomba picha",
     "kubumba kinsweki", "kuzabisa bibuti na nge ve",
     "kubuela baledi bebe to", "udi ulomba bimfuanyi",
   ],
   auto_agression: [
     "me suicider", "suicide", "me tuer", "en finir avec la vie", "je veux mourir", "je veux me faire du mal", "me faire du mal", "plus envie de vivre", "j'ai avalé", "j'ai bu du poison",
+    // An act already carried out, said in the past tense and without the word.
+    "avalé les comprimés", "avale les comprimes", "avalé des comprimés", "pris tous les comprimés", "dormir pour toujours", "ne jamais me réveiller",
     // Said plainly, and far more often than the clinical words above.
     "je ne veux plus vivre", "je ne veux plus de la vie", "pour en finir", "mettre fin à mes jours", "je préfère mourir", "la vie ne vaut plus", "je veux disparaître", "je veux disparaitre",
     "nalingi komiboma", "nalingi kokufa", "namelaki ngenge",
@@ -446,6 +529,7 @@ export const SAFEGUARDING_KEYWORDS: Record<SafeguardingCategory, string[]> = {
     "ndi ne buôwa ku nzubu", "neye wanshipa",
   ],
   mariage_precoce: [
+    "veulent me marier", "veut me marier", "veulent la marier", "doivent me marier",
     "mariage forcé", "mariage force", "on veut la marier", "on veut me marier", "mariée à 14", "mariee a 14", "mariage d'enfant", "elle a 15 ans et on la marie",
     "balingi kobalisa ye na makasi", "kobalisa mwana",
     "ndoa ya kulazimishwa", "wanataka kumuoza", "ndoa ya utotoni",

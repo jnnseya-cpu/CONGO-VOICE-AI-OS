@@ -179,6 +179,28 @@ export function runProtocol(protocol: HealthProtocol, rawAnswers: AnswerMap): Pr
     cursor = question.next ?? null;
   }
 
+  /**
+   * A red flag means "stop now", not "stop now if the tree happened to reach
+   * this question". The walk above stops at the first question the citizen has
+   * not answered, so an answer the platform already holds — a fall on the head
+   * with repeated vomiting and confusion, volunteered in the first sentence —
+   * was being graded on the ordinary rules instead of as an emergency. Every
+   * answered question is checked, wherever it sits in the tree.
+   */
+  for (const question of Object.values(protocol.questions)) {
+    if (seen.has(question.id) || !isAnswered(answers[question.id])) continue;
+    for (const flag of question.redFlags ?? []) {
+      if (evaluateCondition(flag.when, answers)) {
+        redFlags.push({
+          ruleId: flag.id,
+          questionId: question.id,
+          label: flag.label,
+          action: question.onRedFlag?.action ?? protocol.outcomes.severity_4.action,
+        });
+      }
+    }
+  }
+
   const triggeredRuleIds: string[] = [];
   let severity: SeverityLevel;
   if (redFlags.length > 0) {
