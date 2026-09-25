@@ -1097,6 +1097,82 @@ export const languageCorpus = pgTable(
   (t) => [index("corpus_lang_status_idx").on(t.language, t.reviewStatus), index("corpus_interaction_idx").on(t.interactionId)],
 );
 
+/**
+ * Terminology the platform is not free to paraphrase (FR-LG-05).
+ *
+ * A model asked to render "signes de danger" into Lingala will produce
+ * something reasonable and different every time. For a word a citizen has to
+ * recognise — a disease, an input, an exam — reasonable and different is worse
+ * than fixed and agreed. These entries are versioned and approved, and the
+ * rendered answer is corrected against them rather than merely prompted with
+ * them.
+ */
+export const glossaries = pgTable(
+  "glossaries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    module: moduleEnum("module").default("general").notNull(),
+    /** The canonical French term, as it appears in the reasoning language. */
+    termFr: varchar("term_fr", { length: 160 }).notNull(),
+    /** Approved rendering per language: { ln: "…", kg: "…", sw: "…", lua: "…" }. */
+    translations: jsonb("translations").$type<Partial<Record<string, string>>>().default({}).notNull(),
+    /** Renderings seen in the wild that must be rewritten to the approved one. */
+    variants: jsonb("variants").$type<Partial<Record<string, string[]>>>().default({}).notNull(),
+    version: varchar("version", { length: 24 }).default("1.0.0").notNull(),
+    status: lifecycleStatusEnum("status").default("approved").notNull(),
+    approvedBy: varchar("approved_by", { length: 160 }),
+    notes: text("notes"),
+    ...timestamps,
+  },
+  (t) => [index("glossaries_module_term_idx").on(t.module, t.termFr), index("glossaries_status_idx").on(t.status)],
+);
+
+export type GlossaryEntry = typeof glossaries.$inferSelect;
+
+/**
+ * Measured quality per language, and the decision it forces (AI-18, §6.5).
+ *
+ * A language goes live in a module when its numbers pass, and comes back out
+ * when they stop passing. Both directions matter: shipping Kikongo on the
+ * strength of a demo, and leaving it shipped after a model change degraded it,
+ * are the same failure seen from different ends.
+ *
+ * A language with no measurement at all is not "unknown", it is not ready.
+ */
+export const languageQuality = pgTable(
+  "language_quality",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    language: languageEnum("language").notNull(),
+    module: moduleEnum("module").default("general").notNull(),
+    /** Word error rate on the clean gold set, 0–1. */
+    werClean: real("wer_clean"),
+    /** Word error rate on 8 kHz field audio, 0–1. */
+    werField: real("wer_field"),
+    /** Intent accuracy on the gold set, 0–1. */
+    intentAccuracy: real("intent_accuracy"),
+    /** Recall of the emergency severity class, 0–1. Health only. */
+    emergencyRecall: real("emergency_recall"),
+    /** Text-to-speech intelligibility, mean opinion score 1–5. */
+    ttsMos: real("tts_mos"),
+    /** Language identification accuracy, 0–1. */
+    languageIdAccuracy: real("language_id_accuracy"),
+    /** Size of the evaluation set the numbers came from. */
+    sampleSize: integer("sample_size").default(0).notNull(),
+    /** Who measured it: an evaluation run, or a reviewer panel. */
+    source: varchar("source", { length: 64 }).default("evaluation").notNull(),
+    /** Derived and stored so a dashboard does not recompute a safety decision. */
+    passes: boolean("passes").default(false).notNull(),
+    failedGates: jsonb("failed_gates").$type<string[]>().default([]).notNull(),
+    measuredAt: timestamp("measured_at", { withTimezone: true }).defaultNow().notNull(),
+    notes: text("notes"),
+    ...timestamps,
+  },
+  (t) => [index("language_quality_lang_module_idx").on(t.language, t.module), index("language_quality_measured_idx").on(t.measuredAt)],
+);
+
+export type LanguageQualityRow = typeof languageQuality.$inferSelect;
+
 export const languageLexicon = pgTable(
   "language_lexicon",
   {

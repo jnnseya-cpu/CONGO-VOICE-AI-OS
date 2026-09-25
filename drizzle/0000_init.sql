@@ -346,6 +346,20 @@ CREATE TABLE "follow_ups" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "glossaries" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"module" "module_type" DEFAULT 'general' NOT NULL,
+	"term_fr" varchar(160) NOT NULL,
+	"translations" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"variants" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"version" varchar(24) DEFAULT '1.0.0' NOT NULL,
+	"status" "lifecycle_status" DEFAULT 'approved' NOT NULL,
+	"approved_by" varchar(160),
+	"notes" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "health_triage_records" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"interaction_id" uuid NOT NULL,
@@ -516,6 +530,26 @@ CREATE TABLE "language_lexicon" (
 	"added_by" uuid,
 	"usage_count" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "language_quality" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"language" "language_code" NOT NULL,
+	"module" "module_type" DEFAULT 'general' NOT NULL,
+	"wer_clean" real,
+	"wer_field" real,
+	"intent_accuracy" real,
+	"emergency_recall" real,
+	"tts_mos" real,
+	"language_id_accuracy" real,
+	"sample_size" integer DEFAULT 0 NOT NULL,
+	"source" varchar(64) DEFAULT 'evaluation' NOT NULL,
+	"passes" boolean DEFAULT false NOT NULL,
+	"failed_gates" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"measured_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"notes" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "learner_profiles" (
@@ -913,6 +947,8 @@ CREATE INDEX "citizen_identifiers_kind_hash_idx" ON "citizen_identifiers" USING 
 CREATE INDEX "consents_user_purpose_idx" ON "consents" USING btree ("user_id","purpose");--> statement-breakpoint
 CREATE INDEX "event_store_type_idx" ON "event_store" USING btree ("event_type","occurred_at");--> statement-breakpoint
 CREATE INDEX "event_store_aggregate_idx" ON "event_store" USING btree ("aggregate_type","aggregate_id");--> statement-breakpoint
+CREATE INDEX "glossaries_module_term_idx" ON "glossaries" USING btree ("module","term_fr");--> statement-breakpoint
+CREATE INDEX "glossaries_status_idx" ON "glossaries" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "interactions_session_idx" ON "interactions" USING btree ("session_id");--> statement-breakpoint
 CREATE INDEX "interactions_user_idx" ON "interactions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "interactions_module_idx" ON "interactions" USING btree ("module");--> statement-breakpoint
@@ -923,6 +959,8 @@ CREATE INDEX "kb_documents_module_idx" ON "kb_documents" USING btree ("module","
 CREATE INDEX "corpus_lang_status_idx" ON "language_corpus" USING btree ("language","review_status");--> statement-breakpoint
 CREATE INDEX "corpus_interaction_idx" ON "language_corpus" USING btree ("interaction_id");--> statement-breakpoint
 CREATE INDEX "lexicon_lang_term_idx" ON "language_lexicon" USING btree ("language","term");--> statement-breakpoint
+CREATE INDEX "language_quality_lang_module_idx" ON "language_quality" USING btree ("language","module");--> statement-breakpoint
+CREATE INDEX "language_quality_measured_idx" ON "language_quality" USING btree ("measured_at");--> statement-breakpoint
 CREATE INDEX "learning_evidence_user_idx" ON "learning_evidence" USING btree ("user_id","topic");--> statement-breakpoint
 CREATE INDEX "market_prices_commodity_idx" ON "market_prices" USING btree ("commodity","observed_at");--> statement-breakpoint
 CREATE INDEX "notification_templates_key_idx" ON "notification_templates" USING btree ("key","channel","language");--> statement-breakpoint

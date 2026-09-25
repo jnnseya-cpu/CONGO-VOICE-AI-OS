@@ -12,6 +12,7 @@ import { PROVINCES, GEOGRAPHY_STATS } from "./geography";
 import { SERVICE_DIRECTORY } from "./service-directory";
 import { PLANTING_CALENDAR } from "./calendars";
 import { NOTIFICATION_TEMPLATES } from "./notification-templates";
+import { GLOSSARY_SEED } from "./glossary";
 import type { LanguageCode } from "../schema";
 
 export * from "./geography";
@@ -25,13 +26,14 @@ export interface ReferenceSeedResult {
   services: number;
   plantingCalendars: number;
   templates: number;
+  glossaryTerms: number;
   skipped: string[];
 }
 
 /** Load (or top up) every reference table. Safe to call repeatedly. */
 export async function seedReferenceData(log: (m: string) => void = () => {}): Promise<ReferenceSeedResult> {
   const db = await getDb();
-  const result: ReferenceSeedResult = { provinces: 0, territories: 0, services: 0, plantingCalendars: 0, templates: 0, skipped: [] };
+  const result: ReferenceSeedResult = { provinces: 0, territories: 0, services: 0, plantingCalendars: 0, templates: 0, glossaryTerms: 0, skipped: [] };
 
   // Provinces and territories -------------------------------------------------------------
   const [{ n: provinceCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.provinces);
@@ -111,6 +113,29 @@ export async function seedReferenceData(log: (m: string) => void = () => {}): Pr
     log(`Modèles de notification : ${result.templates} entrées (${NOTIFICATION_TEMPLATES.length} clés × 5 langues).`);
   } else {
     result.skipped.push("notification_templates");
+  }
+
+
+  // Terminology ---------------------------------------------------------------------------
+  const [{ n: glossaryCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.glossaries);
+  if (glossaryCount === 0) {
+    for (const g of GLOSSARY_SEED) {
+      await db.insert(schema.glossaries).values({
+        module: g.module,
+        termFr: g.termFr,
+        translations: g.translations,
+        variants: g.variants ?? {},
+        version: "1.0.0",
+        // Nothing is enforced on a citizen's answer until the language panel
+        // for that language signs the entry off and sets it to active.
+        status: "review",
+        notes: g.notes,
+      });
+      result.glossaryTerms++;
+    }
+    log(`Glossaire : ${result.glossaryTerms} termes chargés en statut « review » (validation par les panels linguistiques requise).`);
+  } else {
+    result.skipped.push("glossaries");
   }
 
   return result;

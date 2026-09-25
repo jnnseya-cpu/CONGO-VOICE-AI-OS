@@ -22,6 +22,8 @@ import { emitEvent } from "./events";
 import { hasReminderConsent, notifyRole, notifyTemplate, sendDueNotifications } from "./notifications";
 import { checkAcuCaps } from "./metering";
 import { overdueDataRequests } from "./privacy";
+import { dailyReviewSample } from "@server/ai/agents/learning";
+import { downgradedLanguages } from "@server/ai/language/gates";
 import { pruneAuthAttempts } from "./lockout";
 import { pruneRateLimitCounters } from "./rate-limit";
 import { safeLog } from "./redact";
@@ -271,6 +273,8 @@ export interface SchedulerReport {
   acuAlerts: number;
   overdueDataRequests: number;
   securityCountersPruned: number;
+  qualityReviewSampled: number;
+  languagesDowngraded: number;
   errors: Array<{ step: string; message: string }>;
 }
 
@@ -297,6 +301,41 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
   const expired = await step("expire_reports", errors, () => expireReports(now), 0);
   const acuAlerts = await step("acu_caps", errors, () => checkAcuCaps(now), []);
   const overdue = await step("data_requests", errors, () => overdueDataRequests(now), []);
+
+  /**
+   * AI-16. Confidence is recorded on every turn, but a number nobody reads
+   * changes nothing. The turns the platform was least sure of go in front of a
+   * person each day, which is also how the evaluation set grows into something
+   * worth measuring against.
+   */
+  const review = await step("low_confidence_review", errors, () => dailyReviewSample(now), { day: "", items: [], lowConfidenceTotal: 0, target: 0 });
+  if (review.items.length > 0) {
+    await notifyRole("platform_admin", {
+      type: "reminder",
+      channel: "in_app",
+      title: `Revue qualité du ${review.day} : ${review.items.length} échanges à relire`,
+      body: `${review.lowConfidenceTotal} échange(s) à faible confiance ce jour-là. L'échantillon retenu est trié du moins sûr au plus sûr.`,
+      payload: { day: review.day, sampled: review.items.length, lowConfidenceTotal: review.lowConfidenceTotal, target: review.target },
+      dedupeKey: `quality-review:${review.day}`,
+    });
+  }
+
+  /**
+   * AI-18. A language whose measured quality has fallen below the gates is
+   * already answering from scripts; this makes sure someone knows it did.
+   */
+  const downgraded = await step("language_gates", errors, () => downgradedLanguages(), []);
+  if (downgraded.length > 0) {
+    await notifyRole("platform_admin", {
+      type: "alert",
+      channel: "in_app",
+      title: `${downgraded.length} couple(s) langue/module en mode scripté`,
+      body: downgraded.map((d) => `${d.language}/${d.module} : ${d.failedGates.join(" · ")}`).join(" | ").slice(0, 900),
+      payload: { downgraded },
+      requiresAck: true,
+      dedupeKey: `language-gates:${now.toISOString().slice(0, 10)}`,
+    });
+  }
 
   // Security counters are unbounded otherwise: one row per address that ever
   // mistyped a PIN, one per rate-limit bucket that ever filled.
@@ -354,6 +393,8 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
     acuAlerts: acuAlerts.length,
     overdueDataRequests: overdue.length,
     securityCountersPruned: pruned,
+    qualityReviewSampled: review.items.length,
+    languagesDowngraded: downgraded.length,
     errors,
   };
   await emitEvent({ type: "scheduler.run.completed", aggregateType: "scheduler", aggregateId: now.toISOString().slice(0, 10), payload: { ...report, errors: errors.length } });

@@ -18,7 +18,7 @@ import type { ImageInput } from "../types";
 import type { FinalAnswer, GeneralAssessment } from "../schemas";
 import { GeneralAssessment as GeneralSchema } from "../schemas";
 import { GENERAL_AGENT_SYSTEM, messageEnvelope } from "../prompts";
-import { analyseLanguage, localise } from "./language";
+import { analyseLanguage, localise, localiseWithGlossary } from "./language";
 import { assessHealth, attachSafeguardingCase, type HealthTriageResult } from "./health";
 import { assessAgriculture, type AgricultureAssessmentPlus } from "./agriculture";
 import { assessEducation, type EducationAssessmentPlus } from "./education";
@@ -32,6 +32,7 @@ import { BOUNDARY_RESPONSES, CLAIM_FALLBACK, checkOutboundClaims, dedupeSentence
 import { confidenceVector, planClarification, type ConfidenceVector } from "../language/confidence";
 import { toSpokenText } from "../language/voice";
 import { scriptText } from "../language/scripts";
+import { languageMode, type LanguageStatus } from "../language/gates";
 
 export interface InteractionInput {
   user: { userId: string; role: Role; language: LanguageCode; province?: string | null } | null;
@@ -107,7 +108,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
   // ACU cap / degraded policy: non-emergency AI falls back to scripted (offline rules) mode; safeguards never switch off.
   const tenantId = userId ? ((await db.select({ tenantId: schema.users.tenantId }).from(schema.users).where(eq(schema.users.id, userId)))[0]?.tenantId ?? null) : null;
   const scripted = await isDegradedMode(tenantId).catch(() => false);
-  const meta = { interactionId, scripted };
+  const meta: { interactionId: string; scripted: boolean } = { interactionId, scripted };
   const save = (patch: Partial<typeof schema.interactions.$inferInsert>) =>
     db.update(schema.interactions).set({ ...patch, updatedAt: new Date() }).where(eq(schema.interactions.id, interactionId));
 
@@ -170,6 +171,17 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       },
     });
     if (transcript) await recordSample({ interactionId, audioFileId, language, sourceText: transcript, translationFr: lang.translationFr, province, intent: lang.intent, module: service, confidence: languageConfidence });
+
+    /**
+     * AI-18. A language answers freely only once its measured quality passes
+     * the gates of §6.5. With no measurement the answer comes from the rules
+     * provider: scripts and menus rather than fluent nonsense.
+     */
+    const languageStatus: LanguageStatus = env.ai.enforceLanguageGates
+      ? await languageMode(language, service).catch(() => ({ language, module: service, mode: "scripted" as const, measuredAt: null, failedGates: ["évaluation indisponible"], reason: "never_measured" as const }))
+      : { language, module: service, mode: "full", measuredAt: null, failedGates: [], reason: "passing" };
+    const scriptedNow = scripted || languageStatus.mode === "scripted";
+    meta.scripted = scriptedNow;
 
     // 4. Personalisation context.
     const profile = await getProfileContext(userId);
@@ -304,11 +316,29 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       confidence: { score: risk.confidence, low: risk.lowConfidence },
       summary: summaryFr,
     };
-    const [actionLocal, understandingLocal, followUpsLocal] = await Promise.all([
-      localise(answer.action, language, interactionId, learning),
-      localise(answer.understanding, language, interactionId, learning),
-      Promise.all(followUps.map((q) => localise(q, language, interactionId, learning))),
+    const [actionRendered, understandingLocal, followUpsLocal] = await Promise.all([
+      localiseWithGlossary(answer.action, language, { interactionId, learning, module: service }),
+      localise(answer.understanding, language, interactionId, learning, service),
+      Promise.all(followUps.map((q) => localise(q, language, interactionId, learning, service))),
     ]);
+    const actionLocal = actionRendered.text;
+    // A term the renderer dropped is worth seeing: it is how a glossary quietly
+    // stops being enforced (FR-LG-05).
+    if (actionRendered.glossary.missing.length > 0 || actionRendered.glossary.corrected.length > 0) {
+      await audit({
+        action: "ai.glossary_applied",
+        actorUserId: userId,
+        entityType: "interaction",
+        entityId: interactionId,
+        after: {
+          language,
+          corrected: actionRendered.glossary.corrected,
+          missing: actionRendered.glossary.missing,
+          versions: actionRendered.glossary.versions,
+        },
+        systemEvent: "glossary",
+      });
+    }
     const answerLocalised: FinalAnswer = { ...answer, action: actionLocal, understanding: understandingLocal };
 
     // 8. Persist structured results and domain records.
@@ -475,7 +505,17 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     }
 
     const latencyMs = Date.now() - started;
-    await save({ status: "completed", latencyMs, modelRoute: scripted ? { mode: "scripted" } : {} });
+    await save({
+      status: "completed",
+      latencyMs,
+      modelRoute: {
+        ...(scriptedNow ? { mode: "scripted" } : {}),
+        ...(scripted ? { degraded: "acu_cap" } : {}),
+        languageMode: languageStatus.mode,
+        languageGate: languageStatus.reason,
+        ...(env.ai.enforceLanguageGates ? {} : { languageGatesEnforced: "false" }),
+      },
+    });
     await audit({ action: "interaction.completed", actorUserId: userId, actorRole: input.user?.role, entityType: "interaction", entityId: interactionId, after: { module: service, language, risk: risk.level, escalated: risk.escalationRequired, caseId }, aiSummary: summaryFr });
 
     return {

@@ -11,7 +11,7 @@
  *  5. Per-language proficiency (listening / understanding / speaking) is measured continuously.
  */
 import "server-only";
-import { and, count, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import type { LanguageCode, ModuleType } from "@server/db/schema";
 import { audit } from "@server/core/audit";
@@ -249,4 +249,64 @@ export async function pendingSamples(language?: LanguageCode, limit = 50) {
     .where(and(eq(schema.languageCorpus.reviewStatus, "pending"), language ? eq(schema.languageCorpus.language, language) : undefined))
     .orderBy(desc(schema.languageCorpus.citizenFlagged), schema.languageCorpus.systemConfidence, desc(schema.languageCorpus.createdAt))
     .limit(limit);
+}
+
+/** How many low-confidence turns a reviewer is asked to look at each day (AI-16). */
+export const DAILY_REVIEW_TARGET = Number(process.env.AI_REVIEW_SAMPLE_TARGET ?? 100);
+
+export interface DailyReviewSample {
+  day: string;
+  /** Turns from the day, lowest confidence first, still awaiting review. */
+  items: Array<{ id: string; interactionId: string | null; language: LanguageCode; module: ModuleType; confidence: number | null; sourceText: string }>;
+  /** How many low-confidence turns there were in total, whether or not they fit in the sample. */
+  lowConfidenceTotal: number;
+  target: number;
+}
+
+/**
+ * The day's review queue (AI-16).
+ *
+ * Confidence is recorded on every turn, but a number nobody reads changes
+ * nothing. This selects the turns the platform was least sure of and puts them
+ * in front of a person, which is also how the evaluation set grows into
+ * something worth measuring against.
+ */
+export async function dailyReviewSample(at: Date = new Date(), target = DAILY_REVIEW_TARGET): Promise<DailyReviewSample> {
+  const db = await getDb();
+  const dayStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+  const previous = new Date(dayStart.getTime() - 24 * 3600 * 1000);
+
+  const rows = await db
+    .select()
+    .from(schema.languageCorpus)
+    .where(and(eq(schema.languageCorpus.reviewStatus, "pending"), gte(schema.languageCorpus.createdAt, previous), lt(schema.languageCorpus.createdAt, dayStart)))
+    .orderBy(asc(schema.languageCorpus.systemConfidence))
+    .limit(Math.max(1, target));
+
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.languageCorpus)
+    .where(
+      and(
+        eq(schema.languageCorpus.reviewStatus, "pending"),
+        gte(schema.languageCorpus.createdAt, previous),
+        lt(schema.languageCorpus.createdAt, dayStart),
+        sql`(${schema.languageCorpus.systemConfidence} is null or ${schema.languageCorpus.systemConfidence} < 0.6)`,
+      ),
+    );
+
+  return {
+    day: previous.toISOString().slice(0, 10),
+    items: rows.map((r) => ({
+      id: r.id,
+      interactionId: r.interactionId,
+      language: r.language,
+      module: r.module,
+      confidence: r.systemConfidence,
+      // Truncated: a reviewer opens the turn to see the rest, and a notification must not carry it.
+      sourceText: r.sourceText.slice(0, 160),
+    })),
+    lowConfidenceTotal: n,
+    target,
+  };
 }

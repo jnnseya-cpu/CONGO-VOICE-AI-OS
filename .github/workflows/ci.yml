@@ -1,0 +1,52 @@
+# DO-03. What must be true before anything reaches an environment.
+#
+# The safety suites are not a separate optional job: a red-team miss or a
+# danger sign that stops escalating is a release blocker (AI-12), so they run
+# in the same gate as the type checker.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        # Everything runs offline against the embedded database and the rules
+        # provider, so no API key and no service container are needed.
+        run: npm test
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Article SEO thresholds
+        run: npm run seo:report

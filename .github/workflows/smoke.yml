@@ -1,0 +1,28 @@
+# The checks that only mean something against a running server (DO-03, §5b of
+# the deployment guide). Run on demand against a deployed environment, and
+# nightly against the last deployment, because a green build is not a working
+# service.
+name: Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL of the deployment to exercise"
+        required: true
+  schedule:
+    - cron: "17 5 * * *"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Exercise the running platform
+        run: node scripts/smoke.mjs "${{ github.event.inputs.base_url || vars.SMOKE_BASE_URL }}"

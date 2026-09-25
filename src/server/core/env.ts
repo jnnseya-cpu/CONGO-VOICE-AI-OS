@@ -71,6 +71,14 @@ export const env = {
     llmModel: process.env.AI_LLM_MODEL ?? "claude-opus-5",
     llmEffort: (process.env.AI_LLM_EFFORT ?? "medium") as "low" | "medium" | "high" | "xhigh" | "max",
     lowConfidenceThreshold: num("AI_LOW_CONFIDENCE_THRESHOLD", 0.55),
+    /**
+     * AI-18 and §6.5: a language answers freely only once its measured quality
+     * passes the gates. Leaving this on means an unevaluated language serves
+     * scripts and menus, which is worse service and honest, rather than fluent
+     * nonsense, which is worse than nothing. Turning it off is a deliberate act
+     * for a supervised demonstration, and is recorded on every turn it affects.
+     */
+    enforceLanguageGates: flag("LANGUAGE_GATES_ENFORCED", true),
   },
 
   storage: {
