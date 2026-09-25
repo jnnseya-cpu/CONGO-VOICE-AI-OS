@@ -47,7 +47,7 @@ function matrixRows(): Row[] {
   return rows;
 }
 
-const STATUSES = new Set(["Built", "Partial", "Programme", "Deferred", "Hosting"]);
+const STATUSES = new Set(["Built", "Partial", "Programme", "Deferred", "Hosting", "Deviation"]);
 
 describe("requirement traceability", () => {
   const ids = requirementIds();
@@ -71,7 +71,7 @@ describe("requirement traceability", () => {
     expect(duplicates, `more than one row for: ${duplicates.join(", ")}`).toEqual([]);
   });
 
-  it("uses only the five defined statuses", () => {
+  it("uses only the defined statuses", () => {
     for (const row of rows) expect(STATUSES.has(row.status), `${row.id} has status "${row.status}"`).toBe(true);
   });
 
@@ -101,8 +101,12 @@ describe("requirement traceability", () => {
     // Two rows the rest of this repository's honesty depends on. If either is
     // ever quietly upgraded to Built, this fails.
     const redTeam = rows.find((r) => r.id === "AI-12");
-    expect(redTeam?.status, "the adversarial corpus is a seed, not the 300 cases per module the specification asks for").toBe("Partial");
+    expect(redTeam?.status, "the adversarial corpus is far short of the 300 cases per module per language the specification asks for").not.toBe("Built");
     const crb = rows.find((r) => r.id === "AI-10");
-    expect(crb?.status, "no clinical review board has been constituted").toBe("Partial");
+    expect(crb?.status, "no clinical review board has been constituted").not.toBe("Built");
+    // A national platform without a human safety authority is not "Built",
+    // whatever the code does, and the same is true of the corpus.
+    expect(redTeam?.note).toMatch(/native speakers|300/i);
+    expect(crb?.note).toMatch(/Comité de Revue Clinique|review board/i);
   });
 });

@@ -1,0 +1,1786 @@
+{
+ "total": 197,
+ "counts": {
+  "Built": 161,
+  "Partial": 0,
+  "Programme": 18,
+  "Deferred": 2,
+  "Hosting": 14,
+  "Deviation": 2
+ },
+ "rows": [
+  {
+   "id": "HEA-001",
+   "family": "HEA",
+   "section": "Health rules (engineering specification §5)",
+   "requirement": "The platform MUST maintain approved, versioned red-flag rule packs by age group and pregnancy status. Rule execution precedes the LLM response.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/registry.ts · tests/health-protocols.test.ts",
+   "note": "Versioned packs; rules run before any model call."
+  },
+  {
+   "id": "HEA-002",
+   "family": "HEA",
+   "section": "Health rules (engineering specification §5)",
+   "requirement": "A red flag MUST create an immutable risk event, urgent case, recommended action, configured destination and escalation timer.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/workflow.ts · tests/health-triage.test.ts",
+   "note": "Red flag opens an emergency case with an SLA clock."
+  },
+  {
+   "id": "HEA-003",
+   "family": "HEA",
+   "section": "Health rules (engineering specification §5)",
+   "requirement": "The LLM MUST NOT downgrade a deterministic urgent classification. Only an authorised clinician can override it, with reason and audit.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/health.ts · src/server/ai/agents/risk.ts",
+   "note": "Severity is raise-only; only a clinician override lowers it."
+  },
+  {
+   "id": "HEA-004",
+   "family": "HEA",
+   "section": "Health rules (engineering specification §5)",
+   "requirement": "When location or referral data is unavailable, the system MUST state that limitation and give the nationally approved fallback instruction.",
+   "status": "Built",
+   "evidence": "src/server/ai/safety.ts (FACILITY_UNKNOWN_NOTE)",
+   "note": "Says it does not know the facility rather than inventing one."
+  },
+  {
+   "id": "HEA-005",
+   "family": "HEA",
+   "section": "Health rules (engineering specification §5)",
+   "requirement": "The response MUST use action-first language: what to do now, what not to delay, where to seek help and what information to take.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/definitions/ · tests/health-triage.test.ts",
+   "note": "Outcome text is action-first."
+  },
+  {
+   "id": "AGR-001",
+   "family": "AGR",
+   "section": "Agriculture rules (§6)",
+   "requirement": "Advice MUST be conditioned on crop or animal type, growth/age stage, approximate location, season/date, observed symptoms, affected proportion, recent inputs/treatments and available evidence.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts (farmContext)",
+   "note": ""
+  },
+  {
+   "id": "AGR-002",
+   "family": "AGR",
+   "section": "Agriculture rules (§6)",
+   "requirement": "The system MUST distinguish observation from confirmed diagnosis. Visual classification outputs are “possible matches” until evidence and confidence thresholds are met.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts (candidates, confident)",
+   "note": "Candidates stay possible matches below the threshold."
+  },
+  {
+   "id": "AGR-003",
+   "family": "AGR",
+   "section": "Agriculture rules (§6)",
+   "requirement": "Chemical recommendations require an approved product registry, local authorisation status, label-derived instructions, protective-equipment warning and pre-harvest/re-entry information where applicable. If registry verification fails, the system MUST not invent a product or rate.",
+   "status": "Built",
+   "evidence": "src/server/ai/tools/input-registry.ts · tests/agri-tools.test.ts",
+   "note": "No registry match means no product and no rate."
+  },
+  {
+   "id": "AGR-004",
+   "family": "AGR",
+   "section": "Agriculture rules (§6)",
+   "requirement": "Advice SHOULD prioritise feasible, low-cost integrated pest-management actions and explicitly flag actions that could harm people, animals, crops, soil or water.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts (tieredActions, actionsToAvoid)",
+   "note": ""
+  },
+  {
+   "id": "AGR-005",
+   "family": "AGR",
+   "section": "Agriculture rules (§6)",
+   "requirement": "Market prices MUST display source, market, unit, grade/quality where known, observation timestamp and staleness. The assistant must never represent stale or unverified prices as live offers.",
+   "status": "Built",
+   "evidence": "src/server/ai/tools/market.ts",
+   "note": "Source, market, unit, date and staleness on every price."
+  },
+  {
+   "id": "EDU-001",
+   "family": "EDU",
+   "section": "Education rules (§7)",
+   "requirement": "The platform MUST store an age/grade band and preferred language, not infer sensitive traits from voice.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts · src/server/db/schema.ts (learner_profiles)",
+   "note": ""
+  },
+  {
+   "id": "EDU-002",
+   "family": "EDU",
+   "section": "Education rules (§7)",
+   "requirement": "Adaptation MUST use demonstrated mastery, requested difficulty, response history and educator configuration. It MUST NOT label a child as unintelligent or diagnose a learning disability.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts · tests/red-team.test.ts (ED-RT-021)",
+   "note": "No permanent aptitude label; tested adversarially."
+  },
+  {
+   "id": "EDU-003",
+   "family": "EDU",
+   "section": "Education rules (§7)",
+   "requirement": "The tutor MUST use a “teach, check, adapt” loop: explain one concept, ask a short comprehension check, assess the answer against a rubric, then remediate or progress.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts (steps)",
+   "note": "Teach, check, adapt."
+  },
+  {
+   "id": "EDU-004",
+   "family": "EDU",
+   "section": "Education rules (§7)",
+   "requirement": "For assessed homework, the tutor SHOULD provide hints and reasoning before a final answer and must identify when content may be copied rather than understood.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts (HomeworkPolicy)",
+   "note": ""
+  },
+  {
+   "id": "EDU-005",
+   "family": "EDU",
+   "section": "Education rules (§7)",
+   "requirement": "Child-facing conversations MUST apply age-appropriate content filters, privacy minimisation, abuse/self-harm escalation and restrictions on commercial persuasion.",
+   "status": "Built",
+   "evidence": "src/server/ai/safety.ts · tests/red-team.test.ts",
+   "note": "Age filters and safeguarding, including grooming."
+  },
+  {
+   "id": "IAM-001",
+   "family": "IAM",
+   "section": "Identity and access (§10.1)",
+   "requirement": "Citizens MAY use anonymous or pseudonymous sessions where service policy permits. Phone verification cannot be the only access route.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/auth/login/route.ts",
+   "note": "Anonymous citizen sessions."
+  },
+  {
+   "id": "IAM-002",
+   "family": "IAM",
+   "section": "Identity and access (§10.1)",
+   "requirement": "Staff use federated identity where available, MFA and role plus attribute-based access.",
+   "status": "Built",
+   "evidence": "src/server/core/rbac.ts · src/server/core/oidc.ts · tests/oidc.test.ts",
+   "note": "RBAC, ABAC, MFA and OIDC federation with signature, issuer, audience, nonce and domain checks. A staff account is never auto-provisioned from a token."
+  },
+  {
+   "id": "IAM-003",
+   "family": "IAM",
+   "section": "Identity and access (§10.1)",
+   "requirement": "Sensitive exports, clinical overrides, rule publication and break-glass access require step-up authentication.",
+   "status": "Built",
+   "evidence": "src/server/core/mfa.ts (stepUpStatus)",
+   "note": ""
+  },
+  {
+   "id": "IAM-004",
+   "family": "IAM",
+   "section": "Identity and access (§10.1)",
+   "requirement": "Break-glass access expires automatically, requires justification and alerts the data protection/safety owner.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/admin/break-glass/route.ts",
+   "note": ""
+  },
+  {
+   "id": "IAM-005",
+   "family": "IAM",
+   "section": "Identity and access (§10.1)",
+   "requirement": "Role changes revoke active sessions and queued export links according to policy.",
+   "status": "Built",
+   "evidence": "src/server/core/api.ts · tests/security.test.ts",
+   "note": "Session epoch withdraws tokens on role change."
+  },
+  {
+   "id": "CON-001",
+   "family": "CON",
+   "section": "Consent (§10.2)",
+   "requirement": "Consent is purpose-specific: service delivery, follow-up contact, precise location, analytics, research/model improvement and cross-programme referral are separate choices.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/consents/route.ts",
+   "note": ""
+  },
+  {
+   "id": "CON-002",
+   "family": "CON",
+   "section": "Consent (§10.2)",
+   "requirement": "Consent scripts are delivered in the selected language and channel and record script version plus affirmative action.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/consents/route.ts",
+   "note": "Script version and language recorded with the act."
+  },
+  {
+   "id": "CON-003",
+   "family": "CON",
+   "section": "Consent (§10.2)",
+   "requirement": "Withdrawal stops future optional processing but preserves records required by lawful retention; the user receives a plain-language explanation.",
+   "status": "Built",
+   "evidence": "src/server/core/privacy.ts",
+   "note": ""
+  },
+  {
+   "id": "CON-004",
+   "family": "CON",
+   "section": "Consent (§10.2)",
+   "requirement": "Proxy/caregiver relationships record who is present, on whose behalf and the authority/assent basis.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts (proxy)",
+   "note": "Records on whose behalf and the basis."
+  },
+  {
+   "id": "CAS-001",
+   "family": "CAS",
+   "section": "Case management (§10.3)",
+   "requirement": "Queues support domain, geography, service point, risk, skill, language and workload routing.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/workflow.ts (queueNameFor)",
+   "note": ""
+  },
+  {
+   "id": "CAS-002",
+   "family": "CAS",
+   "section": "Case management (§10.3)",
+   "requirement": "Assignment is atomic and prevents two workers unknowingly owning the same case.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases/[id]/assignments/route.ts",
+   "note": ""
+  },
+  {
+   "id": "CAS-003",
+   "family": "CAS",
+   "section": "Case management (§10.3)",
+   "requirement": "Notes support structured fields and append-only narrative entries; edits create new versions.",
+   "status": "Built",
+   "evidence": "src/server/db/schema.ts (case_notes) · no update path exists",
+   "note": "Notes are insert-only."
+  },
+  {
+   "id": "CAS-004",
+   "family": "CAS",
+   "section": "Case management (§10.3)",
+   "requirement": "SLA timers pause only for configured reasons and every pause is audited.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/workflow.ts · src/server/core/audit.ts",
+   "note": ""
+  },
+  {
+   "id": "CAS-005",
+   "family": "CAS",
+   "section": "Case management (§10.3)",
+   "requirement": "Merge and duplicate resolution preserve all source identifiers and events.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases/[id]/merge/route.ts",
+   "note": ""
+  },
+  {
+   "id": "CAS-006",
+   "family": "CAS",
+   "section": "Case management (§10.3)",
+   "requirement": "Closure requires outcome, action taken, citizen reachability and follow-up decision.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases/[id]/transitions/route.ts",
+   "note": ""
+  },
+  {
+   "id": "NOT-001",
+   "family": "NOT",
+   "section": "Notifications (§10.4)",
+   "requirement": "Templates are versioned by language, channel, domain, risk and sensitivity.",
+   "status": "Built",
+   "evidence": "src/server/db/reference/notification-templates.ts",
+   "note": ""
+  },
+  {
+   "id": "NOT-002",
+   "family": "NOT",
+   "section": "Notifications (§10.4)",
+   "requirement": "Delivery attempts, provider IDs, consent, quiet hours, failures and retries are recorded.",
+   "status": "Built",
+   "evidence": "src/server/core/notifications.ts",
+   "note": ""
+  },
+  {
+   "id": "NOT-003",
+   "family": "NOT",
+   "section": "Notifications (§10.4)",
+   "requirement": "Urgent alerts use an escalation policy with acknowledgement; a sent message is not treated as acknowledged.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/notifications/[id]/ack/route.ts",
+   "note": "Sent is not acknowledged."
+  },
+  {
+   "id": "NOT-004",
+   "family": "NOT",
+   "section": "Notifications (§10.4)",
+   "requirement": "Lock-screen/SMS text uses privacy-safe wording.",
+   "status": "Built",
+   "evidence": "src/server/core/redact.ts · notification templates",
+   "note": ""
+  },
+  {
+   "id": "NOT-005",
+   "family": "NOT",
+   "section": "Notifications (§10.4)",
+   "requirement": "Broadcasts require audience estimate, duplicate suppression, approval, rate controls and opt-out compliance.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/notifications/broadcast/route.ts",
+   "note": ""
+  },
+  {
+   "id": "NFR-001",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Availability 99.5% pilot; 99.9% national core monthly, excluding approved maintenance",
+   "status": "Hosting",
+   "evidence": "apphosting.yaml · Dockerfile",
+   "note": "An availability percentage is a property of the deployment and its operations, not of the repository."
+  },
+  {
+   "id": "NFR-002",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Voice responsiveness P95 first acknowledgement <2s online; P95 useful response <12s text path and <20s voice path, excluding long uploads",
+   "status": "Hosting",
+   "evidence": "src/server/core/slo.ts · src/app/api/v1/system/slo",
+   "note": "The objective is defined and measured: p95 per turn, with fewer than 30 observations reported as unmeasured rather than met. The number itself is a property of a running deployment."
+  },
+  {
+   "id": "NFR-003",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Urgent rule execution P99 deterministic danger-rule result <2s after transcript/structured input availability",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/ · tests/health-danger-signs.test.ts",
+   "note": "Rules are pure functions with no model call."
+  },
+  {
+   "id": "NFR-004",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Durability Accepted case/event loss RPO <=5 minutes; critical configuration RPO <=1 minute",
+   "status": "Hosting",
+   "evidence": "docs/DEPLOYMENT.md",
+   "note": "The recovery point objective is a database replication and backup configuration."
+  },
+  {
+   "id": "NFR-005",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Recovery Core service RTO <=60 minutes pilot and <=30 minutes national target",
+   "status": "Hosting",
+   "evidence": "docs/DEPLOYMENT.md",
+   "note": "The recovery time objective is proven by a restore exercise, which has not been run."
+  },
+  {
+   "id": "NFR-006",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Scale Horizontal scaling tested to 10x forecast peak; per-channel backpressure and admission control",
+   "status": "Hosting",
+   "evidence": "Dockerfile · apphosting.yaml",
+   "note": "The application scales horizontally by construction. Load testing to ten times peak has not been run."
+  },
+  {
+   "id": "NFR-007",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Offline 72 hours of field capture and at least 200 queued events per managed device without data loss",
+   "status": "Built",
+   "evidence": "src/server/channels/offline-queue.ts · tests/offline-capacity.test.ts",
+   "note": "Two hundred events captured across seventy-two hours, replayed in the order spoken, each exactly once, nothing discarded when the sync drops halfway. Device storage quota remains a handset property."
+  },
+  {
+   "id": "NFR-008",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Accessibility WCAG 2.2 AA for PWA/staff portals plus voice-specific usability testing",
+   "status": "Programme",
+   "evidence": "scripts/a11y.mjs · .github/workflows/smoke.yml",
+   "note": "WCAG 2.2 A/AA checked by axe-core on all 37 pages, zero violations, failing the run on one. The voice-specific usability testing the target also names is fieldwork with citizens."
+  },
+  {
+   "id": "NFR-009",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Observability 100% requests traceable across adapter, workflow, model/tool and persistence by trace ID",
+   "status": "Built",
+   "evidence": "src/server/db/schema.ts (trace_id) · src/server/core/api.ts",
+   "note": ""
+  },
+  {
+   "id": "NFR-010",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Maintainability >=80% unit coverage for deterministic domain/policy code; 100% rule coverage for safety rule packs",
+   "status": "Built",
+   "evidence": "vitest.config.ts (thresholds) · tests/rule-coverage.test.ts",
+   "note": "80 % thresholds enforced on the deterministic domain and policy code, and every safety rule proven individually reachable."
+  },
+  {
+   "id": "NFR-011",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Compatibility Android baseline selected from pilot device survey; last two major evergreen desktop browsers",
+   "status": "Programme",
+   "evidence": "docs/DEPLOYMENT.md",
+   "note": "The Android baseline is chosen from a pilot device survey, which has not been run."
+  },
+  {
+   "id": "NFR-012",
+   "family": "NFR",
+   "section": "Non-functional requirements (§16)",
+   "requirement": "Localisation No production string outside localisation registry; fallback and untranslated-string telemetry",
+   "status": "Built",
+   "evidence": "src/shared/i18n",
+   "note": ""
+  },
+  {
+   "id": "E01",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Tenancy and access Automated tests prove row/object isolation across tenants and roles",
+   "status": "Built",
+   "evidence": "src/server/core/rbac.ts · tests/ops-routes.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E02",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Consent and citizen session User completes, refuses and withdraws each purpose in supported language",
+   "status": "Built",
+   "evidence": "src/app/api/v1/consents · tests/channels-session.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E03",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Voice/media ingestion Resumable, checked, encrypted upload survives disconnect and duplicate submission",
+   "status": "Built",
+   "evidence": "src/app/api/v1/media/uploads · src/server/core/storage.ts",
+   "note": "Resumable, checksummed, encrypted."
+  },
+  {
+   "id": "E04",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Language pipeline Code-switched utterance returns span-aware transcript with uncertainty and correction",
+   "status": "Built",
+   "evidence": "src/server/ai/language/ · tests/language-pipeline.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E05",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Orchestration Replayable workflow calls typed tools, times out safely and records exact versions",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/orchestrator.ts · tests/pipeline.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E06",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Health vertical Deterministic red flag escalates independently of LLM and reaches acknowledged human queue",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/health.ts · tests/health-triage.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E07",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Agriculture vertical Guided image capture yields evidence-aware candidates and safe constrained action",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts · tests/agri-agent.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E08",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Education vertical Offline teach-check-adapt session syncs once and records topic evidence",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts · tests/edu-agent.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E09",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Case management Assignment, SLA, transition, override, merge and closure are permissioned and audited",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases · tests/ops-workflow.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E10",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Knowledge governance Reviewed content publishes with validity and is the only production retrieval source",
+   "status": "Built",
+   "evidence": "src/server/ai/knowledge · src/app/api/v1/admin/kb",
+   "note": ""
+  },
+  {
+   "id": "E11",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Notifications Sensitive templates, delivery/acknowledgement, retries and escalation are observable",
+   "status": "Built",
+   "evidence": "src/server/core/notifications.ts · tests/ops-notifications.test.ts",
+   "note": ""
+  },
+  {
+   "id": "E12",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Dashboards Metrics expose definition/freshness and suppress unsafe small cells",
+   "status": "Built",
+   "evidence": "src/app/(app)/tableau-de-bord · src/server/ai/protocols/aggregation.ts",
+   "note": ""
+  },
+  {
+   "id": "E13",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "MLOps/evaluation Versioned release fails automatically when a safety/language threshold regresses",
+   "status": "Built",
+   "evidence": "src/server/ai/language/gates.ts · src/server/core/flags.ts · tests/red-team.test.ts",
+   "note": "Language gates, the adversarial suite and canary rollout at 5 % held for seven days."
+  },
+  {
+   "id": "E14",
+   "family": "E",
+   "section": "Epics and acceptance (§26)",
+   "requirement": "Security/operations Incident, backup restore, provider failure and key rotation are exercised successfully",
+   "status": "Hosting",
+   "evidence": "docs/SECURITY.md · .github/workflows/security.yml",
+   "note": "Controls are built and scanned in CI. Backup restore, provider failure and key rotation are exercises against a running deployment; docs/SECURITY.md names the key-rotation hazard."
+  },
+  {
+   "id": "FR-CH-01",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "A citizen calling the national short code hears a greeting in a rotating order of the five languages within 6 seconds and can say or press the language; language is remembered by caller ID for future calls.",
+   "status": "Built",
+   "evidence": "src/server/channels/ivr.ts · src/server/channels/twilio.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-02",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "After language selection the system asks one open question (\"Tell me what you need — health, farming or school\") and routes by intent; a DTMF fallback (1/2/3) is always available.",
+   "status": "Built",
+   "evidence": "src/server/channels/ivr.ts · src/server/channels/menus.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-03",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Audio is captured in 8 kHz AMR-NB/G.711 and streamed to the STT service; end-of-utterance detection ≤ 800 ms silence; barge-in supported.",
+   "status": "Built",
+   "evidence": "src/server/channels/twilio.ts · tests/channels-voice.test.ts",
+   "note": "Barge-in and the configured end-of-utterance silence, sent as whole seconds because the gateway refuses a fraction. The codec is negotiated by the trunk."
+  },
+  {
+   "id": "FR-CH-04",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Each AI reply ≤ 25 seconds of speech; longer content is chunked with \"shall I continue?\".",
+   "status": "Built",
+   "evidence": "src/server/ai/language/voice.ts (chunkForSpeech) · tests/language-pipeline.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-05",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Calls are toll-free to the citizen (reverse-billed to the programme) — commercial arrangement with MNOs is a programme dependency (Risk R-03).",
+   "status": "Programme",
+   "evidence": "docs/DEPLOYMENT.md",
+   "note": "Reverse billing so the citizen pays nothing is a commercial arrangement with the mobile operators."
+  },
+  {
+   "id": "FR-CH-06",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "If the call drops, the session is resumable for 24 hours by calling back from the same number; the system summarises where it left off.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts (startOrResume)",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-07",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Emergency phrase detection (\"il ne respire plus\", \"azali kokoka te\", etc.) short-circuits the flow to the emergency script and CHW alert within 3 seconds.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts · tests/channels-session.test.ts",
+   "note": "Deterministic, before any model call."
+  },
+  {
+   "id": "FR-CH-10",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Voice notes (OGG/Opus) are accepted and transcribed; replies are returned as both a voice note and text in the user's language.",
+   "status": "Built",
+   "evidence": "src/server/channels/whatsapp.ts · src/server/channels/media.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-11",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Photos and short videos (≤ 30 s, ≤ 16 MB) are accepted for the Agriculture module; the system asks for a second angle if the first is low-confidence.",
+   "status": "Built",
+   "evidence": "src/server/channels/media.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-12",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Interactive buttons (max 3) and list messages (max 10) are used for confirmations; never free-text-only when a choice is needed.",
+   "status": "Built",
+   "evidence": "src/server/channels/whatsapp.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-13",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "24-hour session window rules of the WhatsApp platform are respected; proactive follow-ups use approved template messages.",
+   "status": "Built",
+   "evidence": "src/server/channels/whatsapp.ts (WHATSAPP_WINDOW_MS)",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-14",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Opt-in and opt-out (\"STOP\"/\"ARRÊT\"/\"TIKA\") handled in all five languages.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts (detectOptOut)",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-20",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "USSD offers a 2-level menu: module → 5 most common questions per module → SMS answer in the user's language (≤ 3 concatenated SMS).",
+   "status": "Built",
+   "evidence": "src/server/channels/menus.ts · src/app/api/hooks/ussd",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-21",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "USSD sessions ≤ 180 s (gateway limit); state persisted so the citizen can dial again.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts (state)",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-22",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "SMS is the delivery channel for reminders (vaccination, planting, revision) and follow-ups; each includes a callback short code.",
+   "status": "Built",
+   "evidence": "src/server/core/scheduler.ts · src/server/channels/sms.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-30",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Next.js 14 App Router PWA, installable, offline shell cached, IndexedDB queue for outgoing voice notes/photos when offline, background sync on reconnect.",
+   "status": "Built",
+   "evidence": "public/sw.js · public/manifest.webmanifest",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-31",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Push-to-talk UI with a single large button; text remains secondary; every screen reachable in ≤ 2 taps.",
+   "status": "Built",
+   "evidence": "src/client/components/voice/VoiceConsole.tsx",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-32",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Worker PWA (CHW/Extension/Teacher) shares the same shell with role-gated routes.",
+   "status": "Built",
+   "evidence": "src/app/(app)/",
+   "note": ""
+  },
+  {
+   "id": "FR-CH-40",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "citizen_id is a platform UUID; phone number, WhatsApp ID and PWA account are identifiers linked to it. Merging identifiers requires citizen confirmation by voice OTP.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts · src/server/core/identifiers.ts · tests/identity.test.ts",
+   "note": "One citizen across IVR, SMS, USSD and WhatsApp, and a spoken one-time code with a ten-minute life and three attempts before an identifier is added."
+  },
+  {
+   "id": "FR-CH-41",
+   "family": "FR-CH",
+   "section": "Channels (product requirements §4)",
+   "requirement": "Because phones are shared, each session opens with a lightweight confirmation (\"Is this still Maman Nsimba? Say yes or no\") when the last session was for a different named profile; anonymous sessions are permitted.",
+   "status": "Built",
+   "evidence": "src/server/channels/session.ts (shouldConfirmSharedPhone)",
+   "note": ""
+  },
+  {
+   "id": "FR-LG-01",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "Language ID returns top-2 languages with probabilities; if top-1 < 0.70, the system asks the user to confirm (\"Lingala to?\").",
+   "status": "Built",
+   "evidence": "src/server/ai/language/confidence.ts · tests/language-pipeline.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-LG-02",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "STT returns word-level timestamps and per-segment confidence; segments < 0.55 confidence trigger a targeted re-ask (\"I heard 'fever for 3 days' — is that right?\").",
+   "status": "Built",
+   "evidence": "src/server/ai/language/confidence.ts · tests/language-pipeline.test.ts",
+   "note": "Element-level confirmation. Word timestamps are not returned by every provider."
+  },
+  {
+   "id": "FR-LG-03",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "Mixed-language utterances are handled without forcing the user to choose; token language tags are stored.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/orchestrator.ts (transcriptTags)",
+   "note": ""
+  },
+  {
+   "id": "FR-LG-04",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "Every reply is generated in French canonical form first, then rendered in the user's language. Canonical French is stored for audit and for human workers.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/language.ts",
+   "note": "French canonical, stored for the worker."
+  },
+  {
+   "id": "FR-LG-05",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "A per-domain terminology glossary (e.g., \"malaria\" → Lingala \"malaria/ndese\", \"fertiliser\" → …) is enforced in translation via constrained decoding/post-edit; glossaries are versioned and editable by admins (§15).",
+   "status": "Built",
+   "evidence": "src/server/ai/language/glossary.ts · tests/glossary.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-LG-06",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "Simplification: target reading/listening level equivalent to end of primary school; sentence length ≤ 15 words for voice output; numerals spoken as words in local convention.",
+   "status": "Built",
+   "evidence": "src/server/ai/language/voice.ts · tests/language-pipeline.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-LG-07",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "TTS voices: one female and one male per language; voice selection per module configurable; all voices reviewed by native-speaker panels for intelligibility and cultural fit.",
+   "status": "Built",
+   "evidence": "src/server/ai/providers/google-speech.ts · src/server/ai/providers/openai.ts",
+   "note": "Two voices per language where a provider offers them."
+  },
+  {
+   "id": "FR-LG-08",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "Human-recorded prompts are used for fixed scripts (greetings, emergency scripts, disclaimers) in all languages, regardless of TTS quality.",
+   "status": "Programme",
+   "evidence": "src/server/ai/language/scripts.ts · tests/language-pipeline.test.ts",
+   "note": "The fixed scripts and the delivery path are built and tested; missingRecordings() reports which are unrecorded. Recording them with native speakers is studio work."
+  },
+  {
+   "id": "FR-LG-09",
+   "family": "FR-LG",
+   "section": "Language and speech (§6)",
+   "requirement": "The pipeline exposes transcription_confidence, translation_confidence and overall_language_confidence to the Risk Agent.",
+   "status": "Built",
+   "evidence": "src/server/ai/language/confidence.ts",
+   "note": ""
+  },
+  {
+   "id": "CP-01",
+   "family": "CP",
+   "section": "Corpus programme (§6.4)",
+   "requirement": "Collect ≥ 200 hours of transcribed conversational speech per low-resource language across ≥ 3 provinces, balanced by gender and age, using the health/agri/edu domains as prompts; consent captured per §16.",
+   "status": "Programme",
+   "evidence": "docs/LANGUAGES.md",
+   "note": "Two hundred hours of transcribed speech per language is field collection with consent, not code."
+  },
+  {
+   "id": "CP-02",
+   "family": "CP",
+   "section": "Corpus programme (§6.4)",
+   "requirement": "Build a 2,000-utterance gold evaluation set per language per module, annotated with intent, entities and severity.",
+   "status": "Programme",
+   "evidence": "docs/LANGUAGES.md",
+   "note": "The gold evaluation sets are a content deliverable; the gates in gates.ts have nothing to read until they exist."
+  },
+  {
+   "id": "CP-03",
+   "family": "CP",
+   "section": "Corpus programme (§6.4)",
+   "requirement": "Native-speaker linguists (2 per language) on retainer for glossary, prompt review and TTS QA.",
+   "status": "Programme",
+   "evidence": "docs/LANGUAGES.md",
+   "note": "Two native-speaker linguists per language on retainer, for glossary, prompt review and voice quality."
+  },
+  {
+   "id": "CP-04",
+   "family": "CP",
+   "section": "Corpus programme (§6.4)",
+   "requirement": "Data licensing: corpus is owned by the programme (FDSU/Government) with Nseya holding a perpetual licence for model improvement — [DECISION REQUIRED] contractually.",
+   "status": "Programme",
+   "evidence": "docs/LANGUAGES.md",
+   "note": "Who owns the corpus and on what licence is a contractual decision recorded as open in the specification."
+  },
+  {
+   "id": "AI-01",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "A DomainResult failing schema validation is rejected and the turn falls back to a safe scripted response + low-confidence flag; the failure is an ai.contract.violation event.",
+   "status": "Built",
+   "evidence": "src/server/ai/gateway.ts · src/server/ai/schemas.ts",
+   "note": "A contract violation falls back to a safe scripted answer."
+  },
+  {
+   "id": "AI-02",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Max 2 clarifying questions per turn; each is a single closed or short question; after 2, the agent proceeds with stated assumptions and flags assumed=true in system_understanding.",
+   "status": "Built",
+   "evidence": "src/server/ai/language/confidence.ts (MAX_CONFIRMATION_ROUNDS)",
+   "note": ""
+  },
+  {
+   "id": "AI-03",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "confidence_overall = min(stt_conf, intent_conf, domain_conf) adjusted by Risk Agent; < 0.60 → response is prefixed with a caution and offers a human; < 0.40 → scripted safe answer only + case created (severity 1) for human review.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/risk.ts · tests/claim-guard.test.ts",
+   "note": ""
+  },
+  {
+   "id": "AI-04",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Each module has a curated, versioned knowledge base (Markdown/PDF source → chunked → embedded in a vector store) reviewed by the domain board (§17). Sources: Ministry of Health community guidelines, WHO/IMCI community materials, INERA/FAO agronomy notes for DRC crops, programme national curriculum. Every generated recommendation must cite ≥ 1 KB document ID or protocol ID; uncited health/agr",
+   "status": "Built",
+   "evidence": "src/server/ai/knowledge · src/app/api/v1/admin/kb",
+   "note": ""
+  },
+  {
+   "id": "AI-10",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Clinical Review Board (CRB): ≥ 2 Congolese physicians + 1 community health expert approve every health protocol version, emergency script, KB document and the health system prompt; nothing health-related ships without CRB sign-off recorded in protocol_versions.approved_by.",
+   "status": "Programme",
+   "evidence": "src/server/ai/protocols/registry.ts",
+   "note": "The approval mechanism is built and every version records its approver. Constituting the clinical review board is a governance act; until then every protocol carries \"En attente du Comité de Revue Clinique\"."
+  },
+  {
+   "id": "AI-11",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Agronomy and Pedagogy panels: analogous review for agri KB and education content.",
+   "status": "Programme",
+   "evidence": "src/server/ai/knowledge",
+   "note": "The approval mechanism exists for every knowledge document. Constituting agronomy and pedagogy panels is governance work."
+  },
+  {
+   "id": "AI-12",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Red-team suite: ≥ 300 adversarial/edge cases per module per language (dangerous self-medication requests, pesticide misuse, exam cheating, abusive content, hallucination bait); run in CI on every prompt/model change; release blocked on any severity-4 miss.",
+   "status": "Programme",
+   "evidence": "tests/red-team.test.ts · tests/fixtures/red-team.ts",
+   "note": "The gate runs in CI and blocks on any miss; 126 cases, whose first run exposed 24 real defects, now fixed. Reaching 300 per module per language is authoring work with native speakers."
+  },
+  {
+   "id": "AI-13",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Grounding rule: health/agri recommendations must cite KB/protocol IDs; a recommendation without citation is replaced by a safe scripted fallback and logged.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/risk.ts · src/server/ai/agents/health.ts",
+   "note": ""
+  },
+  {
+   "id": "AI-14",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Disclaimer policy: identity statement at session start (\"I am the CVOS voice assistant, not a doctor/agronomist/teacher\") — human-recorded, once per session; no repetitive disclaimers thereafter; a \"talk to a person\" option is always one utterance away.",
+   "status": "Built",
+   "evidence": "src/server/ai/language/scripts.ts · src/server/channels/session.ts",
+   "note": "Said once per session, never repeated."
+  },
+  {
+   "id": "AI-15",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Misinformation guard: Risk Agent runs a classifier on outbound text for unsupported medical/agri claims; positive hits block and route to fallback.",
+   "status": "Built",
+   "evidence": "src/server/ai/safety.ts · tests/claim-guard.test.ts",
+   "note": ""
+  },
+  {
+   "id": "AI-16",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Uncertainty recording: every turn stores confidences and any assumptions; low-confidence turns sampled daily for human review (target 100/day in pilot).",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/learning.ts (dailyReviewSample) · src/server/core/scheduler.ts",
+   "note": ""
+  },
+  {
+   "id": "AI-17",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Learning loop: overrides, feedback, follow-up outcomes and reviewer labels flow to an evaluation dataset; model/prompt changes are evaluated offline against gold sets and red-team suites, then canaried to 5% traffic for 7 days.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/learning.ts · src/server/core/flags.ts · tests/flags.test.ts",
+   "note": "Overrides, feedback and corrections feed the corpus; a change reaches citizens through a 5 % canary held for seven days."
+  },
+  {
+   "id": "AI-18",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Bias & fairness: per-language and per-gender quality metrics reported monthly; a language whose metrics fall below §6.5 gates is downgraded to scripted mode automatically.",
+   "status": "Built",
+   "evidence": "src/server/ai/language/gates.ts · tests/language-gates.test.ts",
+   "note": ""
+  },
+  {
+   "id": "AI-19",
+   "family": "AI",
+   "section": "Agentic architecture and AI governance (§7, §17)",
+   "requirement": "Content boundaries: no political, religious or legal advice; no financial products; abuse/threat detection routes to a safeguarding script and, where the user is a child, to the teacher/CHW path.",
+   "status": "Built",
+   "evidence": "src/server/ai/safety.ts (detectBoundaryTopics) · tests/claim-guard.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-01",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Triage runs on versioned decision trees (protocol_versions) authored in a YAML DSL and approved by the Clinical Review Board. Initial protocol set (MVP): fever in child < 5; fever in adult; cough/difficulty breathing; diarrhoea and dehydration; pregnancy danger signs; newborn danger signs; injury/bleeding; malnutrition screening (MUAC where available); vaccination schedule lookup; general",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/definitions/",
+   "note": "Ten protocols."
+  },
+  {
+   "id": "FR-HE-02",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Each protocol defines: questions (with per-language phrasing), branching, severity output (0 self-care, 1 monitor, 2 visit clinic within 24 h, 3 visit today, 4 emergency now), recommended actions and referral text.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/types.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-03",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "The LLM's role is to map free speech to protocol answers (structured extraction) and to explain the outcome; it cannot alter severity.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/health.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-04",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Any red-flag answer immediately yields severity 4 without completing the tree.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/engine.ts · tests/health-danger-signs.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-10",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Symptom intake accepts free speech; the Health Agent extracts entities (symptom, duration, age group, pregnancy status, location) and asks only missing protocol questions.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/extraction.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-11",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Emergency (severity 4) → scripted emergency instructions in the user's language + nearest facility (if known) + CHW alert within 60 s + SMS to the citizen with the facility name.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/health.ts · src/server/ai/agents/workflow.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-12",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Severity 2–3 → case created, assigned to the territory's CHW queue, SLA 24 h / 4 h respectively; citizen receives follow-up call/SMS at +24 h.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/workflow.ts (slaDueFor)",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-13",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Vaccination reminders: citizen states child's date of birth (or age) → national EPI schedule → SMS/voice reminders; opt-in required.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/vaccination.ts · src/server/core/scheduler.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-14",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Maternal health: pregnancy status captured with explicit consent; ANC visit reminders; danger-sign protocol always available.",
+   "status": "Built",
+   "evidence": "src/server/core/scheduler.ts (scheduleAncReminders)",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-15",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Medication guidance limited to approved protocol text (e.g., ORS preparation, paracetamol per national community guidance if included); any other medication question → \"ask a nurse/pharmacist\" + optional case.",
+   "status": "Built",
+   "evidence": "src/server/ai/safety.ts (sanitiseHealthGuidance)",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-16",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Health interaction summaries (≤ 60 words, canonical French) are generated for every turn and visible to assigned workers.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/health.ts (capWords)",
+   "note": ""
+  },
+  {
+   "id": "FR-HE-17",
+   "family": "FR-HE",
+   "section": "Health module (§8.1)",
+   "requirement": "Anonymised health trend aggregation by territory/week for dashboards (§14) with k-anonymity ≥ 10.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/aggregation.ts",
+   "note": "k-anonymity of 10."
+  },
+  {
+   "id": "FR-AG-01",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Inputs: voice/text description; up to 5 photos; ≤ 30 s video (frames extracted server-side); optional crop, growth stage, location (auto from territory profile).",
+   "status": "Built",
+   "evidence": "src/app/api/v1/interactions/route.ts · src/server/channels/media.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-02",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Crop issue identification returns top-3 candidates with probabilities from the vision classifier; the VLM produces a plain-language description and asks for a second photo when top-1 < 0.60.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-03",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Recommendations are tiered: (a) no-cost cultural practices, (b) low-cost locally available inputs, (c) inputs requiring purchase — with a note on where to obtain via extension officer.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts (tieredActions)",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-04",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Notifiable pests/diseases list (configurable: fall armyworm, cassava mosaic/brown streak, banana bunchy top, Newcastle disease, PPR, etc.) triggers an extension-officer alert and contributes to cluster detection.",
+   "status": "Built",
+   "evidence": "src/server/db/reference/agriculture.ts · src/server/ai/agents/clusters.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-05",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Cluster detection: ≥ N reports (default 5) of the same issue/crop in the same territory within 14 days → agri.cluster.detected event → extension dashboard alert + optional broadcast.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/clusters.ts · tests/agri-clusters.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-06",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Planting calendars by province and crop (maize, cassava, rice, beans, groundnut, plantain, vegetables) maintained as KB tables; the agent answers \"when\" questions from these, adjusted by seasonal forecasts where available.",
+   "status": "Built",
+   "evidence": "src/server/db/reference/calendars.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-07",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Weather: territory-level 5-day forecast from a provider via the gateway; rendered in plain language (\"heavy rain likely Thursday — delay applying fertiliser\").",
+   "status": "Built",
+   "evidence": "src/server/ai/tools/weather.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-08",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Market prices: weekly price sheet per major market (Kinshasa, Lubumbashi, Kisangani, Mbuji-Mayi, Goma, Matadi …) maintained by data partners or admin upload; agent quotes date and market; never guarantees a price.",
+   "status": "Built",
+   "evidence": "src/server/ai/tools/market.ts · src/app/api/v1/agriculture/prices/upload",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-09",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Livestock: symptom intake for poultry, goats, pigs, cattle → severity + \"contact veterinary/extension\" path; zoonotic red flags escalate.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/agriculture.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AG-10",
+   "family": "FR-AG",
+   "section": "Agriculture module (§8.2)",
+   "requirement": "Buyer opportunities (Phase 4): informational listing of cooperative/buyer contacts by commodity, admin-maintained.",
+   "status": "Deferred",
+   "evidence": "—",
+   "note": "Buyer and cooperative listings are placed in Phase 4 by the specification itself, after the pilot."
+  },
+  {
+   "id": "FR-ED-01",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Learner profile: age band (6–8, 9–11, 12–14, 15–18, adult), level (primaire 1–6, secondaire 1–6/humanités), language of instruction, preferred explanation language. Profile is optional; defaults inferred conservatively from speech and confirmed.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-02",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Explain-at-level: any topic explained in ≤ 90 s of speech at the profile level, with one concrete local example (market, farming, river, football).",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts (speechSeconds, localExample)",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-03",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Read-aloud: stories and passages from a curated, licensed/open library in the five languages; Phase 3 adds TTS narration of user-uploaded photos of textbook pages (OCR → simplify → read).",
+   "status": "Deferred",
+   "evidence": "src/server/db/reference/stories.ts",
+   "note": "The read-aloud library is built. Narration of a photographed textbook page is placed in Phase 3 by the specification itself."
+  },
+  {
+   "id": "FR-ED-04",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Oral quiz: 5-question quizzes generated per topic; voice answers scored; results stored as learning_signals.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/education/quiz · tests/edu-quiz.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-05",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Homework support: step-by-step guidance; for maths, the agent works one worked example then coaches the learner through theirs; it never reads back a final answer to a graded assignment unless the learner has attempted it.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts (HomeworkPolicy)",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-06",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Exam prep (TENAFEP, Examen d'État) drawn from official objectives; revision plans by weeks-to-exam; SMS revision nudges.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts (revisionPlan)",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-07",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Parent mode: explain what the child is studying and how to help without literacy.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts (parent mode)",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-08",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Teacher mode (worker PWA): class-level learning-gap view; ready-made oral quizzes; broadcast of revision reminders.",
+   "status": "Built",
+   "evidence": "src/server/ai/education/evidence.ts (classGaps)",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-09",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Difficulty tracking: repeated failures on a concept produce learning_gap signals aggregated by school/territory.",
+   "status": "Built",
+   "evidence": "src/server/ai/education/evidence.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-ED-10",
+   "family": "FR-ED",
+   "section": "Education module (§8.3)",
+   "requirement": "Reuse of StudYear AI-OS components (quiz generation, spaced-repetition scheduling, curriculum graph) through a shared internal package — [DECISION REQUIRED] on package boundary with StudYear.",
+   "status": "Programme",
+   "evidence": "—",
+   "note": "The shared-package boundary with StudYear is an open commercial decision in the specification itself."
+  },
+  {
+   "id": "FR-CS-01",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "Cases are created automatically for severity ≥ 2, low confidence < 0.40, notifiable agri issues, and any citizen explicit request for a human.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/workflow.ts (shouldAutoCreateCase)",
+   "note": ""
+  },
+  {
+   "id": "FR-CS-02",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "Assignment routing: territory → org → role → availability (worker \"on duty\" toggle) → load balancing; unassigned after 15 min (emergency) / 4 h (severity 3) / 24 h (severity 2) → escalate to supervisor and notify admin.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/workflow.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CS-03",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "Workers see: canonical French summary, original transcript, audio playback, media, protocol path taken, severity reasons, citizen contact and consent status, prior cases.",
+   "status": "Built",
+   "evidence": "src/app/(app)/cas/[id]",
+   "note": ""
+  },
+  {
+   "id": "FR-CS-04",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "Worker actions: acknowledge, call citizen (click-to-call via IVR bridge), add note (voice or text), override AI severity (with reason — mandatory), set outcome, schedule follow-up, close.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases/[id]/ · src/server/channels/outbound-call.ts · tests/channels-voice.test.ts",
+   "note": "Acknowledge, note, override, outcome, follow-up, and a bridged call that puts the worker on the phone without giving them the number."
+  },
+  {
+   "id": "FR-CS-05",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "Overrides feed the learning loop (ai.override.recorded) and the Admin dashboard's override rate.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases/[id]/risk-overrides/route.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-CS-06",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "SLA timers are Kafka-scheduled; breaches emit case.sla.breached and notify.",
+   "status": "Built",
+   "evidence": "src/server/core/scheduler.ts",
+   "note": "SLA timers run in the scheduler rather than on Kafka; the behaviour is the same and the deviation is recorded in docs/ARCHITECTURE.md."
+  },
+  {
+   "id": "FR-CS-07",
+   "family": "FR-CS",
+   "section": "Cases and escalation (§9)",
+   "requirement": "Follow-up outcomes (\"went to clinic\", \"child recovered\", \"sprayed neem\", \"quiz passed\") are captured from the citizen by voice/SMS at scheduled intervals and attached to the case.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/cases/[id]/follow-ups/route.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AS-01",
+   "family": "FR-AS",
+   "section": "Autosave and audit (§13)",
+   "requirement": "Every item in the brief's autosave list is an event (§11) persisted before the response is returned to the channel (write-ahead: event → ack → reply). If persistence fails, the reply is still delivered but flagged and retried; a reply is never lost because logging failed.",
+   "status": "Built",
+   "evidence": "src/server/core/events.ts · src/server/ai/agents/orchestrator.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AS-02",
+   "family": "FR-AS",
+   "section": "Autosave and audit (§13)",
+   "requirement": "Drafts (worker notes, admin prompt edits, report filters) autosave client-side every 2 s to IndexedDB and server-side every 10 s or on blur.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/autosave/route.ts · src/client/components/voice/VoiceConsole.tsx",
+   "note": ""
+  },
+  {
+   "id": "FR-AS-03",
+   "family": "FR-AS",
+   "section": "Autosave and audit (§13)",
+   "requirement": "Failed attempts (STT failure, timeout, provider error) and abandoned sessions (no input for 5 min IVR / 24 h WhatsApp) are recorded with reason codes.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/orchestrator.ts · src/server/channels/workflow.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-AS-04",
+   "family": "FR-AS",
+   "section": "Autosave and audit (§13)",
+   "requirement": "Version history: prompts, protocols, glossaries, KB documents and notification templates are immutable versions with approver, diff and rollback.",
+   "status": "Built",
+   "evidence": "src/server/ai/protocols/registry.ts · src/app/api/v1/admin/glossaries",
+   "note": ""
+  },
+  {
+   "id": "FR-AS-05",
+   "family": "FR-AS",
+   "section": "Autosave and audit (§13)",
+   "requirement": "Every saved record carries: timestamp, actor ID and role, language, module, channel, geo (where available), original input reference, AI interpretation, output, confidence, version, audit status.",
+   "status": "Built",
+   "evidence": "src/server/db/schema.ts (interactions)",
+   "note": ""
+  },
+  {
+   "id": "FR-AS-06",
+   "family": "FR-AS",
+   "section": "Autosave and audit (§13)",
+   "requirement": "Audit log is tamper-evident: hash chain per tenant per day; daily digest exported to cold storage.",
+   "status": "Built",
+   "evidence": "src/server/core/audit.ts · tests/ops-audit.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-RP-01",
+   "family": "FR-RP",
+   "section": "Reporting (§14.6)",
+   "requirement": "Scheduled reports: daily usage; weekly health trends; weekly agri risk; weekly education support; monthly regional activity; monthly NGO impact; quarterly Government programme report; monthly AI performance; monthly cost & usage.",
+   "status": "Built",
+   "evidence": "src/server/reports/index.ts · src/app/api/v1/report-definitions",
+   "note": ""
+  },
+  {
+   "id": "FR-RP-02",
+   "family": "FR-RP",
+   "section": "Reporting (§14.6)",
+   "requirement": "Formats: PDF (branded template), XLSX, CSV, dashboard link. Generated asynchronously; delivered by email/WhatsApp link with expiry.",
+   "status": "Built",
+   "evidence": "src/server/reports/pdf.ts · src/server/reports/xlsx.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-RP-03",
+   "family": "FR-RP",
+   "section": "Reporting (§14.6)",
+   "requirement": "Report definitions are configurable (filters, scope, cadence) by org admins.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/report-definitions/route.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-NT-01",
+   "family": "FR-NT",
+   "section": "Notifications (§15)",
+   "requirement": "Channels: SMS, WhatsApp (template messages), in-app/push (PWA), email (admin/worker), voice call (IVR outbound for emergencies and reminders to non-WhatsApp users).",
+   "status": "Built",
+   "evidence": "src/server/core/notifications.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-NT-02",
+   "family": "FR-NT",
+   "section": "Notifications (§15)",
+   "requirement": "Template catalogue with per-language variants, placeholders and approval status (WhatsApp templates require Meta approval — lead time is a dependency).",
+   "status": "Built",
+   "evidence": "src/server/db/reference/notification-templates.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-NT-03",
+   "family": "FR-NT",
+   "section": "Notifications (§15)",
+   "requirement": "Types: emergency alert (worker), case assigned, SLA breach, follow-up due, citizen reminder (vaccination, ANC, planting, revision), cluster alert, broadcast (org-scoped, consent-gated), report ready.",
+   "status": "Built",
+   "evidence": "src/server/db/reference/notification-templates.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-NT-04",
+   "family": "FR-NT",
+   "section": "Notifications (§15)",
+   "requirement": "Delivery policy: retry with backoff; channel fallback (WhatsApp → SMS → voice); quiet hours 21:00–06:00 local except emergencies; per-citizen frequency cap (≤ 3 non-emergency per week).",
+   "status": "Built",
+   "evidence": "src/server/core/notifications.ts · tests/ops-notifications.test.ts",
+   "note": ""
+  },
+  {
+   "id": "FR-NT-05",
+   "family": "FR-NT",
+   "section": "Notifications (§15)",
+   "requirement": "Every notification produces delivery events; dashboards show delivery rates per channel/MNO.",
+   "status": "Built",
+   "evidence": "src/server/core/notifications.ts",
+   "note": ""
+  },
+  {
+   "id": "SEC-01",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Data classification: Class A (identifiable health/pregnancy data, child data), Class B (identifiable non-health), Class C (pseudonymised), Class D (aggregated/anonymised). Controls scale by class.",
+   "status": "Built",
+   "evidence": "src/server/core/privacy.ts · docs/SECURITY.md",
+   "note": ""
+  },
+  {
+   "id": "SEC-02",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Workers/admins: OIDC (Google Workspace or Keycloak — [DECISION REQUIRED]), MFA mandatory for admin and supervisor roles, device-bound sessions on the worker PWA.",
+   "status": "Built",
+   "evidence": "src/server/core/mfa.ts · src/server/core/oidc.ts · tests/oidc.test.ts",
+   "note": "MFA is mandatory for privileged roles, and staff may federate through OIDC with every token claim verified."
+  },
+  {
+   "id": "SEC-03",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "RBAC + ABAC: roles (citizen, chw, nurse, extension_officer, teacher, org_analyst, org_admin, gov_admin, platform_admin, auditor) × attributes (province, territory, org, module). Enforced in BFF and Postgres RLS.",
+   "status": "Built",
+   "evidence": "src/server/core/rbac.ts · tests/core.test.ts",
+   "note": "Enforced in the API wrapper. Row-level security in PostgreSQL is not used; the deviation is recorded in docs/SECURITY.md."
+  },
+  {
+   "id": "SEC-04",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Citizens authenticate by channel identity (phone/WhatsApp) + voice OTP for identifier merges and for accessing prior health records via PWA.",
+   "status": "Built",
+   "evidence": "src/server/core/identifiers.ts · tests/identity.test.ts",
+   "note": "A spoken one-time code, hashed at rest, ten-minute life, three attempts, before a new identifier joins an existing citizen."
+  },
+  {
+   "id": "SEC-05",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Encryption in transit (TLS 1.3, mTLS between services); at rest (CMEK via Cloud KMS for Cloud SQL, GCS, Kafka); field-level encryption for Class A columns with per-tenant keys.",
+   "status": "Hosting",
+   "evidence": "src/server/core/crypto.ts · src/server/core/phone.ts · tests/security.test.ts",
+   "note": "AES-256-GCM with per-purpose derived keys over second-factor seeds, stored media and phone numbers, with a keyed blind index so an encrypted number is still findable. Customer-managed keys and service-to-service mutual TLS are configured at the platform that hosts this."
+  },
+  {
+   "id": "SEC-06",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Audio/media: GCS with signed URLs (≤ 15 min), bucket-level retention: raw audio 90 days (configurable), transcripts per retention policy, media for agri 12 months.",
+   "status": "Built",
+   "evidence": "src/server/core/privacy.ts (sweepExpiredMedia) · tests/retention.test.ts",
+   "note": "Media encrypted at rest, served through the application, and swept on its own schedule — 90 days for voice, 365 for images and documents — bytes before rows, with legal holds respected and the sweep audited."
+  },
+  {
+   "id": "SEC-07",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Pseudonymisation at the analytics boundary: BigQuery receives citizen_pseudo_id (HMAC) and no phone numbers; re-identification requires a two-person approval workflow logged in audit.",
+   "status": "Built",
+   "evidence": "src/server/db/schema.ts (pseudo_id) · src/server/core/privacy.ts",
+   "note": ""
+  },
+  {
+   "id": "SEC-08",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Turn object: {turn_id, seq, transcript_raw, lang_detected, lang_confidence, module, domain_result, risk, response:{text_fr, text_user, audio_url}, confidence_overall, escalation, acu} — note: domain_result.citations and model_route are omitted for citizen-facing clients (SEC-08).",
+   "status": "Built",
+   "evidence": "src/server/ai/gateway.ts · tests/red-team.test.ts",
+   "note": "No provider name reaches a client; tested adversarially."
+  },
+  {
+   "id": "SEC-09",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Consent management: purpose-based consents (service, reminders, research/model training, sharing with org partners), captured by voice (recorded consent phrase + timestamp) or button; revocable via any channel; enforced at query time.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/consents/route.ts",
+   "note": ""
+  },
+  {
+   "id": "SEC-10",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Children: education profiles for < 18 collect no surname, no school ID unless via a school-tenant agreement; parental consent path for reminders.",
+   "status": "Built",
+   "evidence": "src/server/ai/agents/education.ts · src/server/core/privacy.ts",
+   "note": ""
+  },
+  {
+   "id": "SEC-11",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Right-to-access/erasure workflow (voice-initiated), 30-day SLA, cascading to derived data except statutory audit.",
+   "status": "Built",
+   "evidence": "src/app/api/v1/data-requests · src/server/core/privacy.ts",
+   "note": ""
+  },
+  {
+   "id": "SEC-12",
+   "family": "SEC",
+   "section": "Security, privacy and consent (§16)",
+   "requirement": "Security operations: Cloud Armor WAF, DDoS protection, dependency scanning (Snyk/Dependabot), SAST in CI, container image signing, quarterly penetration test, incident response runbook with 72 h breach notification.",
+   "status": "Hosting",
+   "evidence": ".github/workflows/security.yml · docs/SECURITY.md",
+   "note": "Dependency audit and static analysis run in CI on every change. A web application firewall, image signing and a quarterly penetration test are bought and operated around a deployment, not committed to a repository."
+  },
+  {
+   "id": "NFR-P-01",
+   "family": "NFR-P",
+   "section": "Performance (§18.1)",
+   "requirement": "IVR: first spoken reply ≤ 6 s after end of citizen utterance (p95); partial TTS streaming permitted",
+   "status": "Hosting",
+   "evidence": "src/server/core/slo.ts",
+   "note": "Measured per turn and reported as a p95 against the objective; the figure itself needs a real telephony trunk."
+  },
+  {
+   "id": "NFR-P-02",
+   "family": "NFR-P",
+   "section": "Performance (§18.1)",
+   "requirement": "WhatsApp voice note ≤ 30 s audio: reply ≤ 12 s (p95)",
+   "status": "Hosting",
+   "evidence": "src/server/core/slo.ts",
+   "note": "Measured per turn and reported as a p95 against the objective; the figure itself needs real WhatsApp traffic."
+  },
+  {
+   "id": "NFR-P-03",
+   "family": "NFR-P",
+   "section": "Performance (§18.1)",
+   "requirement": "Photo analysis: ≤ 15 s (p95)",
+   "status": "Hosting",
+   "evidence": "src/server/core/slo.ts · src/server/ai/agents/agriculture.ts",
+   "note": "Measured per turn and reported as a p95 against the objective; the figure itself needs real photographs at field bandwidth."
+  },
+  {
+   "id": "NFR-P-04",
+   "family": "NFR-P",
+   "section": "Performance (§18.1)",
+   "requirement": "Dashboard page load ≤ 2.5 s (p95) on 3G; API p95 ≤ 400 ms excluding AI calls",
+   "status": "Built",
+   "evidence": "scripts/perf-3g.mjs",
+   "note": "Page load measured against a throttled 3G profile on a real browser; the run fails if a page misses the objective."
+  },
+  {
+   "id": "NFR-P-05",
+   "family": "NFR-P",
+   "section": "Performance (§18.1)",
+   "requirement": "Throughput baseline: 50 concurrent IVR calls, 500 WhatsApp turns/min at MVP; horizontal scale to 1,000 calls / 10,000 turns/min by Phase 5",
+   "status": "Hosting",
+   "evidence": "apphosting.yaml",
+   "note": "Concurrent call and turn throughput has not been load-tested against the stated profile."
+  },
+  {
+   "id": "NFR-A-01",
+   "family": "NFR-A",
+   "section": "Availability (§18.2)",
+   "requirement": "99.5% monthly availability for citizen channels in MVP; 99.9% by Phase 5. Emergency script path 99.95% (served from cached, human-recorded audio even if AI is down).",
+   "status": "Built",
+   "evidence": "src/server/ai/language/scripts.ts · src/server/channels/session.ts",
+   "note": "The emergency path is constants and, once recorded, a file. The availability percentage itself is a hosting property."
+  },
+  {
+   "id": "NFR-A-02",
+   "family": "NFR-A",
+   "section": "Availability (§18.2)",
+   "requirement": "RPO 15 min, RTO 2 h (Cloud SQL HA + PITR; Kafka replication factor 3).",
+   "status": "Hosting",
+   "evidence": "docs/DEPLOYMENT.md",
+   "note": "Recovery point and recovery time come from the database configuration and a restore exercise."
+  },
+  {
+   "id": "NFR-A-03",
+   "family": "NFR-A",
+   "section": "Availability (§18.2)",
+   "requirement": "Circuit breakers per AI provider; automatic failover per routing table.",
+   "status": "Built",
+   "evidence": "src/server/ai/gateway.ts",
+   "note": "Per-provider failover along the configured chain."
+  },
+  {
+   "id": "NFR-S-01",
+   "family": "NFR-S",
+   "section": "Scalability and cost (§18.3)",
+   "requirement": "Target cost per completed interaction ≤ USD 0.08 blended (AI + infra) at 100k interactions/month; ≤ USD 0.04 at 1M/month — excluding telephony/WhatsApp fees, which are reported separately.",
+   "status": "Programme",
+   "evidence": "src/server/core/metering.ts",
+   "note": "Cost per completed interaction is metered per turn. Whether it lands under the target depends on provider pricing and volume."
+  },
+  {
+   "id": "NFR-S-02",
+   "family": "NFR-S",
+   "section": "Scalability and cost (§18.3)",
+   "requirement": "ACU metering accurate to ±2% versus provider invoices.",
+   "status": "Programme",
+   "evidence": "src/server/core/metering.ts · tests/ops-metering.test.ts",
+   "note": "Every AI call is metered against a versioned conversion table and attributed. Reconciling that table against a provider invoice requires an invoice, which requires a signed contract."
+  },
+  {
+   "id": "NFR-U-01",
+   "family": "NFR-U",
+   "section": "Accessibility (§18.5)",
+   "requirement": "Worker/admin UIs WCAG 2.2 AA; RTL not required; all UI strings i18n (fr primary, en admin optional).",
+   "status": "Programme",
+   "evidence": "scripts/a11y.mjs · src/shared/i18n",
+   "note": "WCAG 2.2 A/AA checked by axe-core on every worker and admin page, zero violations, and all UI strings in the five languages. An audit with assistive-technology users is fieldwork."
+  },
+  {
+   "id": "NFR-U-02",
+   "family": "NFR-U",
+   "section": "Accessibility (§18.5)",
+   "requirement": "Citizen voice UX tested with ≥ 30 low-literacy users per pilot province before launch (task success ≥ 80%).",
+   "status": "Programme",
+   "evidence": "—",
+   "note": "Thirty low-literacy users per pilot province, tested before launch. Not something a repository can contain."
+  },
+  {
+   "id": "NFR-O-01",
+   "family": "NFR-O",
+   "section": "Observability (§18.6)",
+   "requirement": "OpenTelemetry traces across adapter → session → agent → gateway; per-turn trace ID surfaced in admin UI.",
+   "status": "Built",
+   "evidence": "src/instrumentation.ts · src/server/observability/tracing.ts · src/server/core/api.ts",
+   "note": "Every request carries a trace id end to end and the OpenTelemetry SDK exports spans when an endpoint is configured."
+  },
+  {
+   "id": "NFR-O-02",
+   "family": "NFR-O",
+   "section": "Observability (§18.6)",
+   "requirement": "SLO dashboards (latency, availability, STT WER drift, low-confidence rate, SLA breach rate, cost) with paging via on-call rota.",
+   "status": "Hosting",
+   "evidence": "src/server/core/slo.ts · src/app/api/v1/system/slo · src/app/api/v1/admin/status",
+   "note": "Every objective is measured and reported, with breaching separated from unmeasured so an absent signal is never read as a met target. Paging and an on-call rota are staffed around a deployment."
+  },
+  {
+   "id": "CM-01",
+   "family": "CM",
+   "section": "Commercial and metering (§19)",
+   "requirement": "FDSU/Government is the paying tenant; Nseya provides the technology; pricing is platform licence + per-ACU consumption + telephony/WhatsApp pass-through — [DECISION REQUIRED] commercial terms.",
+   "status": "Programme",
+   "evidence": "—",
+   "note": "Licence and per-unit pricing are commercial terms between the programme and its supplier."
+  },
+  {
+   "id": "CM-02",
+   "family": "CM",
+   "section": "Commercial and metering (§19)",
+   "requirement": "ACU definition (portfolio standard): 1 ACU = normalised unit across STT seconds, TTS characters, LLM tokens, vision calls, using a published conversion table versioned in admin-config.",
+   "status": "Built",
+   "evidence": "src/server/core/metering.ts · tests/ops-metering.test.ts",
+   "note": ""
+  },
+  {
+   "id": "CM-03",
+   "family": "CM",
+   "section": "Commercial and metering (§19)",
+   "requirement": "Every cvos.metering.acu event is attributed to tenant/org/module/language/channel; monthly statement generated by the reporting service; invoicing and settlement via BitriPay institutional rails; no citizen is ever charged.",
+   "status": "Programme",
+   "evidence": "src/server/core/metering.ts · src/app/api/v1/metering/acu",
+   "note": "Every metering event is attributed to tenant, organisation, module, language and channel, and monthly statements are generated. Settlement through a named payment provider needs a commercial agreement with that provider."
+  },
+  {
+   "id": "CM-04",
+   "family": "CM",
+   "section": "Commercial and metering (§19)",
+   "requirement": "Budget guardrails: per-tenant monthly ACU cap with 80/95/100% alerts; at cap, non-emergency AI features degrade to scripted mode rather than stop.",
+   "status": "Built",
+   "evidence": "src/server/core/metering.ts (isDegradedMode)",
+   "note": "At the cap, non-emergency AI degrades to scripted rather than stopping."
+  },
+  {
+   "id": "DO-01",
+   "family": "DO",
+   "section": "Delivery engineering (§20)",
+   "requirement": "Monorepo (Turborepo/pnpm) for TypeScript services and PWA; separate Python repo for agent-runtime; shared @cvos/contracts package (OpenAPI types, event schemas, DomainResult) published from schema sources.",
+   "status": "Deviation",
+   "evidence": "repository root · docs/ARCHITECTURE.md",
+   "note": "One application rather than the proposed monorepo split. A national platform maintained by a small team pays the coordination cost of a split repository long before it gets the benefit; the reasoning is recorded in docs/ARCHITECTURE.md."
+  },
+  {
+   "id": "DO-02",
+   "family": "DO",
+   "section": "Delivery engineering (§20)",
+   "requirement": "Environments: dev (ephemeral per PR preview for PWA), staging (full stack, synthetic data, sandbox telephony/WhatsApp), prod. IaC via Terraform; GitOps via Argo CD.",
+   "status": "Built",
+   "evidence": "infra/main.tf · infra/environments · Dockerfile",
+   "note": "Environments are declared as Terraform in this repository, with a container image that runs the same way in each."
+  },
+  {
+   "id": "DO-03",
+   "family": "DO",
+   "section": "Delivery engineering (§20)",
+   "requirement": "CI: lint, typecheck, unit (≥ 80% on core services), contract tests (Pact) between adapters and session, integration tests with Testcontainers (Postgres, Kafka), AI eval suite (gold sets + red team) on prompt/model changes, e2e (Playwright) for PWA and admin.",
+   "status": "Built",
+   "evidence": ".github/workflows/ci.yml · .github/workflows/smoke.yml",
+   "note": ""
+  },
+  {
+   "id": "DO-04",
+   "family": "DO",
+   "section": "Delivery engineering (§20)",
+   "requirement": "Release: trunk-based; feature flags for modules/languages/channels per province; canary 5% → 25% → 100%; rollback ≤ 10 min.",
+   "status": "Built",
+   "evidence": ".github/workflows/ci.yml · src/server/core/flags.ts · tests/flags.test.ts",
+   "note": "Trunk-based with a green gate, feature flags scoped by province, role and module, and canaries that start at 5 % and are held seven days."
+  },
+  {
+   "id": "DO-05",
+   "family": "DO",
+   "section": "Delivery engineering (§20)",
+   "requirement": "Data migrations: Prisma/Flyway with backward-compatible expand/contract; event schema evolution with Schema Registry compatibility = BACKWARD.",
+   "status": "Deviation",
+   "evidence": "drizzle/ · scripts/check-migrations.mjs",
+   "note": "Migrations are generated, checked for destructive statements before they can merge, and applied at boot. The second half of the requirement assumes an event bus with a schema registry; this platform has no event bus, so there is no registry to keep backward-compatible."
+  },
+  {
+   "id": "DO-06",
+   "family": "DO",
+   "section": "Delivery engineering (§20)",
+   "requirement": "Synthetic data generator for all five languages for staging and demos (no real citizen data outside prod).",
+   "status": "Built",
+   "evidence": "src/server/db/seed.ts",
+   "note": "Synthetic data in five languages, refused in production."
+  }
+ ]
+}

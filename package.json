@@ -20,7 +20,8 @@
     "db:check": "node scripts/check-migrations.mjs",
     "perf": "node scripts/perf-3g.mjs",
     "a11y": "node scripts/a11y.mjs",
-    "crawl": "node scripts/crawl.mjs"
+    "crawl": "node scripts/crawl.mjs",
+    "requirements:docx": "node scripts/requirements-docx.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -50,6 +51,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^5.0.2",
     "axe-core": "4.13.0",
+    "docx": "^9.7.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
