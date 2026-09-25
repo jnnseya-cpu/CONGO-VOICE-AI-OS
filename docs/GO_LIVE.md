@@ -138,28 +138,41 @@ Write these down before touching anything. Everything else follows from them.
 ```bash
 npm ci
 npm run typecheck && npm run lint && npm test
-npm run build
+```
 
-# NEXT_PUBLIC_SITE_URL must be present at BUILD time as well as at runtime.
-# The browser bundle inlines it; getting it wrong bakes the wrong origin into
-# every page.
-docker build \
-  --build-arg NEXT_PUBLIC_SITE_URL=https://congovoicecd.com \
-  -t europe-west1-docker.pkg.dev/PROJECT/cvos/app:$(git rev-parse --short HEAD) .
-docker push europe-west1-docker.pkg.dev/PROJECT/cvos/app:$(git rev-parse --short HEAD)
+Then build in Cloud Build rather than on the machine you are typing on. Cloud
+Shell gives you a 5 GB home directory, which a Next.js build plus `node_modules`
+plus Docker layers does not comfortably fit in:
+
+```bash
+gcloud builds submit --config cloudbuild.yaml \
+  --substitutions=_REGION=africa-south1,_SITE_URL=https://congovoicecd.com
 
 # Deploy by digest, never by tag: a tag can be moved under you.
-docker inspect --format='{{index .RepoDigests 0}}' \
-  europe-west1-docker.pkg.dev/PROJECT/cvos/app:$(git rev-parse --short HEAD)
+gcloud artifacts docker images describe \
+  africa-south1-docker.pkg.dev/$PROJECT/cvos/app:latest --format='value(image_summary.digest)'
 ```
+
+`NEXT_PUBLIC_SITE_URL` is passed as a build argument because it is inlined into
+the browser bundle. An image built without it carries the wrong origin, silently.
 
 ## 3. Stand up the infrastructure
 
+State goes in a bucket, not on the machine you ran from. A local state file on a
+Cloud Shell VM is gone when the VM is recycled, and state that is gone means
+every resource is orphaned — still running, still billing, no longer managed.
+It also holds the database password in clear, so it must never sit in a working
+copy where it can be committed.
+
 ```bash
+gcloud storage buckets create gs://$PROJECT-tfstate --location=africa-south1 \
+  --uniform-bucket-level-access --public-access-prevention
+gcloud storage buckets update gs://$PROJECT-tfstate --versioning
+
 cd infra
 cp environments/pilot.tfvars.example environments/pilot.tfvars
-# Fill in: project_id, image (the digest from §2), public_url, domain, db_password.
-terraform init
+# Fill in: project_id, image (the digest from §2), public_url, domain.
+terraform init -backend-config="bucket=$PROJECT-tfstate"
 terraform plan  -var-file=environments/pilot.tfvars
 terraform apply -var-file=environments/pilot.tfvars
 ```

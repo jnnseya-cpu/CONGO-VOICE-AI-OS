@@ -1,0 +1,38 @@
+# Build the image in Cloud Build, not on the machine you are typing on.
+#
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --substitutions=_REGION=africa-south1,_SITE_URL=https://congovoicecd.com
+#
+# Cloud Shell gives you a 5 GB home directory. A Next.js build plus node_modules
+# plus Docker layers does not comfortably fit in it, and a build that dies
+# halfway through leaves you guessing whether the image is sound. Cloud Build has
+# its own disk, its own network, and pushes straight to Artifact Registry.
+#
+# The site URL must be present at BUILD time: it is inlined into the browser
+# bundle, and an image built without it carries the wrong origin silently.
+
+substitutions:
+  _REGION: africa-south1
+  _REPO: cvos
+  _IMAGE: app
+  _SITE_URL: https://congovoicecd.com
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - --build-arg=NEXT_PUBLIC_SITE_URL=${_SITE_URL}
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest
+      - .
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

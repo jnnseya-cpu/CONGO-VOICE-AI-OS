@@ -53,3 +53,13 @@ next-env.d.ts
 
 # coverage output
 /coverage
+
+# Terraform: state carries the database password in clear, and the plan files
+# carry it too. Neither ever belongs in a commit.
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+.terraform.lock.hcl
+infra/environments/*.tfvars
+!infra/environments/*.tfvars.example

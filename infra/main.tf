@@ -14,6 +14,25 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  /*
+   * State lives in a bucket, not on the machine you happened to run from.
+   *
+   * Two reasons, both of which have ended badly for someone. A local state file
+   * on a Cloud Shell VM is gone when the VM is recycled, and state that is gone
+   * means every resource below is orphaned: still running, still billing, and no
+   * longer managed by anything. And a state file contains the database password
+   * in clear, so it must never sit in a working copy where it can be committed.
+   *
+   * The bucket is supplied at init time because a backend cannot read variables:
+   *
+   *   gcloud storage buckets create gs://<project>-tfstate --location=africa-south1    *     --uniform-bucket-level-access --public-access-prevention
+   *   gcloud storage buckets update gs://<project>-tfstate --versioning
+   *   terraform init -backend-config="bucket=<project>-tfstate"
+   */
+  backend "gcs" {
+    prefix = "cvos"
+  }
 }
 
 provider "google" {
