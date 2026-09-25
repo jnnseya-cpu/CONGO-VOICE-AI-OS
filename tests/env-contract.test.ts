@@ -10,7 +10,18 @@ import { describe, expect, it } from "vitest";
  */
 const ROOTS = ["src", "scripts"];
 /** Runtime-provided or test-only, never set by an operator. */
-const EXEMPT = new Set(["NODE_ENV", "VITEST", "PGLITE_MEMORY", "PORT", "npm_package_version"]);
+const EXEMPT = new Set([
+  "NODE_ENV",
+  "VITEST",
+  "PGLITE_MEMORY",
+  "PORT",
+  "npm_package_version",
+  // Set by Next.js itself to say which runtime the code is executing in.
+  "NEXT_RUNTIME",
+  // Provided by the test harness and the container image, not by an operator.
+  "CHROMIUM_PATH",
+  "PERF_TARGET_MS",
+]);
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

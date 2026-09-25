@@ -25,6 +25,7 @@ import { overdueDataRequests, sweepExpiredMedia } from "./privacy";
 import { dailyReviewSample } from "@server/ai/agents/learning";
 import { downgradedLanguages } from "@server/ai/language/gates";
 import { canariesDue } from "./flags";
+import { sloReport } from "./slo";
 import { pruneIdentifierClaims } from "./identifiers";
 import { pruneAuthAttempts } from "./lockout";
 import { pruneRateLimitCounters } from "./rate-limit";
@@ -277,6 +278,7 @@ export interface SchedulerReport {
   securityCountersPruned: number;
   mediaDeleted: number;
   canariesDue: number;
+  sloBreaches: number;
   qualityReviewSampled: number;
   languagesDowngraded: number;
   errors: Array<{ step: string; message: string }>;
@@ -305,6 +307,27 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
   const expired = await step("expire_reports", errors, () => expireReports(now), 0);
   const acuAlerts = await step("acu_caps", errors, () => checkAcuCaps(now), []);
   const overdue = await step("data_requests", errors, () => overdueDataRequests(now), []);
+
+  /**
+   * NFR-O-02. A target nobody measures is a target nobody meets. The
+   * objectives are computed from what is already recorded, and a breach is an
+   * alert rather than a line on a dashboard somebody opens on Monday.
+   */
+  const slo = await step("slo", errors, () => sloReport({ from: new Date(now.getTime() - 3600_000), to: now }), { measurements: [], breaching: [], unmeasured: [] });
+  if (slo.breaching.length > 0) {
+    await notifyRole("platform_admin", {
+      type: "alert",
+      channel: "in_app",
+      title: `${slo.breaching.length} objectif(s) de service non tenu(s)`,
+      body: slo.breaching
+        .map((m) => `${m.objective.title} : ${Math.round(m.value ?? 0)}${m.objective.unit === "ms" ? " ms" : " %"} contre ${m.objective.target} (${m.objective.requirement})`)
+        .join(" | ")
+        .slice(0, 900),
+      payload: { breaching: slo.breaching },
+      requiresAck: true,
+      dedupeKey: `slo:${now.toISOString().slice(0, 13)}`,
+    });
+  }
 
   /**
    * SEC-06. A citizen's voice describing a sick child is kept only as long as
@@ -437,6 +460,7 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
     securityCountersPruned: pruned,
     mediaDeleted: retention.deleted,
     canariesDue: canaries.length,
+    sloBreaches: slo.breaching.length,
     qualityReviewSampled: review.items.length,
     languagesDowngraded: downgraded.length,
     errors,

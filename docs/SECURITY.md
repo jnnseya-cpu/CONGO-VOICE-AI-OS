@@ -38,6 +38,14 @@ label, so a key that protects recordings cannot read second-factor seeds.
 **Losing the root key makes every stored recording unreadable.** It belongs in
 a secret manager with versioning, not in an environment file.
 
+Rotation is not a drop-in. Phone numbers are found through a keyed digest
+derived from the same root, so a new key means every existing digest stops
+matching: citizens cannot sign in and alerts cannot find a destination. The
+platform does not crash — an unreadable number fails that delivery and is
+counted on the readiness probe — but the rotation is only complete once every
+stored value has been re-encrypted and re-indexed under the new key. Plan it as
+a migration with both keys available, never as a config change.
+
 ## 3. Identity and access
 
 - Sessions are HMAC-signed tokens. Tampering with any claim, including the

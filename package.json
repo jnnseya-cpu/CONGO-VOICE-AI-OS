@@ -17,11 +17,17 @@
     "smoke": "node scripts/smoke.mjs",
     "icons": "node scripts/rasterise-icons.mjs",
     "test:coverage": "vitest run --coverage",
-    "db:check": "node scripts/check-migrations.mjs"
+    "db:check": "node scripts/check-migrations.mjs",
+    "perf": "node scripts/perf-3g.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@electric-sql/pglite": "^0.5.8",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-node": "^0.222.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "marked": "^18.0.12",

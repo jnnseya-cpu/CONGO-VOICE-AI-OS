@@ -16,6 +16,7 @@ afterEach(() => {
 
 function asProduction(patch: Record<string, string | undefined>) {
   ENV.NODE_ENV = "production";
+  ENV.DEPLOYMENT_STAGE = "prod";
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) delete ENV[k];
     else ENV[k] = v;
@@ -25,7 +26,22 @@ function asProduction(patch: Record<string, string | undefined>) {
 describe("readiness", () => {
   it("passes outside production, where the log provider is the point", () => {
     ENV.NODE_ENV = "test";
+    delete ENV.DEPLOYMENT_STAGE;
     expect(readiness().ok).toBe(true);
+  });
+
+  it("does not demand telephony of a staging environment that serves nobody", () => {
+    asProduction({ DEPLOYMENT_STAGE: "staging", SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log", VOICE_PROVIDER: "log", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://x" });
+    const r = readiness();
+    expect(r.stage).toBe("staging");
+    expect(r.checks.find((c) => c.id === "escalation_delivery")?.ok).toBe(true);
+    // The other promises still have to hold: staging holds real-shaped data.
+    expect(r.ok).toBe(true);
+  });
+
+  it("demands it of a pilot province, which does serve citizens", () => {
+    asProduction({ DEPLOYMENT_STAGE: "pilot", SMS_PROVIDER: "log", WHATSAPP_PROVIDER: "log", VOICE_PROVIDER: "log", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://x" });
+    expect(readiness().ok).toBe(false);
   });
 
   it("refuses to call itself ready when an escalation would reach nobody", () => {
