@@ -1,7 +1,7 @@
 # Build the image in Cloud Build, not on the machine you are typing on.
 #
-#   gcloud builds submit --config cloudbuild.yaml \
-#     --substitutions=_REGION=africa-south1,_SITE_URL=https://congovoicecd.com
+#   gcloud builds submit --config cloudbuild.yaml --substitutions=\
+#     _REGION=africa-south1,_SITE_URL=https://congovoicecd.com,_TAG=$(git rev-parse --short HEAD)
 #
 # Cloud Shell gives you a 5 GB home directory. A Next.js build plus node_modules
 # plus Docker layers does not comfortably fit in it, and a build that dies
@@ -11,11 +11,15 @@
 # The site URL must be present at BUILD time: it is inlined into the browser
 # bundle, and an image built without it carries the wrong origin silently.
 
+# $SHORT_SHA is populated only for builds started by a trigger. A manual
+# `gcloud builds submit` leaves it empty, which produces the tag "app:" and a
+# build that fails on an invalid reference. _TAG is passed in instead.
 substitutions:
   _REGION: africa-south1
   _REPO: cvos
   _IMAGE: app
   _SITE_URL: https://congovoicecd.com
+  _TAG: manual
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -23,12 +27,12 @@ steps:
     args:
       - build
       - --build-arg=NEXT_PUBLIC_SITE_URL=${_SITE_URL}
-      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest
       - .
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest
 
 options:
