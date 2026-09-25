@@ -18,7 +18,9 @@
     "icons": "node scripts/rasterise-icons.mjs",
     "test:coverage": "vitest run --coverage",
     "db:check": "node scripts/check-migrations.mjs",
-    "perf": "node scripts/perf-3g.mjs"
+    "perf": "node scripts/perf-3g.mjs",
+    "a11y": "node scripts/a11y.mjs",
+    "crawl": "node scripts/crawl.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -47,6 +49,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^5.0.2",
+    "axe-core": "4.13.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",

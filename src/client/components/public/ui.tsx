@@ -83,7 +83,9 @@ export function KeyFacts({ items }: { items: Array<{ value: string; label: strin
         <div key={f.label} className="bg-white p-5">
           <dt className="text-[12px] font-semibold uppercase tracking-wide text-muted">{f.label}</dt>
           <dd className="mt-1.5 text-[26px] font-bold tabular-nums leading-none tracking-tight text-ink">{f.value}</dd>
-          {f.note && <p className="mt-2 text-[12px] leading-snug text-muted">{f.note}</p>}
+          {/* A <p> here is not a permitted child of a definition list group; a
+              second <dd> is, and reads as part of the same term. */}
+          {f.note && <dd className="mt-2 text-[12px] leading-snug text-muted">{f.note}</dd>}
         </div>
       ))}
     </dl>
@@ -108,7 +110,14 @@ export function Callout({ tone = "info", title, children }: { tone?: "info" | "d
 
 export function DataTable({ head, rows, caption }: { head: string[]; rows: ReactNode[][]; caption?: string }) {
   return (
-    <div className="overflow-x-auto rounded-[14px] border border-line bg-white">
+    // A table wider than the screen scrolls sideways; without a tab stop a
+    // keyboard user can never reach the columns on the right (WCAG 2.1.1).
+    <div
+      className="overflow-x-auto rounded-[14px] border border-line bg-white"
+      tabIndex={0}
+      role="region"
+      aria-label={caption ?? "Tableau"}
+    >
       <table className="w-full min-w-[560px] border-collapse text-[13.5px]">
         {caption && <caption className="px-5 pt-4 text-left text-[12.5px] text-muted">{caption}</caption>}
         <thead>

@@ -40,7 +40,7 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const draftKey = `console:${module}`;
 
-  const accentCls = { health: "bg-[#166534] hover:bg-[#14532d] ring-[#166534]/25", agri: "bg-[#16a34a] hover:bg-[#15803d] ring-[#16a34a]/25", edu: "bg-[#7c3aed] hover:bg-[#6d28d9] ring-[#7c3aed]/25" }[accent];
+  const accentCls = { health: "bg-[#166534] hover:bg-[#14532d] ring-[#166534]/25", agri: "bg-[#13682f] hover:bg-[#0f5526] ring-[#13682f]/25", edu: "bg-[#7c3aed] hover:bg-[#6d28d9] ring-[#7c3aed]/25" }[accent];
 
   // Ensure a session exists (anonymous citizens can start speaking immediately).
   useEffect(() => {
@@ -244,6 +244,9 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
             onClick={recording ? stopRecording : startRecording}
             disabled={busy}
             aria-pressed={recording}
+            // The single most important control on the platform carried no name
+            // at all: a screen reader announced "button" and nothing else.
+            aria-label={recording ? t("recording") : busy ? t("processing") : t("holdToSpeak")}
             className={`relative flex h-24 w-24 items-center justify-center rounded-full text-white shadow-lg ring-8 transition disabled:opacity-50 ${recording ? "rec-ring bg-danger ring-danger/20" : accentCls}`}
             style={recording ? { transform: `scale(${1 + level * 0.12})` } : undefined}
           >

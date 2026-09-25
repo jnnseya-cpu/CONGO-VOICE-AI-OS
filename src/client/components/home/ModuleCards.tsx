@@ -14,7 +14,7 @@ export function ModuleCards({ stats }: { stats: ModuleStats }) {
   const { t, lang } = useLanguage();
   const cards = [
     { href: "/sante", title: t("healthOs"), desc: t("healthDesc"), icon: <IconHeart size={26} />, tile: "bg-health-soft text-health", titleColor: "text-health", button: "bg-[#166534] hover:bg-[#14532d]", a: [formatNumber(stats.health.today, lang), t("interactionsToday")], b: [formatNumber(stats.health.urgent, lang), t("urgentCases")] },
-    { href: "/agriculture", title: t("agriOs"), desc: t("agriDesc"), icon: <IconLeaf size={26} />, tile: "bg-agri-soft text-agri", titleColor: "text-agri", button: "bg-[#16a34a] hover:bg-[#15803d]", a: [formatNumber(stats.agriculture.today, lang), t("interactionsToday")], b: [formatNumber(stats.agriculture.alerts, lang), t("agriAlerts")] },
+    { href: "/agriculture", title: t("agriOs"), desc: t("agriDesc"), icon: <IconLeaf size={26} />, tile: "bg-agri-soft text-agri", titleColor: "text-agri", button: "bg-[#13682f] hover:bg-[#0f5526]", a: [formatNumber(stats.agriculture.today, lang), t("interactionsToday")], b: [formatNumber(stats.agriculture.alerts, lang), t("agriAlerts")] },
     { href: "/education", title: t("eduOs"), desc: t("eduDesc"), icon: <IconGraduation size={26} />, tile: "bg-edu-soft text-edu", titleColor: "text-edu", button: "bg-[#7c3aed] hover:bg-[#6d28d9]", a: [formatNumber(stats.education.today, lang), t("sessionsToday")], b: [formatNumber(stats.education.topics, lang), t("topicsRequested")] },
   ];
   return (

@@ -1,3 +1,9 @@
+/*
+ * Text colours are set to meet WCAG 2.2 AA (4.5:1) against every surface they
+ * are used on — white, the page background, and each of the soft tag
+ * backgrounds. scripts/a11y.mjs measures this on every page and fails the
+ * build on a single violation, so a lighter grey cannot creep back in.
+ */
 @import "tailwindcss";
 
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
@@ -9,25 +15,25 @@
   --line-strong: #d5dbe5;
   --ink: #0f172a;
   --ink-2: #334155;
-  --muted: #64748b;
-  --muted-2: #94a3b8;
+  --muted: #475569;
+  --muted-2: #5a6879;
   --brand: #1d4ed8;
   --brand-2: #2563eb;
   --brand-soft: #e8efff;
   --navy: #0b1220;
   --navy-2: #111a2e;
   --navy-3: #182238;
-  --health: #15803d;
+  --health: #146b34;
   --health-soft: #e7f6ec;
-  --agri: #16a34a;
+  --agri: #13682f;
   --agri-soft: #e9f8ee;
   --edu: #7c3aed;
   --edu-soft: #f1eaff;
-  --danger: #dc2626;
+  --danger: #b91c1c;
   --danger-soft: #fdecec;
-  --warn: #d97706;
+  --warn: #8a5206;
   --warn-soft: #fff4e0;
-  --ok: #16a34a;
+  --ok: #13682f;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
   --shadow-lg: 0 20px 50px -20px rgba(15, 23, 42, 0.35);

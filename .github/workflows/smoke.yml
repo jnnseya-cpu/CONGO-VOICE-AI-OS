@@ -26,3 +26,14 @@ jobs:
       - run: npm ci
       - name: Exercise the running platform
         run: node scripts/smoke.mjs "${{ github.event.inputs.base_url || vars.SMOKE_BASE_URL }}"
+
+      - name: Install a browser for the page checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Walk every page for errors and broken links
+        run: node scripts/crawl.mjs "${{ github.event.inputs.base_url || vars.SMOKE_BASE_URL }}"
+
+      # WCAG 2.2 A/AA on every page. A contrast or labelling regression is a
+      # citizen locked out, so it fails the run rather than warning (NFR-008).
+      - name: Check accessibility
+        run: node scripts/a11y.mjs "${{ github.event.inputs.base_url || vars.SMOKE_BASE_URL }}"

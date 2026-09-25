@@ -6,10 +6,14 @@
  *
  *   node scripts/crawl.mjs http://localhost:3000
  */
+import { existsSync } from "node:fs";
 import { chromium } from "playwright-core";
 
 const base = (process.argv[2] ?? "http://localhost:3000").replace(/\/$/, "");
-const EXEC = process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+// Use the browser this environment already has; on a runner that installed one
+// through Playwright, let Playwright find it.
+const DEFAULT_EXEC = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const EXEC = process.env.CHROMIUM_PATH ?? (existsSync(DEFAULT_EXEC) ? DEFAULT_EXEC : undefined);
 const PHONE = process.env.CRAWL_PHONE ?? "+243900000001";
 const PIN = process.env.CRAWL_PIN ?? "1234";
 const CALLER_IP = `198.18.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250) + 1}`;
@@ -36,7 +40,7 @@ if (!body?.token) {
   process.exit(1);
 }
 
-const browser = await chromium.launch({ executablePath: EXEC, args: ["--no-sandbox"] });
+const browser = await chromium.launch({ ...(EXEC ? { executablePath: EXEC } : {}), args: ["--no-sandbox"] });
 const ctx = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   extraHTTPHeaders: { "x-forwarded-for": CALLER_IP },

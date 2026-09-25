@@ -321,9 +321,11 @@ export const SHARE_COLORS = ["#1d4ed8", "#15803d", "#7c3aed", "#d97706", "#0891b
 
 /* ── Tables ───────────────────────────────────────────────────────────────── */
 
-export function TableShell({ head, children, empty }: { head: ReactNode; children: ReactNode; empty?: boolean }) {
+export function TableShell({ head, children, empty, label }: { head: ReactNode; children: ReactNode; empty?: boolean; label?: string }) {
   return (
-    <div className="overflow-x-auto">
+    // Focusable so the columns that scroll off the right of a narrow screen can
+    // be reached from the keyboard (WCAG 2.1.1).
+    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={label ?? "Tableau de données"}>
       <table className="w-full min-w-[720px] border-collapse text-left">
         <thead>
           <tr className="border-b border-line bg-surface-2 text-[11.5px] uppercase tracking-wide text-muted">{head}</tr>

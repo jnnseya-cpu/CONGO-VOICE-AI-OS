@@ -62,14 +62,24 @@ export function LoginForm({ next }: { next: string }) {
           <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <select value={lang} onChange={(e) => setLang(e.target.value as typeof lang)} className="h-11 rounded-lg border border-line-strong bg-white px-3 text-sm">
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value as typeof lang)}
+            aria-label={t("languageLabel")}
+            className="h-11 rounded-lg border border-line-strong bg-white px-3 text-sm"
+          >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.label}
               </option>
             ))}
           </select>
-          <select value={province} onChange={(e) => setProvince(e.target.value)} className="h-11 rounded-lg border border-line-strong bg-white px-3 text-sm">
+          <select
+            value={province}
+            onChange={(e) => setProvince(e.target.value)}
+            aria-label={t("provinceLabel")}
+            className="h-11 rounded-lg border border-line-strong bg-white px-3 text-sm"
+          >
             {PROVINCES.map((p) => (
               <option key={p}>{p}</option>
             ))}

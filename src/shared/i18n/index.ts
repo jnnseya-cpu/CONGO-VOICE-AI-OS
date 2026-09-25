@@ -78,6 +78,10 @@ const fr = {
   pin: "Code PIN",
   continueAsCitizen: "Continuer sans compte",
   citizen: "Citoyen",
+  // Names for the two selects on the sign-in card. Without them a screen reader
+  // announces "combo box" twice and the citizen has no idea what they are setting.
+  languageLabel: "Langue",
+  provinceLabel: "Province",
   administrator: "Administrateur",
   ago_min: "Il y a {n} min",
   ago_hour: "Il y a {n} h",
@@ -210,6 +214,8 @@ const ln: Dict = {
   phone: "Nimero ya telefone",
   pin: "Code PIN",
   continueAsCitizen: "Kokoba kozanga compte",
+  languageLabel: "Monoko",
+  provinceLabel: "Provense",
   holdToSpeak: "Fina mpo na koloba",
   recording: "Ezali kokanga mongongo... fina mpo na kotika",
   processing: "Tozali koyoka mpe kososola message na yo...",
