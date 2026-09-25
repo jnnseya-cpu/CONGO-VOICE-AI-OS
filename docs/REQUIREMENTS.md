@@ -27,8 +27,8 @@ where the work sits, not a claim that it is all done.
 A status of Built is a claim about this repository, not about the programme. A
 platform can satisfy every row below and still not be ready for citizens: the
 clinical approvals, the staffed queues and the measured language quality are
-Programme rows, and they are the ones that decide a launch. See docs/SECURITY.md
-and the go/no-go assessment for that judgement.
+Programme rows, and they are the ones that decide a launch. That judgement is in
+docs/LAUNCH_READINESS.md, with docs/SECURITY.md for the security posture.
 
 ## Health rules (engineering specification §5)
 

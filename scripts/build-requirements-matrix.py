@@ -264,8 +264,8 @@ out.append("")
 out.append("A status of Built is a claim about this repository, not about the programme. A")
 out.append("platform can satisfy every row below and still not be ready for citizens: the")
 out.append("clinical approvals, the staffed queues and the measured language quality are")
-out.append("Programme rows, and they are the ones that decide a launch. See docs/SECURITY.md")
-out.append("and the go/no-go assessment for that judgement.")
+out.append("Programme rows, and they are the ones that decide a launch. That judgement is in")
+out.append("docs/LAUNCH_READINESS.md, with docs/SECURITY.md for the security posture.")
 out.append("")
 
 order = ["HEA", "AGR", "EDU", "IAM", "CON", "CAS", "NOT", "NFR", "E", "FR-CH", "FR-LG", "CP", "AI", "FR-HE", "FR-AG", "FR-ED", "FR-CS", "FR-AS", "FR-RP", "FR-NT", "SEC", "NFR-P", "NFR-A", "NFR-S", "NFR-U", "NFR-O", "CM", "DO"]
