@@ -224,7 +224,7 @@ export async function recordLanguageQuality(input: {
 /** Every language and module pair, for the administration console. */
 export async function languageReadiness(languages: LanguageCode[], modules: ModuleType[]): Promise<LanguageStatus[]> {
   const out: LanguageStatus[] = [];
-  for (const language of languages) for (const module of modules) out.push(await languageMode(language, module));
+  for (const language of languages) for (const service of modules) out.push(await languageMode(language, service));
   return out;
 }
 

@@ -44,6 +44,8 @@ export interface SessionState {
   lastSummary?: string;
   lastInteractionId?: string;
   lastModule?: ModuleType;
+  /** The identity statement has been said on this session (AI-14). */
+  identityStated?: boolean;
   /** Shared-phone confirmation (FR-CH-41). */
   sharedPhonePrompted?: boolean;
   sharedPhoneAnswer?: "self" | "other";
@@ -500,6 +502,28 @@ export function resumeSummary(session: ChannelSession): string | null {
   return `${t("resumePrefix", language)} « ${trimmed} »`;
 }
 
+/**
+ * The identity statement (AI-14).
+ *
+ * Said once at the start of a session, never repeated afterwards. A citizen who
+ * believes they are speaking to a doctor acts on the answer differently, and a
+ * disclaimer attached to every reply stops being heard by the third one.
+ */
+export function shouldStateIdentity(session: ChannelSession): boolean {
+  return !readState(session).identityStated;
+}
+
+export async function recordIdentityStated(session: ChannelSession): Promise<ChannelSession> {
+  const db = await getDb();
+  const state = readState(session);
+  const [row] = await db
+    .update(schema.sessions)
+    .set({ state: { ...state, identityStated: true } })
+    .where(eq(schema.sessions.id, session.id))
+    .returning();
+  return row;
+}
+
 /** Lightweight shared-phone confirmation (FR-CH-41): asked once per session on phone channels. */
 export function shouldConfirmSharedPhone(session: ChannelSession): boolean {
   const state = readState(session);
@@ -768,11 +792,23 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   }
 
   // 5. Normal path.
+  const statesIdentity = shouldStateIdentity(session);
   const out = await runInteraction(interactionInput);
   await linkInteraction(out.interactionId, session.id, seq, input.idempotencyKey ?? null);
 
+  /**
+   * AI-14: who is speaking, said once, before the first answer of a session
+   * and never again. A citizen who believes they are speaking to a doctor acts
+   * on the answer differently.
+   */
+  let replyText = out.responseText;
+  if (statesIdentity) {
+    replyText = `${deliverScript("identity", out.language).text} ${replyText}`;
+    await recordIdentityStated(session);
+  }
+
   const shouldChunk = input.chunk ?? (!capabilities.longText || capabilities.spokenReply);
-  const chunks = shouldChunk ? chunkForSpeech(out.responseText) : [out.responseText];
+  const chunks = shouldChunk ? chunkForSpeech(replyText) : [replyText];
   const hasMore = chunks.length > 1;
   const continuation = hasMore ? { chunks, index: 0, interactionId: out.interactionId } : null;
 

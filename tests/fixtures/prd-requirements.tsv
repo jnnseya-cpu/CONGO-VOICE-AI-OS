@@ -1,0 +1,200 @@
+# Requirement identifiers extracted from the two product requirement documents.
+# Source: CONGO_VOICE_AI_OS_Developer_Ready_PRD_v1.0.docx and CONGO_VOICE_AI_OS_PRD_v1.0.docx (6 September 2026).
+# One identifier per line, with the sentence that defines it. Regenerate with scripts/extract-requirements.mjs.
+HEA-001	HEA-001: The platform MUST maintain approved, versioned red-flag rule packs by age group and pregnancy status. Rule execution precedes the LLM respons
+HEA-002	HEA-002: A red flag MUST create an immutable risk event, urgent case, recommended action, configured destination and escalation timer.
+HEA-003	HEA-003: The LLM MUST NOT downgrade a deterministic urgent classification. Only an authorised clinician can override it, with reason and audit.
+HEA-004	HEA-004: When location or referral data is unavailable, the system MUST state that limitation and give the nationally approved fallback instruction.
+HEA-005	HEA-005: The response MUST use action-first language: what to do now, what not to delay, where to seek help and what information to take.
+AGR-001	AGR-001: Advice MUST be conditioned on crop or animal type, growth/age stage, approximate location, season/date, observed symptoms, affected proportio
+AGR-002	AGR-002: The system MUST distinguish observation from confirmed diagnosis. Visual classification outputs are “possible matches” until evidence and con
+AGR-003	AGR-003: Chemical recommendations require an approved product registry, local authorisation status, label-derived instructions, protective-equipment w
+AGR-004	AGR-004: Advice SHOULD prioritise feasible, low-cost integrated pest-management actions and explicitly flag actions that could harm people, animals, c
+AGR-005	AGR-005: Market prices MUST display source, market, unit, grade/quality where known, observation timestamp and staleness. The assistant must never rep
+EDU-001	EDU-001: The platform MUST store an age/grade band and preferred language, not infer sensitive traits from voice.
+EDU-002	EDU-002: Adaptation MUST use demonstrated mastery, requested difficulty, response history and educator configuration. It MUST NOT label a child as uni
+EDU-003	EDU-003: The tutor MUST use a “teach, check, adapt” loop: explain one concept, ask a short comprehension check, assess the answer against a rubric, th
+EDU-004	EDU-004: For assessed homework, the tutor SHOULD provide hints and reasoning before a final answer and must identify when content may be copied rather
+EDU-005	EDU-005: Child-facing conversations MUST apply age-appropriate content filters, privacy minimisation, abuse/self-harm escalation and restrictions on c
+IAM-001	IAM-001: Citizens MAY use anonymous or pseudonymous sessions where service policy permits. Phone verification cannot be the only access route.
+IAM-002	IAM-002: Staff use federated identity where available, MFA and role plus attribute-based access.
+IAM-003	IAM-003: Sensitive exports, clinical overrides, rule publication and break-glass access require step-up authentication.
+IAM-004	IAM-004: Break-glass access expires automatically, requires justification and alerts the data protection/safety owner.
+IAM-005	IAM-005: Role changes revoke active sessions and queued export links according to policy.
+CON-001	CON-001: Consent is purpose-specific: service delivery, follow-up contact, precise location, analytics, research/model improvement and cross-programme
+CON-002	CON-002: Consent scripts are delivered in the selected language and channel and record script version plus affirmative action.
+CON-003	CON-003: Withdrawal stops future optional processing but preserves records required by lawful retention; the user receives a plain-language explanatio
+CON-004	CON-004: Proxy/caregiver relationships record who is present, on whose behalf and the authority/assent basis.
+CAS-001	CAS-001: Queues support domain, geography, service point, risk, skill, language and workload routing.
+CAS-002	CAS-002: Assignment is atomic and prevents two workers unknowingly owning the same case.
+CAS-003	CAS-003: Notes support structured fields and append-only narrative entries; edits create new versions.
+CAS-004	CAS-004: SLA timers pause only for configured reasons and every pause is audited.
+CAS-005	CAS-005: Merge and duplicate resolution preserve all source identifiers and events.
+CAS-006	CAS-006: Closure requires outcome, action taken, citizen reachability and follow-up decision.
+NOT-001	NOT-001: Templates are versioned by language, channel, domain, risk and sensitivity.
+NOT-002	NOT-002: Delivery attempts, provider IDs, consent, quiet hours, failures and retries are recorded.
+NOT-003	NOT-003: Urgent alerts use an escalation policy with acknowledgement; a sent message is not treated as acknowledged.
+NOT-004	NOT-004: Lock-screen/SMS text uses privacy-safe wording.
+NOT-005	NOT-005: Broadcasts require audience estimate, duplicate suppression, approval, rate controls and opt-out compliance.
+NFR-001	NFR-001
+NFR-002	NFR-002
+NFR-003	NFR-003
+NFR-004	NFR-004
+NFR-005	NFR-005
+NFR-006	NFR-006
+NFR-007	NFR-007
+NFR-008	NFR-008
+NFR-009	NFR-009
+NFR-010	NFR-010
+NFR-011	NFR-011
+NFR-012	NFR-012
+E01	E01 Tenancy and access
+E02	E02 Consent and citizen session
+E03	E03 Voice/media ingestion
+E04	E04 Language pipeline
+E05	E05 Orchestration
+E06	E06 Health vertical
+E07	E07 Agriculture vertical
+E08	E08 Education vertical
+E09	E09 Case management
+E10	E10 Knowledge governance
+E11	E11 Notifications
+E12	E12 Dashboards
+E13	E13 MLOps/evaluation
+E14	E14 Security/operations
+FR-CH-01	FR-CH-01 A citizen calling the national short code hears a greeting in a rotating order of the five languages within 6 seconds and can say or press th
+FR-CH-02	FR-CH-02 After language selection the system asks one open question ("Tell me what you need — health, farming or school") and routes by intent; a DTMF
+FR-CH-03	FR-CH-03 Audio is captured in 8 kHz AMR-NB/G.711 and streamed to the STT service; end-of-utterance detection ≤ 800 ms silence; barge-in supported.
+FR-CH-04	FR-CH-04 Each AI reply ≤ 25 seconds of speech; longer content is chunked with "shall I continue?".
+FR-CH-05	FR-CH-05 Calls are toll-free to the citizen (reverse-billed to the programme) — commercial arrangement with MNOs is a programme dependency (Risk R-03)
+FR-CH-06	FR-CH-06 If the call drops, the session is resumable for 24 hours by calling back from the same number; the system summarises where it left off.
+FR-CH-07	FR-CH-07 Emergency phrase detection ("il ne respire plus", "azali kokoka te", etc.) short-circuits the flow to the emergency script and CHW alert with
+FR-CH-10	FR-CH-10 Voice notes (OGG/Opus) are accepted and transcribed; replies are returned as both a voice note and text in the user's language.
+FR-CH-11	FR-CH-11 Photos and short videos (≤ 30 s, ≤ 16 MB) are accepted for the Agriculture module; the system asks for a second angle if the first is low-con
+FR-CH-12	FR-CH-12 Interactive buttons (max 3) and list messages (max 10) are used for confirmations; never free-text-only when a choice is needed.
+FR-CH-13	FR-CH-13 24-hour session window rules of the WhatsApp platform are respected; proactive follow-ups use approved template messages.
+FR-CH-14	FR-CH-14 Opt-in and opt-out ("STOP"/"ARRÊT"/"TIKA") handled in all five languages.
+FR-CH-20	FR-CH-20 USSD offers a 2-level menu: module → 5 most common questions per module → SMS answer in the user's language (≤ 3 concatenated SMS).
+FR-CH-21	FR-CH-21 USSD sessions ≤ 180 s (gateway limit); state persisted so the citizen can dial again.
+FR-CH-22	FR-CH-22 SMS is the delivery channel for reminders (vaccination, planting, revision) and follow-ups; each includes a callback short code.
+FR-CH-30	FR-CH-30 Next.js 14 App Router PWA, installable, offline shell cached, IndexedDB queue for outgoing voice notes/photos when offline, background sync o
+FR-CH-31	FR-CH-31 Push-to-talk UI with a single large button; text remains secondary; every screen reachable in ≤ 2 taps.
+FR-CH-32	FR-CH-32 Worker PWA (CHW/Extension/Teacher) shares the same shell with role-gated routes.
+FR-CH-40	FR-CH-40 citizen_id is a platform UUID; phone number, WhatsApp ID and PWA account are identifiers linked to it. Merging identifiers requires citizen c
+FR-CH-41	FR-CH-41 Because phones are shared, each session opens with a lightweight confirmation ("Is this still Maman Nsimba? Say yes or no") when the last ses
+FR-LG-01	FR-LG-01 Language ID returns top-2 languages with probabilities; if top-1 < 0.70, the system asks the user to confirm ("Lingala to?").
+FR-LG-02	FR-LG-02 STT returns word-level timestamps and per-segment confidence; segments < 0.55 confidence trigger a targeted re-ask ("I heard 'fever for 3 day
+FR-LG-03	FR-LG-03 Mixed-language utterances are handled without forcing the user to choose; token language tags are stored.
+FR-LG-04	FR-LG-04 Every reply is generated in French canonical form first, then rendered in the user's language. Canonical French is stored for audit and for h
+FR-LG-05	FR-LG-05 A per-domain terminology glossary (e.g., "malaria" → Lingala "malaria/ndese", "fertiliser" → …) is enforced in translation via constrained de
+FR-LG-06	FR-LG-06 Simplification: target reading/listening level equivalent to end of primary school; sentence length ≤ 15 words for voice output; numerals spo
+FR-LG-07	FR-LG-07 TTS voices: one female and one male per language; voice selection per module configurable; all voices reviewed by native-speaker panels for i
+FR-LG-08	FR-LG-08 Human-recorded prompts are used for fixed scripts (greetings, emergency scripts, disclaimers) in all languages, regardless of TTS quality.
+FR-LG-09	FR-LG-09 The pipeline exposes transcription_confidence, translation_confidence and overall_language_confidence to the Risk Agent.
+CP-01	CP-01 Collect ≥ 200 hours of transcribed conversational speech per low-resource language across ≥ 3 provinces, balanced by gender and age, using the h
+CP-02	CP-02 Build a 2,000-utterance gold evaluation set per language per module, annotated with intent, entities and severity.
+CP-03	CP-03 Native-speaker linguists (2 per language) on retainer for glossary, prompt review and TTS QA.
+CP-04	CP-04 Data licensing: corpus is owned by the programme (FDSU/Government) with Nseya holding a perpetual licence for model improvement — [DECISION REQU
+AI-01	AI-01 A DomainResult failing schema validation is rejected and the turn falls back to a safe scripted response + low-confidence flag; the failure is a
+AI-02	AI-02 Max 2 clarifying questions per turn; each is a single closed or short question; after 2, the agent proceeds with stated assumptions and flags as
+AI-03	AI-03 confidence_overall = min(stt_conf, intent_conf, domain_conf) adjusted by Risk Agent; < 0.60 → response is prefixed with a caution and offers a h
+AI-04	AI-04 Each module has a curated, versioned knowledge base (Markdown/PDF source → chunked → embedded in a vector store) reviewed by the domain board (§
+FR-HE-01	FR-HE-01 Triage runs on versioned decision trees (protocol_versions) authored in a YAML DSL and approved by the Clinical Review Board. Initial protoco
+FR-HE-02	FR-HE-02 Each protocol defines: questions (with per-language phrasing), branching, severity output (0 self-care, 1 monitor, 2 visit clinic within 24 h
+FR-HE-03	FR-HE-03 The LLM's role is to map free speech to protocol answers (structured extraction) and to explain the outcome; it cannot alter severity.
+FR-HE-04	FR-HE-04 Any red-flag answer immediately yields severity 4 without completing the tree.
+FR-HE-10	FR-HE-10 Symptom intake accepts free speech; the Health Agent extracts entities (symptom, duration, age group, pregnancy status, location) and asks on
+FR-HE-11	FR-HE-11 Emergency (severity 4) → scripted emergency instructions in the user's language + nearest facility (if known) + CHW alert within 60 s + SMS t
+FR-HE-12	FR-HE-12 Severity 2–3 → case created, assigned to the territory's CHW queue, SLA 24 h / 4 h respectively; citizen receives follow-up call/SMS at +24 h
+FR-HE-13	FR-HE-13 Vaccination reminders: citizen states child's date of birth (or age) → national EPI schedule → SMS/voice reminders; opt-in required.
+FR-HE-14	FR-HE-14 Maternal health: pregnancy status captured with explicit consent; ANC visit reminders; danger-sign protocol always available.
+FR-HE-15	FR-HE-15 Medication guidance limited to approved protocol text (e.g., ORS preparation, paracetamol per national community guidance if included); any o
+FR-HE-16	FR-HE-16 Health interaction summaries (≤ 60 words, canonical French) are generated for every turn and visible to assigned workers.
+FR-HE-17	FR-HE-17 Anonymised health trend aggregation by territory/week for dashboards (§14) with k-anonymity ≥ 10.
+FR-AG-01	FR-AG-01 Inputs: voice/text description; up to 5 photos; ≤ 30 s video (frames extracted server-side); optional crop, growth stage, location (auto from
+FR-AG-02	FR-AG-02 Crop issue identification returns top-3 candidates with probabilities from the vision classifier; the VLM produces a plain-language descripti
+FR-AG-03	FR-AG-03 Recommendations are tiered: (a) no-cost cultural practices, (b) low-cost locally available inputs, (c) inputs requiring purchase — with a not
+FR-AG-04	FR-AG-04 Notifiable pests/diseases list (configurable: fall armyworm, cassava mosaic/brown streak, banana bunchy top, Newcastle disease, PPR, etc.) tr
+FR-AG-05	FR-AG-05 Cluster detection: ≥ N reports (default 5) of the same issue/crop in the same territory within 14 days → agri.cluster.detected event → extens
+FR-AG-06	FR-AG-06 Planting calendars by province and crop (maize, cassava, rice, beans, groundnut, plantain, vegetables) maintained as KB tables; the agent ans
+FR-AG-07	FR-AG-07 Weather: territory-level 5-day forecast from a provider via the gateway; rendered in plain language ("heavy rain likely Thursday — delay appl
+FR-AG-08	FR-AG-08 Market prices: weekly price sheet per major market (Kinshasa, Lubumbashi, Kisangani, Mbuji-Mayi, Goma, Matadi …) maintained by data partners 
+FR-AG-09	FR-AG-09 Livestock: symptom intake for poultry, goats, pigs, cattle → severity + "contact veterinary/extension" path; zoonotic red flags escalate.
+FR-AG-10	FR-AG-10 Buyer opportunities (Phase 4): informational listing of cooperative/buyer contacts by commodity, admin-maintained.
+FR-ED-01	FR-ED-01 Learner profile: age band (6–8, 9–11, 12–14, 15–18, adult), level (primaire 1–6, secondaire 1–6/humanités), language of instruction, preferre
+FR-ED-02	FR-ED-02 Explain-at-level: any topic explained in ≤ 90 s of speech at the profile level, with one concrete local example (market, farming, river, foot
+FR-ED-03	FR-ED-03 Read-aloud: stories and passages from a curated, licensed/open library in the five languages; Phase 3 adds TTS narration of user-uploaded pho
+FR-ED-04	FR-ED-04 Oral quiz: 5-question quizzes generated per topic; voice answers scored; results stored as learning_signals.
+FR-ED-05	FR-ED-05 Homework support: step-by-step guidance; for maths, the agent works one worked example then coaches the learner through theirs; it never read
+FR-ED-06	FR-ED-06 Exam prep (TENAFEP, Examen d'État) drawn from official objectives; revision plans by weeks-to-exam; SMS revision nudges.
+FR-ED-07	FR-ED-07 Parent mode: explain what the child is studying and how to help without literacy.
+FR-ED-08	FR-ED-08 Teacher mode (worker PWA): class-level learning-gap view; ready-made oral quizzes; broadcast of revision reminders.
+FR-ED-09	FR-ED-09 Difficulty tracking: repeated failures on a concept produce learning_gap signals aggregated by school/territory.
+FR-ED-10	FR-ED-10 Reuse of StudYear AI-OS components (quiz generation, spaced-repetition scheduling, curriculum graph) through a shared internal package — [DEC
+FR-CS-01	FR-CS-01 Cases are created automatically for severity ≥ 2, low confidence < 0.40, notifiable agri issues, and any citizen explicit request for a human
+FR-CS-02	FR-CS-02 Assignment routing: territory → org → role → availability (worker "on duty" toggle) → load balancing; unassigned after 15 min (emergency) / 4
+FR-CS-03	FR-CS-03 Workers see: canonical French summary, original transcript, audio playback, media, protocol path taken, severity reasons, citizen contact and
+FR-CS-04	FR-CS-04 Worker actions: acknowledge, call citizen (click-to-call via IVR bridge), add note (voice or text), override AI severity (with reason — manda
+FR-CS-05	FR-CS-05 Overrides feed the learning loop (ai.override.recorded) and the Admin dashboard's override rate.
+FR-CS-06	FR-CS-06 SLA timers are Kafka-scheduled; breaches emit case.sla.breached and notify.
+FR-CS-07	FR-CS-07 Follow-up outcomes ("went to clinic", "child recovered", "sprayed neem", "quiz passed") are captured from the citizen by voice/SMS at schedul
+FR-AS-01	FR-AS-01 Every item in the brief's autosave list is an event (§11) persisted before the response is returned to the channel (write-ahead: event → ack 
+FR-AS-02	FR-AS-02 Drafts (worker notes, admin prompt edits, report filters) autosave client-side every 2 s to IndexedDB and server-side every 10 s or on blur.
+FR-AS-03	FR-AS-03 Failed attempts (STT failure, timeout, provider error) and abandoned sessions (no input for 5 min IVR / 24 h WhatsApp) are recorded with reas
+FR-AS-04	FR-AS-04 Version history: prompts, protocols, glossaries, KB documents and notification templates are immutable versions with approver, diff and rollb
+FR-AS-05	FR-AS-05 Every saved record carries: timestamp, actor ID and role, language, module, channel, geo (where available), original input reference, AI inte
+FR-AS-06	FR-AS-06 Audit log is tamper-evident: hash chain per tenant per day; daily digest exported to cold storage.
+FR-RP-01	FR-RP-01 Scheduled reports: daily usage; weekly health trends; weekly agri risk; weekly education support; monthly regional activity; monthly NGO impa
+FR-RP-02	FR-RP-02 Formats: PDF (branded template), XLSX, CSV, dashboard link. Generated asynchronously; delivered by email/WhatsApp link with expiry.
+FR-RP-03	FR-RP-03 Report definitions are configurable (filters, scope, cadence) by org admins.
+FR-NT-01	FR-NT-01 Channels: SMS, WhatsApp (template messages), in-app/push (PWA), email (admin/worker), voice call (IVR outbound for emergencies and reminders 
+FR-NT-02	FR-NT-02 Template catalogue with per-language variants, placeholders and approval status (WhatsApp templates require Meta approval — lead time is a de
+FR-NT-03	FR-NT-03 Types: emergency alert (worker), case assigned, SLA breach, follow-up due, citizen reminder (vaccination, ANC, planting, revision), cluster a
+FR-NT-04	FR-NT-04 Delivery policy: retry with backoff; channel fallback (WhatsApp → SMS → voice); quiet hours 21:00–06:00 local except emergencies; per-citizen
+FR-NT-05	FR-NT-05 Every notification produces delivery events; dashboards show delivery rates per channel/MNO.
+SEC-01	SEC-01 Data classification: Class A (identifiable health/pregnancy data, child data), Class B (identifiable non-health), Class C (pseudonymised), Clas
+SEC-02	SEC-02 Workers/admins: OIDC (Google Workspace or Keycloak — [DECISION REQUIRED]), MFA mandatory for admin and supervisor roles, device-bound sessions 
+SEC-03	SEC-03 RBAC + ABAC: roles (citizen, chw, nurse, extension_officer, teacher, org_analyst, org_admin, gov_admin, platform_admin, auditor) × attributes (
+SEC-04	SEC-04 Citizens authenticate by channel identity (phone/WhatsApp) + voice OTP for identifier merges and for accessing prior health records via PWA.
+SEC-05	SEC-05 Encryption in transit (TLS 1.3, mTLS between services); at rest (CMEK via Cloud KMS for Cloud SQL, GCS, Kafka); field-level encryption for Clas
+SEC-06	SEC-06 Audio/media: GCS with signed URLs (≤ 15 min), bucket-level retention: raw audio 90 days (configurable), transcripts per retention policy, media
+SEC-07	SEC-07 Pseudonymisation at the analytics boundary: BigQuery receives citizen_pseudo_id (HMAC) and no phone numbers; re-identification requires a two-p
+SEC-08	SEC-08 No AI provider names, model names, system prompts or API keys are present in any client bundle, log line returned to users, or error message; s
+SEC-09	SEC-09 Consent management: purpose-based consents (service, reminders, research/model training, sharing with org partners), captured by voice (recorde
+SEC-10	SEC-10 Children: education profiles for < 18 collect no surname, no school ID unless via a school-tenant agreement; parental consent path for reminder
+SEC-11	SEC-11 Right-to-access/erasure workflow (voice-initiated), 30-day SLA, cascading to derived data except statutory audit.
+SEC-12	SEC-12 Security operations: Cloud Armor WAF, DDoS protection, dependency scanning (Snyk/Dependabot), SAST in CI, container image signing, quarterly pe
+AI-10	AI-10 Clinical Review Board (CRB): ≥ 2 Congolese physicians + 1 community health expert approve every health protocol version, emergency script, KB do
+AI-11	AI-11 Agronomy and Pedagogy panels: analogous review for agri KB and education content.
+AI-12	AI-12 Red-team suite: ≥ 300 adversarial/edge cases per module per language (dangerous self-medication requests, pesticide misuse, exam cheating, abusi
+AI-13	AI-13 Grounding rule: health/agri recommendations must cite KB/protocol IDs; a recommendation without citation is replaced by a safe scripted fallback
+AI-14	AI-14 Disclaimer policy: identity statement at session start ("I am the CVOS voice assistant, not a doctor/agronomist/teacher") — human-recorded, once
+AI-15	AI-15 Misinformation guard: Risk Agent runs a classifier on outbound text for unsupported medical/agri claims; positive hits block and route to fallba
+AI-16	AI-16 Uncertainty recording: every turn stores confidences and any assumptions; low-confidence turns sampled daily for human review (target 100/day in
+AI-17	AI-17 Learning loop: overrides, feedback, follow-up outcomes and reviewer labels flow to an evaluation dataset; model/prompt changes are evaluated off
+AI-18	AI-18 Bias & fairness: per-language and per-gender quality metrics reported monthly; a language whose metrics fall below §6.5 gates is downgraded to s
+AI-19	AI-19 Content boundaries: no political, religious or legal advice; no financial products; abuse/threat detection routes to a safeguarding script and, 
+NFR-P-01	NFR-P-01
+NFR-P-02	NFR-P-02
+NFR-P-03	NFR-P-03
+NFR-P-04	NFR-P-04
+NFR-P-05	NFR-P-05
+NFR-A-01	NFR-A-01 99.5% monthly availability for citizen channels in MVP; 99.9% by Phase 5. Emergency script path 99.95% (served from cached, human-recorded au
+NFR-A-02	NFR-A-02 RPO 15 min, RTO 2 h (Cloud SQL HA + PITR; Kafka replication factor 3).
+NFR-A-03	NFR-A-03 Circuit breakers per AI provider; automatic failover per routing table.
+NFR-S-01	NFR-S-01 Target cost per completed interaction ≤ USD 0.08 blended (AI + infra) at 100k interactions/month; ≤ USD 0.04 at 1M/month — excluding telephon
+NFR-S-02	NFR-S-02 ACU metering accurate to ±2% versus provider invoices.
+NFR-U-01	NFR-U-01 Worker/admin UIs WCAG 2.2 AA; RTL not required; all UI strings i18n (fr primary, en admin optional).
+NFR-U-02	NFR-U-02 Citizen voice UX tested with ≥ 30 low-literacy users per pilot province before launch (task success ≥ 80%).
+NFR-O-01	NFR-O-01 OpenTelemetry traces across adapter → session → agent → gateway; per-turn trace ID surfaced in admin UI.
+NFR-O-02	NFR-O-02 SLO dashboards (latency, availability, STT WER drift, low-confidence rate, SLA breach rate, cost) with paging via on-call rota.
+CM-01	CM-01 FDSU/Government is the paying tenant; Nseya provides the technology; pricing is platform licence + per-ACU consumption + telephony/WhatsApp pass
+CM-02	CM-02 ACU definition (portfolio standard): 1 ACU = normalised unit across STT seconds, TTS characters, LLM tokens, vision calls, using a published con
+CM-03	CM-03 Every cvos.metering.acu event is attributed to tenant/org/module/language/channel; monthly statement generated by the reporting service; invoici
+CM-04	CM-04 Budget guardrails: per-tenant monthly ACU cap with 80/95/100% alerts; at cap, non-emergency AI features degrade to scripted mode rather than sto
+DO-01	DO-01 Monorepo (Turborepo/pnpm) for TypeScript services and PWA; separate Python repo for agent-runtime; shared @cvos/contracts package (OpenAPI types
+DO-02	DO-02 Environments: dev (ephemeral per PR preview for PWA), staging (full stack, synthetic data, sandbox telephony/WhatsApp), prod. IaC via Terraform;
+DO-03	DO-03 CI: lint, typecheck, unit (≥ 80% on core services), contract tests (Pact) between adapters and session, integration tests with Testcontainers (P
+DO-04	DO-04 Release: trunk-based; feature flags for modules/languages/channels per province; canary 5% → 25% → 100%; rollback ≤ 10 min.
+DO-05	DO-05 Data migrations: Prisma/Flyway with backward-compatible expand/contract; event schema evolution with Schema Registry compatibility = BACKWARD.
+DO-06	DO-06 Synthetic data generator for all five languages for staging and demos (no real citizen data outside prod).
