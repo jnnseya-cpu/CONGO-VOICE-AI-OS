@@ -135,7 +135,11 @@ resource "google_sql_database_instance" "main" {
     ip_configuration {
       ipv4_enabled    = false
       private_network = google_compute_network.main.id
-      require_ssl     = true
+      # ENCRYPTED_ONLY, not TRUSTED_CLIENT_CERTIFICATE_REQUIRED: the application
+      # connects with `sslmode=require`, which encrypts but presents no client
+      # certificate. Requiring one here would refuse every connection the
+      # service makes. (`require_ssl` was removed in google provider v6.)
+      ssl_mode = "ENCRYPTED_ONLY"
     }
 
     database_flags {
@@ -236,6 +240,11 @@ resource "google_cloud_run_v2_service" "app" {
     vpc_access {
       network_interfaces {
         network = google_compute_network.main.id
+        # Stated rather than defaulted. Direct VPC egress falls back to a subnet
+        # named after the network, which is what an auto-mode VPC happens to
+        # produce — but relying on that coincidence fails silently the day the
+        # network stops being auto-mode.
+        subnetwork = google_compute_network.main.name
       }
       egress = "PRIVATE_RANGES_ONLY"
     }
