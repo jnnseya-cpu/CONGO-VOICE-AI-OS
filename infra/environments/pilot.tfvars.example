@@ -1,6 +1,32 @@
+# Copy to pilot.tfvars and fill in. Nothing secret belongs in this file:
+# db_password comes from the environment (see below).
+
 project_id  = "congovoice-pilot"
-environment = "pilot"
+environment = "pilot"          # dev | staging | pilot | prod — changes platform behaviour, see docs/GO_LIVE.md §6
 region      = "europe-west1"
-public_url  = "https://congovoice.cd"
-# By digest, so a redeploy is the same bytes.
-image = "europe-west1-docker.pkg.dev/congovoice-pilot/app/congovoice@sha256:REPLACE"
+
+# The origin citizens type. Must match the domain below and the value the image
+# was BUILT with, or the browser bundle and the telephony callbacks disagree
+# with what is actually serving.
+public_url = "https://congovoice.cd"
+
+# The web domain. Empty means the service answers only on its run.app URL.
+domain        = "congovoice.cd"
+manage_dns    = false          # true only if the zone below is yours in Cloud DNS
+dns_zone_name = ""             # e.g. "congovoice-cd" when manage_dns = true
+
+# By digest, so a redeploy is the same bytes. The repository is created by this
+# Terraform (google_artifact_registry_repository.app, id "cvos").
+image = "europe-west1-docker.pkg.dev/congovoice-pilot/cvos/app@sha256:REPLACE"
+
+# Never zero where calls are answered: a cold start is a citizen waiting.
+min_instances = 1
+max_instances = 10
+
+# db_password is sensitive and has no default. Supply it from the environment
+# rather than from a file that gets committed by accident:
+#
+#   export TF_VAR_db_password="$(gcloud secrets versions access latest --secret=cvos-pilot-db-password)"
+#
+# If the secret does not exist yet:
+#   openssl rand -base64 32 | tr -d '\n' | gcloud secrets create cvos-pilot-db-password --data-file=-

@@ -15,7 +15,7 @@
  * Every step is independent: one failure never stops the others.
  */
 import "server-only";
-import { and, eq, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lte } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import { audit, verifyAuditChain } from "./audit";
 import { emitEvent } from "./events";
@@ -478,4 +478,54 @@ export async function upcomingReminders(userId: string, limit = 20) {
     .where(and(eq(schema.schedules.userId, userId), eq(schema.schedules.status, "scheduled"), isNotNull(schema.schedules.scheduledFor)))
     .orderBy(schema.schedules.scheduledFor)
     .limit(limit);
+}
+
+/* ── Is it actually running? ───────────────────────────────────────────────── */
+
+/**
+ * How long the maintenance job may be silent before the platform says so.
+ *
+ * It is scheduled every five minutes. Three-quarters of an hour of silence is
+ * not a slow run, it is a job that is not arriving — which is what happened
+ * when the scheduler's identity token was not understood and every call was
+ * refused. Reminders, SLA sweeps, retention deletions and the daily audit-chain
+ * verification all stop, and nothing else in the platform notices.
+ */
+export const SCHEDULER_STALE_AFTER_MS = 45 * 60 * 1000;
+
+/** When the maintenance job last completed, from its own audit record. */
+export async function lastSchedulerRun(): Promise<Date | null> {
+  try {
+    const db = await getDb();
+    const [row] = await db
+      .select({ at: schema.auditLogs.createdAt })
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.action, "scheduler.run"))
+      .orderBy(desc(schema.auditLogs.createdAt))
+      .limit(1);
+    return row?.at ?? null;
+  } catch (err) {
+    console.error("[scheduler] last-run lookup failed", err);
+    return null;
+  }
+}
+
+export interface SchedulerHealth {
+  lastRunAt: Date | null;
+  staleMs: number | null;
+  ok: boolean;
+}
+
+/**
+ * Never having run is not reported as stale: a deployment minutes old has not
+ * had a first run yet, and crying wolf during every rollout teaches people to
+ * ignore the signal. `startedAt` is when this process came up.
+ */
+export async function schedulerHealth(startedAt: number, now: number = Date.now()): Promise<SchedulerHealth> {
+  const lastRunAt = await lastSchedulerRun();
+  if (!lastRunAt) {
+    return { lastRunAt: null, staleMs: null, ok: now - startedAt < SCHEDULER_STALE_AFTER_MS };
+  }
+  const staleMs = now - lastRunAt.getTime();
+  return { lastRunAt, staleMs, ok: staleMs < SCHEDULER_STALE_AFTER_MS };
 }

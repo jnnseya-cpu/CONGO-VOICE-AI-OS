@@ -157,7 +157,13 @@ const ALGORITHMS: Record<string, string> = { RS256: "RSA-SHA256", RS384: "RSA-SH
  * Each of these has been a real-world break on its own. A token that is signed
  * but issued for a different application is not a sign-in to this one.
  */
-export async function verifyIdToken(token: string, config: OidcConfig, expectedNonce: string, now = Date.now()): Promise<IdTokenClaims> {
+/**
+ * Signature check only: the JWT mechanics, shared by every caller that has to
+ * trust a token somebody else signed. Kept in one place deliberately — a second
+ * implementation of "check this signature" is a second chance to get it wrong.
+ * What the claims must *say* is each caller's own business.
+ */
+export async function verifySignedJwt(token: string, jwksUri: string): Promise<IdTokenClaims> {
   const [headerPart, payloadPart, signaturePart] = token.split(".");
   if (!headerPart || !payloadPart || !signaturePart) throw new Error("oidc_malformed_token");
 
@@ -165,8 +171,7 @@ export async function verifyIdToken(token: string, config: OidcConfig, expectedN
   const nodeAlg = ALGORITHMS[header.alg];
   if (!nodeAlg) throw new Error(`oidc_unsupported_alg_${header.alg}`);
 
-  const doc = await discover(config);
-  const keys = await jwks(doc.jwks_uri);
+  const keys = await jwks(jwksUri);
   const key = keys.find((k) => (header.kid ? k.kid === header.kid : true) && k.kty === "RSA");
   if (!key) throw new Error("oidc_signing_key_not_found");
 
@@ -175,7 +180,12 @@ export async function verifyIdToken(token: string, config: OidcConfig, expectedN
   verifier.update(`${headerPart}.${payloadPart}`);
   if (!verifier.verify(publicKey, Buffer.from(signaturePart, "base64url"))) throw new Error("oidc_bad_signature");
 
-  const claims = JSON.parse(Buffer.from(payloadPart, "base64url").toString()) as IdTokenClaims;
+  return JSON.parse(Buffer.from(payloadPart, "base64url").toString()) as IdTokenClaims;
+}
+
+export async function verifyIdToken(token: string, config: OidcConfig, expectedNonce: string, now = Date.now()): Promise<IdTokenClaims> {
+  const doc = await discover(config);
+  const claims = await verifySignedJwt(token, doc.jwks_uri);
   if (claims.iss?.replace(/\/$/, "") !== config.issuer) throw new Error("oidc_issuer_mismatch");
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!audiences.includes(config.clientId)) throw new Error("oidc_audience_mismatch");

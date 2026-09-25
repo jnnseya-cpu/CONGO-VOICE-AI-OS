@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { getDb } from "@server/db/client";
 import { readiness } from "@server/core/status";
 import { clinicalReadiness } from "@server/ai/review/gate";
+import { SCHEDULER_STALE_AFTER_MS, schedulerHealth } from "@server/core/scheduler";
 import { sql } from "drizzle-orm";
+
+/** When this process came up, so a fresh deployment is not reported as stale. */
+const STARTED_AT = Date.now();
 
 /** Liveness/readiness probe. */
 export async function GET() {
@@ -14,7 +18,20 @@ export async function GET() {
     const ready = readiness();
     // Whether anyone clinically accountable has signed the content is part of
     // being able to do the job, not a separate concern (AI-10).
-    const checks = [...ready.checks, ...(await clinicalReadiness().catch(() => []))];
+    // A scheduler that stopped arriving takes reminders, SLA sweeps, retention
+    // deletions and audit verification with it, and nothing else notices.
+    const cron = await schedulerHealth(STARTED_AT).catch(() => null);
+    const schedulerCheck = cron
+      ? [{
+          id: "scheduler_running",
+          ok: cron.ok,
+          detail: cron.lastRunAt
+            ? `Dernière exécution il y a ${Math.round((cron.staleMs ?? 0) / 60000)} min (seuil ${SCHEDULER_STALE_AFTER_MS / 60000} min).`
+            : "Aucune exécution enregistrée depuis le démarrage.",
+        }]
+      : [];
+
+    const checks = [...ready.checks, ...schedulerCheck, ...(await clinicalReadiness().catch(() => []))];
     const failing = checks.filter((c) => !c.ok);
     if (failing.length > 0) {
       return NextResponse.json({ status: "degraded", time: new Date().toISOString(), failing }, { status: 503 });

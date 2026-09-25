@@ -28,11 +28,50 @@ locals {
   media_bucket = "${local.name}-media"
 }
 
+# ── The APIs this needs, enabled before anything asks for them ───────────────
+#
+# Terraform will otherwise fail partway through a first apply with an error
+# naming a service nobody has turned on, leaving half the estate created.
+
+resource "google_project_service" "required" {
+  for_each = toset([
+    "run.googleapis.com",
+    "sqladmin.googleapis.com",
+    "secretmanager.googleapis.com",
+    "cloudscheduler.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "servicenetworking.googleapis.com",
+    "compute.googleapis.com",
+    "dns.googleapis.com",
+    "iam.googleapis.com",
+  ])
+  project = var.project_id
+  service = each.key
+  # Turning an API off because Terraform was destroyed would break anything
+  # else in the project that also uses it.
+  disable_on_destroy = false
+}
+
+# ── Where the image lives ────────────────────────────────────────────────────
+
+resource "google_artifact_registry_repository" "app" {
+  location      = var.region
+  repository_id = "cvos"
+  format        = "DOCKER"
+  description   = "CONGO VOICE AI OS container images."
+  depends_on    = [google_project_service.required]
+
+  docker_config {
+    immutable_tags = false
+  }
+}
+
 # ── Network: the database is never reachable from the internet ────────────────
 
 resource "google_compute_network" "main" {
   name                    = "${local.name}-net"
   auto_create_subnetworks = true
+  depends_on              = [google_project_service.required]
 }
 
 resource "google_compute_global_address" "private_ip" {
@@ -212,6 +251,24 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "NEXT_PUBLIC_SITE_URL"
         value = var.public_url
       }
+      # Not a label: pilot and prod are the stages at which the platform assumes
+      # a real citizen is on the other end. An escalation must be able to reach
+      # a person, clinical content must carry a review-board sign-off, and a
+      # log-only provider fails loudly instead of pretending it sent something.
+      env {
+        name  = "DEPLOYMENT_STAGE"
+        value = var.environment
+      }
+      # So the maintenance endpoint can tell the scheduler's own identity token
+      # from anybody else's. Without these it refuses every scheduled run.
+      env {
+        name  = "CRON_OIDC_AUDIENCE"
+        value = "${var.public_url}/api/v1/workflow/run"
+      }
+      env {
+        name  = "CRON_SERVICE_ACCOUNT"
+        value = google_service_account.app.email
+      }
 
       dynamic "env" {
         for_each = google_secret_manager_secret.app
@@ -245,6 +302,21 @@ resource "google_cloud_run_v2_service" "app" {
   }
 }
 
+# ── Who may call it ──────────────────────────────────────────────────────────
+#
+# A Cloud Run v2 service requires authentication by default. This one answers
+# citizens on the open internet and telephony webhooks from providers who hold
+# no Google credentials, so it is public at the network edge — and every
+# /api/v1 route enforces its own session and permission check in handle().
+
+resource "google_cloud_run_v2_service_iam_member" "public" {
+  project  = var.project_id
+  location = google_cloud_run_v2_service.app.location
+  name     = google_cloud_run_v2_service.app.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
 # ── Scheduled work ───────────────────────────────────────────────────────────
 
 resource "google_cloud_scheduler_job" "workflow" {
@@ -252,6 +324,14 @@ resource "google_cloud_scheduler_job" "workflow" {
   description = "Reminders, SLA sweep, retention, quality review and report jobs."
   schedule    = "*/5 * * * *"
   time_zone   = "Africa/Kinshasa"
+
+  # A run that overlaps the next one is worse than a run that is skipped: every
+  # step is independent and idempotent, but two sweeps at once double the work.
+  attempt_deadline = "320s"
+
+  retry_config {
+    retry_count = 1
+  }
 
   http_target {
     http_method = "POST"
@@ -261,8 +341,13 @@ resource "google_cloud_scheduler_job" "workflow" {
     }
     oidc_token {
       service_account_email = google_service_account.app.email
+      # Stated rather than defaulted: the token is bound to this exact endpoint,
+      # and the application checks it against the same string.
+      audience = "${var.public_url}/api/v1/workflow/run"
     }
   }
+
+  depends_on = [google_project_service.required]
 }
 
 # ── The web domain ───────────────────────────────────────────────────────────

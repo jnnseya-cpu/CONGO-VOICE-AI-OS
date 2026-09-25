@@ -8,6 +8,21 @@ output "database_connection_name" {
   description = "For the Cloud SQL connector."
 }
 
+output "database_private_ip" {
+  value       = google_sql_database_instance.main.private_ip_address
+  description = <<-EOT
+    The address to build DATABASE_URL from, then put in the database_url secret:
+      postgresql://cvos_app:<password>@<this>:5432/cvos?sslmode=require
+    The instance has no public address, so this is reachable only from the VPC
+    the service runs in.
+  EOT
+}
+
+output "image_repository" {
+  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.app.repository_id}"
+  description = "Push the image here, then deploy it by digest."
+}
+
 output "media_bucket" {
   value = google_storage_bucket.media.name
 }

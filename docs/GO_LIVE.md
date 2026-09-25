@@ -130,9 +130,23 @@ private address, the media bucket, the service account, the scheduler job, and
 
 ```bash
 terraform output secrets_to_populate
-printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add cvos-pilot-session-secret     --data-file=-
+printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add cvos-pilot-session-secret      --data-file=-
 printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add cvos-pilot-data-encryption-key --data-file=-
+
+# DATABASE_URL has to be composed: the instance has no public address, so this
+# is reachable only from inside the service's VPC.
+terraform output database_private_ip
+printf '%s' "postgresql://cvos_app:<password>@<private-ip>:5432/cvos?sslmode=require" \
+  | gcloud secrets versions add cvos-pilot-database-url --data-file=-
+
 # …and one version per remaining secret.
+```
+
+The Terraform also creates the image repository and enables the APIs, so §2's
+push target exists before you push to it:
+
+```bash
+terraform output image_repository   # europe-west1-docker.pkg.dev/<project>/cvos
 ```
 
 > **The data encryption key is not rotatable by editing it.** Phone numbers are
@@ -199,6 +213,18 @@ behaviours change:
    cannot tell anyone their situation is less than urgent on nobody's authority.
    See §7.
 3. **Log-only providers fail loudly** instead of pretending a message was sent.
+
+Terraform sets `DEPLOYMENT_STAGE` from `var.environment`, so this follows the
+environment you named in §1 rather than being a separate thing to remember.
+
+It also sets `CRON_OIDC_AUDIENCE` and `CRON_SERVICE_ACCOUNT`, which is how the
+maintenance endpoint recognises Cloud Scheduler's identity token. Both must be
+present or the scheduler is refused — and a refused scheduler is silent:
+reminders stop firing, SLA breaches stop being swept, expired recordings stop
+being deleted and the audit chain stops being verified, while everything else
+looks healthy. The readiness probe now reports the deployment degraded if no
+maintenance run has been recorded for 45 minutes, so this cannot pass unnoticed
+again.
 
 ## 7. Constitute the Clinical Review Board
 

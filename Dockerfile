@@ -11,6 +11,12 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# The public origin has to be present at BUILD time, not only at runtime: it is
+# inlined into the browser bundle. An image built without it carries whatever
+# the fallback happens to be, and the wrong origin in a client bundle is silent
+# — links look right in the markup and go to the wrong host.
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
 # A build must not reach a real database; the embedded one is used for prerendering.
 ENV NODE_ENV=production
 RUN npm run build

@@ -4,6 +4,7 @@ import { hasPermission } from "@server/core/rbac";
 import { runScheduler } from "@server/core/scheduler";
 import { audit } from "@server/core/audit";
 import { clientIp } from "@server/core/api";
+import { authoriseScheduler } from "@server/core/service-identity";
 
 /**
  * Scheduled maintenance entry point (Cloud Scheduler / cron / `npm run workflow:run`).
@@ -12,13 +13,28 @@ import { clientIp } from "@server/core/api";
  * blocked cases, produces scheduled reports, verifies yesterday's audit chain, checks ACU
  * caps and flags overdue data requests.
  *
- * Authorised by the CRON_SECRET header or by a platform-admin session.
+ * Authorised by the scheduler's own identity token, by the CRON_SECRET header,
+ * or by a platform-admin session. The identity token is the case that matters:
+ * Cloud Scheduler sends one and nothing else, so a route that understood only
+ * the other two answered 401 every five minutes while reminders, SLA sweeps,
+ * retention deletions and audit verification quietly never happened.
  */
 export async function POST(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
   const session = sessionFromRequest(req);
-  const authorised = (secret && req.headers.get("x-cron-secret") === secret) || (session && hasPermission(session.role, "admin:config"));
-  if (!authorised) return NextResponse.json({ error: { code: "unauthorized", message: "Non autorisé" } }, { status: 401 });
+  const byPerson = Boolean(session && hasPermission(session.role, "admin:config"));
+  const byMachine = byPerson
+    ? ({ ok: true, via: "secret" } as const)
+    : await authoriseScheduler({
+        authorization: req.headers.get("authorization"),
+        cronSecretHeader: req.headers.get("x-cron-secret"),
+      });
+
+  if (!byPerson && !byMachine.ok) {
+    // Say why in the logs. A refused scheduler is indistinguishable from a
+    // scheduler with nothing to do unless the refusal is written down.
+    console.error(`[scheduler] refused: ${byMachine.reason}`);
+    return NextResponse.json({ error: { code: "unauthorized", message: "Non autorisé" } }, { status: 401 });
+  }
 
   const report = await runScheduler();
   await audit({

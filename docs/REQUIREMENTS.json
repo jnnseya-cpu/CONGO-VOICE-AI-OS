@@ -1752,8 +1752,8 @@
    "section": "Delivery engineering (§20)",
    "requirement": "CI: lint, typecheck, unit (≥ 80% on core services), contract tests (Pact) between adapters and session, integration tests with Testcontainers (Postgres, Kafka), AI eval suite (gold sets + red team) on prompt/model changes, e2e (Playwright) for PWA and admin.",
    "status": "Built",
-   "evidence": ".github/workflows/ci.yml · .github/workflows/smoke.yml",
-   "note": ""
+   "evidence": ".github/workflows/ci.yml · .github/workflows/smoke.yml · scripts/preflight.mjs",
+   "note": "A green build gates a merge; a deployed origin is checked before traffic reaches it — readiness, the origin it serves against the origin it believes in, headers, and that no private endpoint answers anonymously."
   },
   {
    "id": "DO-04",
