@@ -7,6 +7,7 @@ import { resetSmsOutbox, smsOutbox } from "@server/channels/sms";
 import { resetWhatsappOutbox, whatsappOutbox } from "@server/channels/whatsapp";
 import { sendFollowUp } from "@server/channels/follow-up";
 import { patchState } from "@server/channels/session";
+import { phoneLookup } from "@server/core/phone";
 
 import { GET as whatsappVerify, POST as whatsappHook } from "@/app/api/hooks/whatsapp/route";
 import { POST as ussdHook } from "@/app/api/hooks/ussd/route";
@@ -225,7 +226,8 @@ describe("channel webhooks (offline providers)", () => {
 
   it("sends a proactive follow-up as free text inside the window and as a template outside it", async () => {
     const db = await getDb();
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.phone, "+243810000202"));
+    // The number itself is ciphertext on disk; the keyed index is how it is found.
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.phoneIndex, phoneLookup("+243810000202")));
     expect(user).toBeTruthy();
     const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.userId, user.id));
 

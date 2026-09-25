@@ -50,6 +50,29 @@ export function hangup(): string {
   return "<Hangup/>";
 }
 
+/**
+ * How long a caller may stop speaking before the platform decides they have
+ * finished (FR-CH-03). Eight hundred milliseconds is the specification's value;
+ * it is configurable because the right number depends on the trunk and on how
+ * people actually pause in each language, which only a pilot can tell us.
+ */
+export const END_OF_UTTERANCE_MS = (() => {
+  const raw = process.env.IVR_END_OF_UTTERANCE_MS;
+  const parsed = raw === undefined ? NaN : Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 800;
+})();
+
+/**
+ * The gateway takes whole seconds or the word "auto"; a fractional value is
+ * rejected outright, which would silently disable speech capture on every call.
+ * So 800 ms is sent as one second — and a deployment that finds the recogniser's
+ * own endpointing faster can set IVR_END_OF_UTTERANCE_MS=auto to use it.
+ */
+export function speechTimeoutValue(ms: number = END_OF_UTTERANCE_MS): string {
+  if (process.env.IVR_END_OF_UTTERANCE_MS?.trim().toLowerCase() === "auto") return "auto";
+  return String(Math.max(1, Math.round(ms / 1000)));
+}
+
 export interface GatherOptions {
   action: string;
   numDigits?: number;
@@ -67,8 +90,12 @@ export function gather(opts: GatherOptions, children: string): string {
     'method="POST"',
     `timeout="${opts.timeout ?? 5}"`,
     `language="${sayLanguage(opts.language ?? "fr")}"`,
+    // Barge-in: a caller who already knows what they want must be able to speak
+    // over the menu. Without this they wait through prompts they have heard
+    // twenty times, on a call they may be paying for.
+    'bargeIn="true"',
+    `speechTimeout="${opts.speechTimeout ?? speechTimeoutValue()}"`,
     opts.numDigits ? `numDigits="${opts.numDigits}"` : "",
-    opts.speechTimeout ? `speechTimeout="${opts.speechTimeout}"` : "",
     opts.hints ? `hints="${escapeXml(opts.hints)}"` : "",
   ]
     .filter(Boolean)

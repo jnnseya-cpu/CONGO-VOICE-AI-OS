@@ -15,7 +15,7 @@ import { env } from "@server/core/env";
 import { emitEvent } from "@server/core/events";
 import { runInteraction } from "@server/ai/agents/orchestrator";
 import { detectEmergencyTerms } from "@server/ai/safety";
-import { phoneColumns, phoneLookup, readPhone } from "@server/core/phone";
+import { phoneColumns, phoneLookup } from "@server/core/phone";
 import { deliverScript } from "@server/ai/language/scripts";
 import { toSpokenText } from "@server/ai/language/voice";
 import { ChannelError } from "./errors";
@@ -142,7 +142,10 @@ export async function identifyCitizen(input: {
       .values({
         isAnonymous: true,
         role: "citizen",
-        phone,
+        // Encrypted, with the keyed index that makes the lookup above possible;
+        // a plain column here would both leak the number and orphan the caller
+        // on their next call.
+        ...phoneColumns(phone),
         languagePreference: input.language ?? "fr",
         province: input.province ?? null,
         consentStatus: "pending",
