@@ -66,7 +66,7 @@ describe("readiness", () => {
   });
 
   it("is ready when everything a promise depends on is present", () => {
-    asProduction({ SMS_PROVIDER: "twilio", WHATSAPP_PROVIDER: "meta", VOICE_PROVIDER: "twilio", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://congovoice.cd" });
+    asProduction({ SMS_PROVIDER: "twilio", WHATSAPP_PROVIDER: "meta", VOICE_PROVIDER: "twilio", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://congovoicecd.com" });
     expect(readiness().ok).toBe(true);
   });
 });

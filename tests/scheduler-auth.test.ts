@@ -17,7 +17,7 @@ import { SCHEDULER_STALE_AFTER_MS, schedulerHealth } from "@server/core/schedule
 import { audit } from "@server/core/audit";
 import { getDb, resetDbForTests } from "@server/db/client";
 
-const AUDIENCE = "https://congovoice.cd/api/v1/workflow/run";
+const AUDIENCE = "https://congovoicecd.com/api/v1/workflow/run";
 const SERVICE_ACCOUNT = "congovoice-pilot-app@congovoice-pilot.iam.gserviceaccount.com";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -76,7 +76,7 @@ describe("the scheduler's identity token", () => {
   });
 
   it("refuses a token minted for a different endpoint", async () => {
-    const token = schedulerToken({ aud: "https://congovoice.cd/api/v1/admin/seed" });
+    const token = schedulerToken({ aud: "https://congovoicecd.com/api/v1/admin/seed" });
     const result = await verifySchedulerToken(`Bearer ${token}`, { audience: AUDIENCE, serviceAccount: SERVICE_ACCOUNT });
     expect(result).toEqual({ ok: false, reason: "audience_mismatch" });
   });

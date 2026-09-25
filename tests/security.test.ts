@@ -63,7 +63,7 @@ describe("session revocation", () => {
 });
 
 describe("forwarded address", () => {
-  const req = (value: string) => new NextRequest("https://congovoice.cd/api/v1/auth/login", { headers: { "x-forwarded-for": value } });
+  const req = (value: string) => new NextRequest("https://congovoicecd.com/api/v1/auth/login", { headers: { "x-forwarded-for": value } });
 
   it("reads the hop our own proxy wrote, not the one the caller claims", () => {
     // One trusted proxy: the right-most entry is the address it observed.

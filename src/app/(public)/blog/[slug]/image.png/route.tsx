@@ -43,7 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
         <div style={{ display: "flex", fontSize, fontWeight: 600, lineHeight: 1.16, letterSpacing: -1.4, maxWidth: 1010 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 22, color: "rgba(255,255,255,0.68)" }}>
           <div style={{ display: "flex" }}>{author}</div>
-          <div style={{ display: "flex" }}>congovoice.cd/blog</div>
+          <div style={{ display: "flex" }}>congovoicecd.com/blog</div>
         </div>
         <div style={{ display: "flex", height: 9, width: "100%" }}>
           <div style={{ flex: 1, background: "#007fff" }} />

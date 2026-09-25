@@ -1,7 +1,7 @@
 /**
  * The check you run against a deployed origin before you send anyone to it.
  *
- *   node scripts/preflight.mjs https://congovoice.cd
+ *   node scripts/preflight.mjs https://congovoicecd.com
  *
  * Everything here has been got wrong at least once by somebody: a service that
  * answers on one origin while believing it lives on another, a webhook that

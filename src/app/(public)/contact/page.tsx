@@ -87,7 +87,7 @@ export default function ContactPage() {
           <Callout tone="warn" title="Adresses en cours d'activation">
             <p>{SITE.contactsNote}</p>
             <p>
-              Le domaine <strong>congovoice.cd</strong> et les adresses ci-dessous sont les adresses prévues du programme&nbsp;: elles sont activées avec l&apos;hébergement et l&apos;enregistrement du domaine, et ne doivent pas être considérées comme joignables aujourd&apos;hui. Une institution qui souhaite entrer en contact dès maintenant passe par son canal officiel habituel auprès du programme.
+              Le domaine <strong>congovoicecd.com</strong> et les adresses ci-dessous sont les adresses prévues du programme&nbsp;: elles sont activées avec l&apos;hébergement et l&apos;enregistrement du domaine, et ne doivent pas être considérées comme joignables aujourd&apos;hui. Une institution qui souhaite entrer en contact dès maintenant passe par son canal officiel habituel auprès du programme.
             </p>
           </Callout>
         </Section>

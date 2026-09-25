@@ -111,7 +111,7 @@ variable "domain" {
   type        = string
   default     = ""
   description = <<-EOT
-    The domain citizens type, without a scheme: congovoice.cd.
+    The domain citizens type, without a scheme: congovoicecd.com.
 
     Leave it empty and the service answers only on its generated run.app URL,
     which is fine for staging and wrong for anything else: canonical links, the

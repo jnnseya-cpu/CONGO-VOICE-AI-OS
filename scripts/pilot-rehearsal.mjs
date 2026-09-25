@@ -14,7 +14,7 @@
  *
  *   REHEARSAL_PHYSICIANS="+243900000008,+243900000007" \
  *   REHEARSAL_CHW="+243900000006" \
- *   node scripts/pilot-rehearsal.mjs https://congovoice.cd
+ *   node scripts/pilot-rehearsal.mjs https://congovoicecd.com
  */
 const base = (process.argv[2] ?? "http://localhost:3202").replace(/\/$/, "");
 const ADMIN_PHONE = process.env.REHEARSAL_ADMIN ?? "+243900000001";

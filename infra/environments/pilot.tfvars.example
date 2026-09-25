@@ -13,10 +13,10 @@ data_residency          = ["ZA", "US"]
 # The origin citizens type. Must match the domain below and the value the image
 # was BUILT with, or the browser bundle and the telephony callbacks disagree
 # with what is actually serving.
-public_url = "https://congovoice.cd"
+public_url = "https://congovoicecd.com"
 
 # The web domain. Empty means the service answers only on its run.app URL.
-domain        = "congovoice.cd"
+domain        = "congovoicecd.com"
 manage_dns    = false          # true only if the zone below is yours in Cloud DNS
 dns_zone_name = ""             # e.g. "congovoice-cd" when manage_dns = true
 

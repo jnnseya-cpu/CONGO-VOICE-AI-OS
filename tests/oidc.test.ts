@@ -34,7 +34,7 @@ beforeEach(() => {
     OIDC_ISSUER: ISSUER,
     OIDC_CLIENT_ID: CLIENT_ID,
     OIDC_CLIENT_SECRET: "secret",
-    OIDC_REDIRECT_URI: "https://congovoice.cd/api/v1/auth/oidc/callback",
+    OIDC_REDIRECT_URI: "https://congovoicecd.com/api/v1/auth/oidc/callback",
     OIDC_ALLOWED_DOMAINS: "",
   });
   resetDiscoveryCache();

@@ -28,7 +28,7 @@ env:
     availability: [BUILD, RUNTIME]
 
   - variable: NEXT_PUBLIC_SITE_URL
-    value: https://congovoice.cd
+    value: https://congovoicecd.com
     availability: [BUILD, RUNTIME]
 
   # Uploads must go to a bucket: a Cloud Run instance's disk does not survive it.

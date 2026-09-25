@@ -117,7 +117,7 @@ Two things worth knowing before the ministry asks:
 
 ```bash
 # What a deployment would have to admit if asked:
-curl -s https://congovoice.cd/api/v1/system/health | jq '.failing'
+curl -s https://congovoicecd.com/api/v1/system/health | jq '.failing'
 ```
 
 ## 1. Decide the four inputs
@@ -126,7 +126,7 @@ Write these down before touching anything. Everything else follows from them.
 
 | Input | Example | Notes |
 |---|---|---|
-| Domain | `congovoice.cd` | The origin citizens type. Must be registered and its DNS reachable by you. |
+| Domain | `congovoicecd.com` | The origin citizens type. Must be registered and its DNS reachable by you. |
 | Environment | `pilot` | `dev`, `staging`, `pilot` or `prod`. **This is not cosmetic** — see §6. |
 | Region | `europe-west1` | Latency to Kinshasa. Revisit if a data-residency decision is taken. |
 | Province and module for the pilot | Kinshasa, health | The pilot is bounded; the feature flags widen it later. |
@@ -144,7 +144,7 @@ npm run build
 # The browser bundle inlines it; getting it wrong bakes the wrong origin into
 # every page.
 docker build \
-  --build-arg NEXT_PUBLIC_SITE_URL=https://congovoice.cd \
+  --build-arg NEXT_PUBLIC_SITE_URL=https://congovoicecd.com \
   -t europe-west1-docker.pkg.dev/PROJECT/cvos/app:$(git rev-parse --short HEAD) .
 docker push europe-west1-docker.pkg.dev/PROJECT/cvos/app:$(git rev-parse --short HEAD)
 
@@ -221,7 +221,7 @@ wait for the managed certificate. It is normally minutes and can be an hour.
 
 ```bash
 # Certificate issued and the domain answering?
-curl -sI https://congovoice.cd | head -3
+curl -sI https://congovoicecd.com | head -3
 ```
 
 ## 5. Migrate and seed — carefully
@@ -275,7 +275,7 @@ Nothing health-related is assessed until this is done (AI-10).
    expert — recording each one's registration number:
 
 ```bash
-curl -X POST https://congovoice.cd/api/v1/admin/review/members \
+curl -X POST https://congovoicecd.com/api/v1/admin/review/members \
   -H 'content-type: application/json' -H "authorization: Bearer $ADMIN_TOKEN" \
   -d '{"boardKey":"crb","userId":"<uuid>","seat":"physician","credential":"CNOM-…"}'
 ```
@@ -291,7 +291,7 @@ Steps 1–4 and the first citizen journeys can be rehearsed end to end:
 ```bash
 REHEARSAL_ADMIN=+243… REHEARSAL_PHYSICIANS=+243…,+243… \
 REHEARSAL_CHW=+243… REHEARSAL_WORKER=+243… \
-npm run rehearsal -- https://congovoice.cd
+npm run rehearsal -- https://congovoicecd.com
 ```
 
 It signs in over HTTP as each person, seats the board, has the members sign
@@ -312,7 +312,7 @@ field, not a code change.
 Run this against the real origin before anyone is told the number.
 
 ```bash
-npm run preflight -- https://congovoice.cd
+npm run preflight -- https://congovoicecd.com
 ```
 
 It checks, as an anonymous caller: the readiness probe, that the origin it
@@ -325,10 +325,10 @@ failure and prints what to fix.
 Then the three checks that need a browser:
 
 ```bash
-npm run rehearsal -- https://congovoice.cd  # 28 checks: seated, signed, answering
-npm run smoke -- https://congovoice.cd    # 37 behavioural checks
-npm run crawl -- https://congovoice.cd    # every page, console errors, broken links
-npm run a11y  -- https://congovoice.cd    # WCAG 2.2 A/AA, fails on one violation
+npm run rehearsal -- https://congovoicecd.com  # 28 checks: seated, signed, answering
+npm run smoke -- https://congovoicecd.com    # 37 behavioural checks
+npm run crawl -- https://congovoicecd.com    # every page, console errors, broken links
+npm run a11y  -- https://congovoicecd.com    # WCAG 2.2 A/AA, fails on one violation
 ```
 
 ## 9. Connect the channels
@@ -337,10 +337,10 @@ Only now, when the origin is right, point the providers at it:
 
 | Channel | Where it goes |
 |---|---|
-| Voice (IVR) | `https://congovoice.cd/api/hooks/ivr/twilio` |
-| SMS | `https://congovoice.cd/api/hooks/sms` and `/api/hooks/sms/dlr` |
-| WhatsApp | `https://congovoice.cd/api/hooks/whatsapp` |
-| USSD | `https://congovoice.cd/api/hooks/ussd` |
+| Voice (IVR) | `https://congovoicecd.com/api/hooks/ivr/twilio` |
+| SMS | `https://congovoicecd.com/api/hooks/sms` and `/api/hooks/sms/dlr` |
+| WhatsApp | `https://congovoicecd.com/api/hooks/whatsapp` |
+| USSD | `https://congovoicecd.com/api/hooks/ussd` |
 
 Set `TWILIO_AUTH_TOKEN` (and the equivalents) at the same time. Until it is set,
 signature validation is skipped so the platform still runs offline — which is
@@ -353,7 +353,7 @@ in `/historique` and the case in `/cas`.
 
 ```bash
 # One province, one module, 5% of traffic, held for seven days.
-curl -X POST https://congovoice.cd/api/v1/admin/feature-flags \
+curl -X POST https://congovoicecd.com/api/v1/admin/feature-flags \
   -H 'content-type: application/json' -H "authorization: Bearer $ADMIN_TOKEN" \
   -d '{"key":"module.health","enabled":true,"modules":["health"],"provinces":["Kinshasa"],"startCanary":true}'
 ```

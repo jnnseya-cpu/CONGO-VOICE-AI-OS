@@ -109,7 +109,7 @@ const CHANNELS: ChannelCard[] = [
     note: SITE.channels.web.note,
     icon: <IconGlobe size={22} />,
     what: [
-      "Ouvrez congovoice.cd dans le navigateur du téléphone ou de l'ordinateur.",
+      "Ouvrez congovoicecd.com dans le navigateur du téléphone ou de l'ordinateur.",
       "Appuyez sur le bouton du micro et parlez : vous n'avez rien à écrire.",
       "Vous pouvez aussi joindre une photo, écrire, ou faire lire la réponse à voix haute.",
       "Une fois la page ouverte, elle continue de fonctionner sans réseau.",
