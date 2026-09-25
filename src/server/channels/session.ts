@@ -14,7 +14,9 @@ import type { ChannelType, LanguageCode, ModuleType, Role } from "@server/db/sch
 import { env } from "@server/core/env";
 import { emitEvent } from "@server/core/events";
 import { runInteraction } from "@server/ai/agents/orchestrator";
-import { detectEmergencyTerms, EMERGENCY_MESSAGES } from "@server/ai/safety";
+import { detectEmergencyTerms } from "@server/ai/safety";
+import { deliverScript } from "@server/ai/language/scripts";
+import { toSpokenText } from "@server/ai/language/voice";
 import { ChannelError } from "./errors";
 import {
   capabilitiesFromRecord,
@@ -699,7 +701,16 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
   // 4. Emergency short-circuit (FR-CH-07): deterministic keywords, before any model call.
   const emergencyHits = text ? detectEmergencyTerms(text) : [];
   if (emergencyHits.length > 0) {
-    const message = EMERGENCY_MESSAGES[language] ?? EMERGENCY_MESSAGES.fr;
+    /**
+     * NFR-A-01: this path must survive every AI provider being down. The words
+     * are constants, and when the language panel has recorded them the channel
+     * plays the recording rather than asking a synthesis API that may be the
+     * thing that is down.
+     */
+    const alert = deliverScript("emergency_alert", language);
+    const instructions = deliverScript("emergency_instructions", language);
+    const message = toSpokenText(`${alert.text} ${instructions.text}`, language);
+    const scriptAudioUrl = alert.audioUrl;
     // The full pipeline still runs — the CHW alert and the case must be created.
     const background = runInteraction(interactionInput)
       .then(async (out) => {
@@ -751,6 +762,7 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
       text: message,
       fullText: message,
       emergency: true,
+      audioUrl: scriptAudioUrl,
       background,
     });
   }

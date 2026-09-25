@@ -113,7 +113,11 @@ describe("channel session service", () => {
 
     expect(result.status).toBe("emergency");
     expect(result.emergency).toBe(true);
-    expect(result.text).toBe(EMERGENCY_MESSAGES.fr);
+    // The reply must stand on its own with every AI provider down (NFR-A-01):
+    // the alert, then what to do on the way, from fixed approved wording.
+    expect(result.text.startsWith(EMERGENCY_MESSAGES.fr.replace(/\s+:/, " :"))).toBe(true);
+    expect(result.text).toContain("ne restez pas à la maison");
+    expect(result.text).toContain("Emportez le carnet de santé");
     expect(result.background).toBeDefined();
 
     const settled = await settleTurn(result);

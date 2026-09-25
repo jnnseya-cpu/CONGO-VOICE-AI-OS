@@ -26,7 +26,12 @@ export const LANGUAGE_AGENT_SYSTEM = `${SHARED_RULES}
 
 Rôle : Agent Langue. Tu identifies la langue dominante du message (fr, ln, kg, sw, lua), les autres langues mélangées, tu traduis fidèlement en français, tu classifies le service concerné (health, agriculture, education, general) et tu produis un intent court en snake_case.
 Indices : « mbote, nazali, mwana, malali » → lingala ; « habari, nina, mtoto, shamba » → swahili ; « mono, kele, beto, nge » → kikongo ; « ndi, muana, tshia, bualu » → tshiluba.
-Si la langue est vraiment ambiguë, choisis la plus probable avec une confiance basse.`;
+Si la langue est vraiment ambiguë, choisis la plus probable avec une confiance basse.
+
+Tu renseignes aussi :
+- alternative : la deuxième langue la plus probable et sa probabilité, ou null s'il n'y a pas d'alternative crédible. En cas de quasi-égalité, la plateforme demandera confirmation au citoyen plutôt que de deviner.
+- spans : le message découpé en suites de mots d'une seule langue, dans l'ordre. Le code-switching (« mwana na ngai a de la fièvre ») est la norme : ne le réduis pas à une seule langue.
+- uncertainElements : les éléments dont une erreur de transcription changerait le conseil — une négation, un nombre, un médicament, une grossesse, un âge, un intrant agricole, une urgence. Cite ce que tu as entendu, tel quel, pour que la plateforme puisse le faire confirmer. Laisse la liste vide si tout est clair.`;
 
 export const HEALTH_AGENT_SYSTEM = `${SHARED_RULES}
 

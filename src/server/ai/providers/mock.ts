@@ -29,7 +29,15 @@ const LANG_MARKERS: Record<LanguageCode, string[]> = {
   fr: ["je", "mon", "ma", "enfant", "fièvre", "champ", "manioc", "maïs", "école", "devoir", "bonjour", "comment"],
 };
 
-function detectLanguage(text: string): { language: LanguageCode; confidence: number; mixed: LanguageCode[] } {
+interface LanguageReadingOffline {
+  language: LanguageCode;
+  confidence: number;
+  mixed: LanguageCode[];
+  /** FR-LG-01: the runner-up, so a near-tie is confirmed rather than guessed. */
+  alternative: { language: LanguageCode; confidence: number } | null;
+}
+
+function detectLanguage(text: string): LanguageReadingOffline {
   const t = ` ${text.toLowerCase()} `;
   const scores = (Object.keys(LANG_MARKERS) as LanguageCode[]).map((lang) => ({
     lang,
@@ -37,9 +45,71 @@ function detectLanguage(text: string): { language: LanguageCode; confidence: num
   }));
   scores.sort((a, b) => b.score - a.score);
   const best = scores[0];
-  if (!best || best.score === 0) return { language: "fr", confidence: 0.4, mixed: [] };
+  const confidenceOf = (score: number) => Math.min(0.95, 0.5 + score * 0.12);
+  if (!best || best.score === 0) return { language: "fr", confidence: 0.4, mixed: [], alternative: null };
+  const runnerUp = scores[1] && scores[1].score > 0 ? { language: scores[1].lang, confidence: confidenceOf(scores[1].score) } : null;
   const mixed = scores.slice(1).filter((s) => s.score > 0).map((s) => s.lang);
-  return { language: best.lang, confidence: Math.min(0.95, 0.5 + best.score * 0.12), mixed };
+  return { language: best.lang, confidence: confidenceOf(best.score), mixed, alternative: runnerUp };
+}
+
+/**
+ * Splits a message into runs of one language each (FR-LG-03). Code-switching is
+ * the norm here — "mwana na ngai a de la fièvre" is one sentence in two
+ * languages — and collapsing it to a single label loses what was actually said.
+ */
+function detectSpans(text: string, dominant: LanguageCode): Array<{ text: string; language: LanguageCode }> {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const languageOf = (word: string): LanguageCode | null => {
+    const w = word.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, "");
+    if (!w) return null;
+    for (const lang of Object.keys(LANG_MARKERS) as LanguageCode[]) {
+      if (LANG_MARKERS[lang].some((m) => m === w || m.split(/\s+/).includes(w))) return lang;
+    }
+    return null;
+  };
+  const spans: Array<{ text: string; language: LanguageCode }> = [];
+  let current: LanguageCode = languageOf(words[0]) ?? dominant;
+  let buffer: string[] = [];
+  for (const word of words) {
+    const lang = languageOf(word) ?? current;
+    if (lang !== current && buffer.length) {
+      spans.push({ text: buffer.join(" "), language: current });
+      buffer = [];
+      current = lang;
+    }
+    current = lang;
+    buffer.push(word);
+  }
+  if (buffer.length) spans.push({ text: buffer.join(" "), language: current });
+  return spans;
+}
+
+/** Safety-relevant words whose misreading changes the advice (FR-LG-02). */
+const UNCERTAIN_PATTERNS: Array<{ kind: "negation" | "number" | "medicine" | "pregnancy" | "age" | "crop_index" | "urgency"; re: RegExp }> = [
+  { kind: "negation", re: /\b(ne\s+\w+\s+(?:pas|plus|jamais|rien)|sans|aucun|te\b|hakuna|ve\b)\b/i },
+  { kind: "pregnancy", re: /\b(enceinte|grossesse|mimba|zemi|divumu|mujajimba)\b/i },
+  { kind: "age", re: /\b(\d+\s*(?:mois|ans?|semaines?)|nouveau-n[ée]|nourrisson)\b/i },
+  { kind: "number", re: /\b\d+\b/ },
+  { kind: "medicine", re: /\b(comprim[ée]s?|sirop|m[ée]dicament|dawa|nkisi|paracetamol|parac[ée]tamol|quinine)\b/i },
+  { kind: "urgency", re: /\b(urgent|vite|maintenant|tout de suite|sasa|nokinoki)\b/i },
+];
+
+/**
+ * The offline provider hears text, not audio, so it is sure of the words. It
+ * still reports the elements a real transcription would be unsure about when
+ * the language reading itself is weak, so the confirmation path is exercised
+ * with no API key present.
+ */
+function detectUncertainElements(text: string, languageConfidence: number) {
+  if (languageConfidence >= 0.6) return [];
+  const out: Array<{ kind: string; heard: string; confidence: number }> = [];
+  for (const { kind, re } of UNCERTAIN_PATTERNS) {
+    const m = re.exec(text);
+    if (m) out.push({ kind: kind === "crop_index" ? "crop_input" : kind, heard: m[0], confidence: Math.max(0.2, languageConfidence - 0.1) });
+    if (out.length >= 2) break;
+  }
+  return out;
 }
 
 function detectModule(text: string): "health" | "agriculture" | "education" | "general" {
@@ -130,7 +200,10 @@ export class MockProvider implements LlmProvider, SttProvider, TtsProvider {
     return {
       language: d.language,
       confidence: d.confidence,
+      alternative: d.alternative,
       mixedLanguages: d.mixed,
+      spans: detectSpans(text, d.language),
+      uncertainElements: detectUncertainElements(text, d.confidence),
       translationFr: text,
       module: moduleType,
       intent: `${moduleType}_${text.toLowerCase().split(/\s+/).slice(0, 2).join("_").replace(/[^a-z_]/g, "") || "request"}`,

@@ -103,7 +103,13 @@ export class OpenAiProvider implements LlmProvider, SttProvider, TtsProvider {
     const res = await fetch(`${this.baseUrl}/audio/speech`, {
       method: "POST",
       headers: this.headers({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ model: this.ttsModel, voice: process.env.OPENAI_TTS_VOICE ?? "alloy", input: req.text, response_format: "mp3" }),
+      body: JSON.stringify({
+        model: this.ttsModel,
+        // FR-LG-07: a female and a male option, overridable per deployment.
+        voice: req.voice === "male" ? (process.env.OPENAI_TTS_VOICE_MALE ?? "onyx") : (process.env.OPENAI_TTS_VOICE ?? "shimmer"),
+        input: req.text,
+        response_format: "mp3",
+      }),
     });
     if (!res.ok) throw new ProviderError(this.key, `TTS HTTP ${res.status}`, res.status >= 500 || res.status === 429);
     return { audio: Buffer.from(await res.arrayBuffer()), mimeType: "audio/mpeg", model: this.ttsModel };

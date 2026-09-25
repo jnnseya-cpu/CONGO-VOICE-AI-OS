@@ -41,6 +41,12 @@ export interface TranscribeResult {
 export interface SynthesizeRequest {
   text: string;
   language: LanguageCode;
+  /**
+   * FR-LG-07: one female and one male voice per language, chosen per module.
+   * Whose voice delivers health advice is not a neutral detail in every
+   * household, so it is configurable rather than fixed.
+   */
+  voice?: "female" | "male";
 }
 
 export interface SynthesizeResult {

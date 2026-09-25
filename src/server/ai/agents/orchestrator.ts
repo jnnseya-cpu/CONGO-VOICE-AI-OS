@@ -29,6 +29,8 @@ import { isDegradedMode } from "@server/core/metering";
 import { getProfileContext, rememberLanguage } from "./personalisation";
 import { recordSample, retrieveLearningContext } from "./learning";
 import { dedupeSentences, EMERGENCY_MESSAGES, withDisclaimer } from "../safety";
+import { confidenceVector, planClarification, type ConfidenceVector } from "../language/confidence";
+import { toSpokenText } from "../language/voice";
 
 export interface InteractionInput {
   user: { userId: string; role: Role; language: LanguageCode; province?: string | null } | null;
@@ -51,8 +53,14 @@ export interface InteractionOutput {
   intent: string | null;
   answer: FinalAnswer;
   answerLocalised: FinalAnswer;
-  responseText: string; // localised, ready to be spoken
+  responseText: string; // localised, as written
+  /** The same answer prepared for speech: short sentences, numbers as words (FR-LG-06). */
+  spokenText: string;
   followUpQuestions: string[];
+  /** Why a confirmation was asked, if one was (FR-LG-01, FR-LG-02). */
+  clarificationReasons: string[];
+  /** Separate confidence readings rather than one opaque score (FR-LG-09). */
+  confidenceDimensions: ConfidenceVector;
   caseId: string | null;
   audioUrl: string | null;
   audioAvailable: boolean;
@@ -136,7 +144,30 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     const language: LanguageCode = lang.language;
     const languageConfidence = sttLanguage && sttLanguage === language && sttConfidence ? Math.max(lang.confidence, sttConfidence) : lang.confidence;
     const service: ModuleType = input.moduleHint && input.moduleHint !== "general" ? input.moduleHint : lang.module;
-    await save({ language, languageConfidence, translationFr: lang.translationFr, intent: lang.intent, module: service });
+
+    // FR-LG-09: three separate readings, not one number. A confident translation
+    // of a badly-heard sentence must not pass as a confident turn.
+    const confidence: ConfidenceVector = confidenceVector({
+      transcription: sttConfidence,
+      language: languageConfidence,
+      translation: lang.translationFr?.trim() ? languageConfidence : Math.min(languageConfidence, 0.4),
+    });
+    // FR-LG-03: the message as it was actually spoken, language by language.
+    const transcriptTags: Array<[string, string]> = (lang.spans ?? []).map((span) => [span.text, span.language] as [string, string]);
+    await save({
+      language,
+      languageConfidence,
+      translationFr: lang.translationFr,
+      intent: lang.intent,
+      module: service,
+      transcriptTags,
+      confidenceDimensions: {
+        transcription: confidence.transcription ?? -1,
+        language: confidence.language,
+        translation: confidence.translation,
+        overall: confidence.overall,
+      },
+    });
     if (transcript) await recordSample({ interactionId, audioFileId, language, sourceText: transcript, translationFr: lang.translationFr, province, intent: lang.intent, module: service, confidence: languageConfidence });
 
     // 4. Personalisation context.
@@ -187,10 +218,25 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     if (health && risk.level === "critical") actionFr = `${EMERGENCY_MESSAGES.fr} ${actionFr}`;
     if (education?.quiz?.length) actionFr += ` Petit exercice : ${education.quiz.map((q, i) => `${i + 1}) ${q.question}`).join(" ")}`;
     if (agriculture?.lowCostInterventions?.length) actionFr += ` Options à faible coût : ${agriculture.lowCostInterventions.join(", ")}.`;
-    if (risk.lowConfidence) actionFr += " Je ne suis pas certain d'avoir bien compris : pouvez-vous préciser ?";
+    /**
+     * FR-LG-01 and FR-LG-02: ask about the specific thing in doubt rather than
+     * saying "I am not sure" and continuing anyway. An emergency is never
+     * delayed for a question — the deterministic rules have already fired and
+     * the instruction goes out first.
+     */
+    const emergency = risk.level === "critical";
+    const clarification = emergency ? { questions: [], routeToHuman: false, reasons: [] } : planClarification(lang);
+    if (!emergency && clarification.questions.length > 0) {
+      actionFr += ` ${clarification.questions[0]}`;
+    } else if (risk.lowConfidence) {
+      actionFr += " Je ne suis pas certain d'avoir bien compris : pouvez-vous préciser ?";
+    }
     if (health) actionFr = withDisclaimer(actionFr, "fr");
     actionFr = dedupeSentences(actionFr);
-    const followUps = (health?.followUpQuestions ?? agriculture?.followUpQuestions ?? education?.followUpQuestions ?? []).slice(0, 3);
+    const followUps = [
+      ...clarification.questions.slice(1),
+      ...(health?.followUpQuestions ?? agriculture?.followUpQuestions ?? education?.followUpQuestions ?? []),
+    ].slice(0, 3);
     const escalationTo = risk.escalationRequired ? ROLE_LABEL[service] : null;
     const summaryFr = `[${MODULE_LABEL[service]}] ${lang.intent.replace(/_/g, " ")} — risque ${risk.level}${risk.escalationRequired ? ", escaladé" : ""}. ${understanding.slice(0, 140)}`;
     const answer: FinalAnswer = {
@@ -222,7 +268,13 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       escalationRequired: risk.escalationRequired,
       summary: summaryFr,
       citations: health?.citations ?? agriculture?.citations ?? education?.citations ?? [],
-      confidenceDimensions: health?.confidenceDimensions ?? {},
+      confidenceDimensions: {
+        transcription: confidence.transcription ?? -1,
+        language: confidence.language,
+        translation: confidence.translation,
+        overall: confidence.overall,
+        ...(health?.confidenceDimensions ?? {}),
+      },
       protocolVersion: health ? `${health.protocolId}@${health.protocolVersion}` : null,
       safeguarding: (health?.safeguarding ?? false) || (education?.safeguarding ?? false),
     });
@@ -351,8 +403,14 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
     // 10. Text to speech (optional, falls back to on-device synthesis).
     let audioUrl: string | null = null;
+    /**
+     * FR-LG-06: what gets spoken is not what gets displayed. Sentences are cut
+     * to fifteen words and numbers are said as words, because a digit read as a
+     * digit over a bad line is the part the listener loses.
+     */
+    const spokenText = toSpokenText(actionLocal, language);
     if (input.wantsAudio !== false) {
-      const speech = await aiGateway().synthesize({ text: actionLocal, language }, { interactionId });
+      const speech = await aiGateway().synthesize({ text: spokenText, language }, { interactionId });
       if (speech) {
         const stored = await storeUpload(speech.audio, speech.mimeType, "tts");
         const [f] = await db.insert(schema.files).values({ userId, interactionId, kind: "audio", storageKey: stored.key, mimeType: speech.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256 }).returning();
@@ -375,7 +433,10 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       answer,
       answerLocalised,
       responseText: actionLocal,
+      spokenText,
       followUpQuestions: followUpsLocal,
+      clarificationReasons: clarification.reasons,
+      confidenceDimensions: confidence,
       caseId,
       audioUrl,
       audioAvailable: !!audioUrl,
@@ -401,5 +462,25 @@ function failedOutput(interactionId: string, language: LanguageCode, message: st
     confidence: { score: 0, low: true },
     summary: "échec de traitement",
   };
-  return { interactionId, status: "failed", module: "general", language, languageConfidence: 0, transcript: "", intent: null, answer: empty, answerLocalised: empty, responseText: message, followUpQuestions: [], caseId: null, audioUrl: null, audioAvailable: false, latencyMs: Date.now() - started, message };
+  return {
+    interactionId,
+    status: "failed",
+    module: "general",
+    language,
+    languageConfidence: 0,
+    transcript: "",
+    intent: null,
+    answer: empty,
+    answerLocalised: empty,
+    responseText: message,
+    spokenText: toSpokenText(message, language),
+    followUpQuestions: [],
+    clarificationReasons: [],
+    confidenceDimensions: { transcription: null, language: 0, translation: 0, overall: 0 },
+    caseId: null,
+    audioUrl: null,
+    audioAvailable: false,
+    latencyMs: Date.now() - started,
+    message,
+  };
 }

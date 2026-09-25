@@ -7,7 +7,29 @@ export const severity = z.enum(["low", "medium", "high", "critical"]);
 export const LanguageAnalysis = z.object({
   language: languageCode.describe("Dominant language of the message"),
   confidence: z.number().min(0).max(1),
+  /** FR-LG-01: the runner-up, so a near-tie can be confirmed with the citizen instead of guessed. */
+  alternative: z
+    .object({ language: languageCode, confidence: z.number().min(0).max(1) })
+    .nullable()
+    .describe("Second most likely language and its probability, or null when there is no credible alternative"),
   mixedLanguages: z.array(languageCode).describe("Other languages present, if the message mixes languages"),
+  /** FR-LG-03: code-switching is recorded span by span rather than collapsed to one label. */
+  spans: z
+    .array(z.object({ text: z.string(), language: languageCode }))
+    .describe("The message split into runs of one language each, in order. A single-language message is one span."),
+  /**
+   * FR-LG-02 and the low-confidence policy: elements whose misreading would change
+   * the advice. Each is confirmed with the citizen rather than assumed.
+   */
+  uncertainElements: z
+    .array(
+      z.object({
+        kind: z.enum(["negation", "number", "medicine", "pregnancy", "age", "crop_input", "urgency", "other"]),
+        heard: z.string().describe("What was heard, quoted back to the citizen"),
+        confidence: z.number().min(0).max(1),
+      }),
+    )
+    .describe("Safety-relevant elements the transcription is unsure about"),
   translationFr: z.string().describe("Faithful French translation of the message (or the message itself if French)"),
   module: moduleType.describe("Which service the citizen needs"),
   intent: z.string().describe("Short snake_case intent label, e.g. fever_child, cassava_leaf_disease, fractions_help"),
