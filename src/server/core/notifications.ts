@@ -204,8 +204,7 @@ async function sendSms(to: string, text: string): Promise<DispatchResult> {
     }
   }
   if (provider === "twilio") return twilio(to, text, "sms");
-  safeLog.info("notify:sms", `to=${maskPhone(to)} ${text.slice(0, 120)}`);
-  return { ok: true, providerMessageId: `log-${Date.now()}`, provider: "log" };
+  return logOnlyDispatch("sms", to, text);
 }
 
 async function sendWhatsapp(to: string, text: string): Promise<DispatchResult> {
@@ -228,7 +227,26 @@ async function sendWhatsapp(to: string, text: string): Promise<DispatchResult> {
       return { ok: false, failureReason: errMessage(err), provider };
     }
   }
-  safeLog.info("notify:whatsapp", `to=${maskPhone(to)} ${text.slice(0, 120)}`);
+  return logOnlyDispatch("whatsapp", to, text);
+}
+
+/**
+ * The log provider writes a line and nothing leaves the building.
+ *
+ * That is correct on a laptop and a lie in production: a mother is told "un
+ * agent a été alerté et vous recontactera" while the alert reaches stdout, and
+ * the notification is recorded as delivered. It fails in the direction of false
+ * reassurance, which is the one direction a health service must never fail in.
+ *
+ * So in production the log provider reports failure. The message is queued and
+ * retried, the delivery row says why, and the platform can tell an operator its
+ * escalation path is not wired instead of pretending it is.
+ */
+function logOnlyDispatch(channel: string, to: string, text: string): DispatchResult {
+  safeLog.info(`notify:${channel}`, `to=${maskPhone(to)} ${text.slice(0, 120)}`);
+  if (env.isProd) {
+    return { ok: false, failureReason: `${channel}_provider_not_configured`, provider: "log" };
+  }
   return { ok: true, providerMessageId: `log-${Date.now()}`, provider: "log" };
 }
 
@@ -256,10 +274,7 @@ async function twilio(to: string, text: string, kind: "sms" | "whatsapp"): Promi
 /** Outbound IVR: the last resort for citizens without SMS or data. Stub in log mode. */
 async function sendVoice(to: string, text: string): Promise<DispatchResult> {
   const provider = process.env.VOICE_PROVIDER ?? "log";
-  if (provider === "log") {
-    safeLog.info("notify:voice", `ivr_outbound to=${maskPhone(to)} ${text.slice(0, 120)}`);
-    return { ok: true, providerMessageId: `ivr-${Date.now()}`, provider: "log" };
-  }
+  if (provider === "log") return logOnlyDispatch("voice", to, text);
   return { ok: false, failureReason: "voice_provider_not_configured", provider };
 }
 

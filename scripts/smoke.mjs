@@ -63,7 +63,10 @@ async function call(path, { method = "GET", body, token, cookie, headers = {} } 
 section("Reachability and probes");
 {
   const { res, json } = await call("/api/v1/system/health");
-  check("health probe answers ok", res.status === 200 && json?.status === "ok", `status ${res.status} ${json?.error ?? ""}`);
+  const failing = (json?.failing ?? []).map((f) => `${f.id}: ${f.detail}`).join(" | ");
+  // A 503 here on a production deployment usually means the escalation path is
+  // not wired, which is the one failure that must never be quiet.
+  check("health probe answers ok", res.status === 200 && json?.status === "ok", `status ${res.status} ${failing || json?.error || ""}`);
 }
 {
   const { res } = await call("/");
