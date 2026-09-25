@@ -20,6 +20,7 @@ import "server-only";
 import { and, count, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import { env } from "./env";
+import { readPhone } from "./phone";
 import { emitEvent } from "./events";
 import { safeLog, maskPhone } from "./redact";
 import { NOTIFICATION_TEMPLATES } from "@server/db/reference/notification-templates";
@@ -408,7 +409,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
       .where(eq(schema.users.id, input.userId));
     if (u) {
       language = input.language ?? u.language;
-      to = to ?? u.phone ?? undefined;
+      to = to ?? readPhone(u.phone) ?? undefined;
       recipientRole = u.role;
       preferences = u.preferences ?? {};
       if (u.status !== "active") return persistSuppressed(input, channel, language, "recipient_inactive");
@@ -652,7 +653,7 @@ export async function notifyRole(role: Role, input: Omit<NotifyInput, "userId">,
   }
   const results: NotifyResult[] = [];
   for (const r of recipients) {
-    results.push(await notify({ ...input, userId: r.id, to: r.phone ?? undefined }));
+    results.push(await notify({ ...input, userId: r.id, to: readPhone(r.phone) ?? undefined }));
   }
   if (results.length === 0) {
     // Nobody holds this role yet: keep the alert in the shared queue so it is never lost.
@@ -719,7 +720,7 @@ export interface AudienceEstimate {
 export async function estimateAudience(audience: BroadcastAudience): Promise<AudienceEstimate> {
   const db = await getDb();
   const rows = await db
-    .select({ id: schema.users.id, phone: schema.users.phone, role: schema.users.role, preferences: schema.users.preferences })
+    .select({ id: schema.users.id, role: schema.users.role, preferences: schema.users.preferences })
     .from(schema.users)
     .where(
       and(
@@ -762,7 +763,7 @@ export interface BroadcastInput extends BroadcastAudience {
 export async function sendBroadcast(input: BroadcastInput) {
   const db = await getDb();
   const recipients = await db
-    .select({ id: schema.users.id, phone: schema.users.phone, role: schema.users.role, language: schema.users.languagePreference, preferences: schema.users.preferences })
+    .select({ id: schema.users.id, role: schema.users.role, language: schema.users.languagePreference, preferences: schema.users.preferences })
     .from(schema.users)
     .where(
       and(

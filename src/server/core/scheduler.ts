@@ -21,9 +21,10 @@ import { audit, verifyAuditChain } from "./audit";
 import { emitEvent } from "./events";
 import { hasReminderConsent, notifyRole, notifyTemplate, sendDueNotifications } from "./notifications";
 import { checkAcuCaps } from "./metering";
-import { overdueDataRequests } from "./privacy";
+import { overdueDataRequests, sweepExpiredMedia } from "./privacy";
 import { dailyReviewSample } from "@server/ai/agents/learning";
 import { downgradedLanguages } from "@server/ai/language/gates";
+import { pruneIdentifierClaims } from "./identifiers";
 import { pruneAuthAttempts } from "./lockout";
 import { pruneRateLimitCounters } from "./rate-limit";
 import { safeLog } from "./redact";
@@ -273,6 +274,7 @@ export interface SchedulerReport {
   acuAlerts: number;
   overdueDataRequests: number;
   securityCountersPruned: number;
+  mediaDeleted: number;
   qualityReviewSampled: number;
   languagesDowngraded: number;
   errors: Array<{ step: string; message: string }>;
@@ -301,6 +303,25 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
   const expired = await step("expire_reports", errors, () => expireReports(now), 0);
   const acuAlerts = await step("acu_caps", errors, () => checkAcuCaps(now), []);
   const overdue = await step("data_requests", errors, () => overdueDataRequests(now), []);
+
+  /**
+   * SEC-06. A citizen's voice describing a sick child is kept only as long as
+   * it is useful. Deleting it here rather than through a bucket lifecycle rule
+   * means the rule holds wherever the platform runs, and the deletion is an
+   * audited event rather than something nobody can point to afterwards.
+   */
+  const retention = await step("media_retention", errors, () => sweepExpiredMedia(now), { deleted: 0, byKind: {}, failures: [] });
+  if (retention.failures.length > 0) {
+    await notifyRole("platform_admin", {
+      type: "alert",
+      channel: "in_app",
+      title: `${retention.failures.length} objet(s) non supprimé(s) à l'échéance de conservation`,
+      body: "Des fichiers arrivés à échéance n'ont pas pu être supprimés du stockage. La règle de conservation n'est pas tenue tant qu'ils restent.",
+      payload: { failures: retention.failures.slice(0, 20) },
+      requiresAck: true,
+      dedupeKey: `retention-failures:${now.toISOString().slice(0, 10)}`,
+    });
+  }
 
   /**
    * AI-16. Confidence is recorded on every turn, but a number nobody reads
@@ -346,7 +367,9 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
       const db = await getDb();
       const attempts = await pruneAuthAttempts(db, 86_400_000, now.getTime());
       const buckets = await pruneRateLimitCounters(db, 3_600_000, now.getTime());
-      return attempts + buckets;
+      // A spent confirmation code is not evidence of anything.
+      const claims = await pruneIdentifierClaims(now);
+      return attempts + buckets + claims;
     },
     0,
   );
@@ -393,6 +416,7 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
     acuAlerts: acuAlerts.length,
     overdueDataRequests: overdue.length,
     securityCountersPruned: pruned,
+    mediaDeleted: retention.deleted,
     qualityReviewSampled: review.items.length,
     languagesDowngraded: downgraded.length,
     errors,

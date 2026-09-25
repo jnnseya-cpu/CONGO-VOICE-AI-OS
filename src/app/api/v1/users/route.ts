@@ -7,6 +7,7 @@ import { audit } from "@server/core/audit";
 import { badRequest } from "@server/core/errors";
 import { schema } from "@server/db/client";
 import { publicUser } from "@server/core/users";
+import { maskStoredPhone, phoneColumns, phoneLookup } from "@server/core/phone";
 
 export const GET = handle({ permission: "user:manage" }, async ({ db, req, user, ip }) => {
   const { limit, offset } = paging(req);
@@ -21,7 +22,9 @@ export const GET = handle({ permission: "user:manage" }, async ({ db, req, user,
   // This response carries phone numbers. Reading the directory is itself an
   // event worth keeping: it is the cheapest way to exfiltrate citizen contacts.
   await audit({ action: "user.directory_read", actorUserId: user.userId, actorRole: user.role, after: { count: rows.length, role: role ?? "all" }, ip });
-  return { users: rows.map((u) => ({ ...publicUser(u), phone: u.phone, createdAt: u.createdAt, lastActivityAt: u.lastActivityAt })) };
+  // The directory shows the last four digits. A supervisor recognises a
+  // colleague's number from them; a leaked screenshot does not hand over a list.
+  return { users: rows.map((u) => ({ ...publicUser(u), phone: maskStoredPhone(u.phone), createdAt: u.createdAt, lastActivityAt: u.lastActivityAt })) };
 });
 
 const Create = z.object({
@@ -38,11 +41,11 @@ const Create = z.object({
 export const POST = handle({ permission: "user:manage" }, async ({ db, user, json, ip }) => {
   const body = await json(Create);
   if (isWeakPin(body.pin)) throw badRequest("Ce code PIN est trop courant. Choisissez-en un autre.");
-  const [exists] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.phone, body.phone));
+  const [exists] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.phoneIndex, phoneLookup(body.phone)));
   if (exists) throw badRequest("Ce numéro est déjà enregistré");
   const [created] = await db
     .insert(schema.users)
-    .values({ phone: body.phone, pinHash: hashPin(body.pin), name: body.name, role: body.role, languagePreference: body.language, province: body.province, territory: body.territory, organisation: body.organisation, consentStatus: "granted" })
+    .values({ ...phoneColumns(body.phone), pinHash: hashPin(body.pin), name: body.name, role: body.role, languagePreference: body.language, province: body.province, territory: body.territory, organisation: body.organisation, consentStatus: "granted" })
     .returning();
   await audit({ action: "user.created", actorUserId: user.userId, actorRole: user.role, entityType: "user", entityId: created.id, after: { role: created.role, province: created.province }, ip });
   return { user: publicUser(created) };

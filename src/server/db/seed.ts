@@ -9,6 +9,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { getDb, schema } from "./client";
 import { hashPin } from "@server/core/auth";
+import { phoneColumns, phoneLookup } from "@server/core/phone";
 import { runInteraction } from "@server/ai/agents/orchestrator";
 import { reviewSample } from "@server/ai/agents/learning";
 import { seedAgricultureReference } from "./reference/agriculture";
@@ -171,7 +172,7 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
 
   for (const a of DEMO_ACCOUNTS) {
     await db.insert(schema.users).values({
-      phone: a.phone,
+      ...phoneColumns(a.phone),
       pinHash: hashPin(pin),
       name: a.name,
       role: a.role,
@@ -231,7 +232,7 @@ export async function seed(options: { interactions?: number; log?: (m: string) =
   log(`${total} interactions générées.`);
 
   // A few native-speaker verifications so the learning loop has verified examples.
-  const chw = (await db.select().from(schema.users).where(eq(schema.users.phone, "+243900000003")))[0];
+  const chw = (await db.select().from(schema.users).where(eq(schema.users.phoneIndex, phoneLookup("+243900000003"))))[0];
   const pending = await db.select().from(schema.languageCorpus).where(eq(schema.languageCorpus.language, "ln")).limit(4);
   for (const p of pending) {
     await reviewSample(p.id, { userId: chw.id, role: "chw" }, { status: "verified", lexicon: p.sourceText.includes("mwana") ? [{ term: "mwana", meaningFr: "enfant", pronunciation: "MWA-na" }] : undefined });

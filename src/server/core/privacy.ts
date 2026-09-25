@@ -7,7 +7,7 @@
  */
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import { audit } from "./audit";
 import { emitEvent } from "./events";
@@ -218,4 +218,82 @@ export async function activeBreakGlass(userId: string, now = new Date()) {
   const db = await getDb();
   const rows = await db.select().from(schema.breakGlassAccess).where(and(eq(schema.breakGlassAccess.userId, userId)));
   return rows.filter((r) => !r.revokedAt && r.expiresAt.getTime() > now.getTime());
+}
+
+/* ==========================================================================================
+ * MEDIA RETENTION (SEC-06)
+ * ========================================================================================== */
+
+/**
+ * How long recordings and photographs are kept.
+ *
+ * The specification puts this on the storage bucket. Doing it in the
+ * application instead means the rule holds wherever the platform runs,
+ * including on the embedded database on one machine in a health zone, and it
+ * means the deletion is an audited event rather than a silent lifecycle
+ * transition nobody can point to afterwards.
+ *
+ * A citizen's voice describing a sick child is kept only as long as it is
+ * useful for the case and the evaluation set; the structured record outlives it.
+ */
+export const RETENTION_DAYS = {
+  /** Raw voice, the most sensitive thing the platform holds. */
+  audio: Number(process.env.RETENTION_AUDIO_DAYS ?? 90),
+  /** Crop and livestock photographs, which carry a location and a livelihood. */
+  image: Number(process.env.RETENTION_IMAGE_DAYS ?? 365),
+  video: Number(process.env.RETENTION_VIDEO_DAYS ?? 365),
+  /** Generated reports, already expiring by their own rule. */
+  document: Number(process.env.RETENTION_DOCUMENT_DAYS ?? 365),
+} as const;
+
+export interface RetentionSweep {
+  deleted: number;
+  byKind: Record<string, number>;
+  /** Objects whose row was removed but whose bytes could not be, for a human to chase. */
+  failures: Array<{ id: string; reason: string }>;
+}
+
+/**
+ * Deletes media past its retention period, bytes first and then the row.
+ *
+ * Order matters: a row without an object is a broken link, an object without a
+ * row is a file nobody knows to delete. Files held by an active legal hold or
+ * an open safeguarding case are left alone.
+ */
+export async function sweepExpiredMedia(now = new Date()): Promise<RetentionSweep> {
+  const db = await getDb();
+  const sweep: RetentionSweep = { deleted: 0, byKind: {}, failures: [] };
+
+  for (const [kind, days] of Object.entries(RETENTION_DAYS) as Array<[keyof typeof RETENTION_DAYS, number]>) {
+    if (!Number.isFinite(days) || days <= 0) continue;
+    const cutoff = new Date(now.getTime() - days * 86_400_000);
+    const expired = await db
+      .select({ id: schema.files.id, storageKey: schema.files.storageKey })
+      .from(schema.files)
+      .where(and(eq(schema.files.kind, kind), lt(schema.files.createdAt, cutoff), isNull(schema.files.legalHoldUntil)))
+      .limit(500);
+
+    for (const file of expired) {
+      try {
+        await storage().delete(file.storageKey);
+      } catch (err) {
+        sweep.failures.push({ id: file.id, reason: err instanceof Error ? err.message : "delete_failed" });
+        continue;
+      }
+      await db.delete(schema.files).where(eq(schema.files.id, file.id));
+      sweep.deleted++;
+      sweep.byKind[kind] = (sweep.byKind[kind] ?? 0) + 1;
+    }
+  }
+
+  if (sweep.deleted > 0 || sweep.failures.length > 0) {
+    await audit({
+      action: "retention.media_swept",
+      actorRole: "system",
+      entityType: "file",
+      after: { deleted: sweep.deleted, byKind: sweep.byKind, failures: sweep.failures.length, policy: RETENTION_DAYS },
+      systemEvent: "retention",
+    });
+  }
+  return sweep;
 }

@@ -15,6 +15,7 @@ import { env } from "@server/core/env";
 import { emitEvent } from "@server/core/events";
 import { runInteraction } from "@server/ai/agents/orchestrator";
 import { detectEmergencyTerms } from "@server/ai/safety";
+import { phoneColumns, phoneLookup, readPhone } from "@server/core/phone";
 import { deliverScript } from "@server/ai/language/scripts";
 import { toSpokenText } from "@server/ai/language/voice";
 import { ChannelError } from "./errors";
@@ -131,7 +132,7 @@ export async function identifyCitizen(input: {
 
   if (!userId && phone) {
     // The number may already belong to a registered account (a worker calling the IVR).
-    const [byPhone] = await db.select().from(schema.users).where(eq(schema.users.phone, phone));
+    const [byPhone] = await db.select().from(schema.users).where(eq(schema.users.phoneIndex, phoneLookup(phone)));
     if (byPhone) userId = byPhone.id;
   }
 

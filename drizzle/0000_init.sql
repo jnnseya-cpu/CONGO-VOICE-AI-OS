@@ -330,6 +330,8 @@ CREATE TABLE "files" (
 	"mime_type" varchar(120) NOT NULL,
 	"size_bytes" integer NOT NULL,
 	"sha256" varchar(64),
+	"legal_hold_until" timestamp with time zone,
+	"legal_hold_reason" varchar(240),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -396,6 +398,20 @@ CREATE TABLE "idempotency_keys" (
 	"request_hash" varchar(64),
 	"response_status" integer,
 	"response_body" jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "identifier_claims" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"kind" varchar(24) NOT NULL,
+	"value_hash" varchar(128) NOT NULL,
+	"value_last4" varchar(4),
+	"code_hash" text NOT NULL,
+	"delivered_by" varchar(16) DEFAULT 'voice' NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"consumed_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -879,7 +895,10 @@ CREATE TABLE "territories" (
 --> statement-breakpoint
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"phone" varchar(32),
+	"phone" text,
+	"phone_index" varchar(64),
+	"oidc_subject" varchar(255),
+	"oidc_issuer" varchar(255),
 	"name" varchar(160),
 	"is_anonymous" boolean DEFAULT false NOT NULL,
 	"role" "user_role" DEFAULT 'citizen' NOT NULL,
@@ -905,7 +924,8 @@ CREATE TABLE "users" (
 	"session_epoch" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "users_phone_unique" UNIQUE("phone"),
+	CONSTRAINT "users_phone_index_unique" UNIQUE("phone_index"),
+	CONSTRAINT "users_oidc_subject_unique" UNIQUE("oidc_subject"),
 	CONSTRAINT "users_pseudo_id_unique" UNIQUE("pseudo_id")
 );
 --> statement-breakpoint
@@ -923,6 +943,7 @@ ALTER TABLE "feedback" ADD CONSTRAINT "feedback_user_id_users_id_fk" FOREIGN KEY
 ALTER TABLE "files" ADD CONSTRAINT "files_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "follow_ups" ADD CONSTRAINT "follow_ups_case_id_cases_id_fk" FOREIGN KEY ("case_id") REFERENCES "public"."cases"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "health_triage_records" ADD CONSTRAINT "health_triage_records_interaction_id_interactions_id_fk" FOREIGN KEY ("interaction_id") REFERENCES "public"."interactions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "identifier_claims" ADD CONSTRAINT "identifier_claims_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "interactions" ADD CONSTRAINT "interactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "kb_chunks" ADD CONSTRAINT "kb_chunks_document_id_kb_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."kb_documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_profiles" ADD CONSTRAINT "learner_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -947,8 +968,11 @@ CREATE INDEX "citizen_identifiers_kind_hash_idx" ON "citizen_identifiers" USING 
 CREATE INDEX "consents_user_purpose_idx" ON "consents" USING btree ("user_id","purpose");--> statement-breakpoint
 CREATE INDEX "event_store_type_idx" ON "event_store" USING btree ("event_type","occurred_at");--> statement-breakpoint
 CREATE INDEX "event_store_aggregate_idx" ON "event_store" USING btree ("aggregate_type","aggregate_id");--> statement-breakpoint
+CREATE INDEX "files_kind_created_idx" ON "files" USING btree ("kind","created_at");--> statement-breakpoint
 CREATE INDEX "glossaries_module_term_idx" ON "glossaries" USING btree ("module","term_fr");--> statement-breakpoint
 CREATE INDEX "glossaries_status_idx" ON "glossaries" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "identifier_claims_user_idx" ON "identifier_claims" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "identifier_claims_expiry_idx" ON "identifier_claims" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "interactions_session_idx" ON "interactions" USING btree ("session_id");--> statement-breakpoint
 CREATE INDEX "interactions_user_idx" ON "interactions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "interactions_module_idx" ON "interactions" USING btree ("module");--> statement-breakpoint

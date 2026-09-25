@@ -4,6 +4,7 @@ import { audit } from "@server/core/audit";
 import { notFound } from "@server/core/errors";
 import { schema } from "@server/db/client";
 import { beginEnrolment, mfaRequiredFor, stepUpStatus } from "@server/core/mfa";
+import { readPhone } from "@server/core/phone";
 
 /** Current MFA state for the signed-in user. */
 export const GET = handle({ auth: true }, async ({ db, user }) => {
@@ -19,7 +20,8 @@ export const GET = handle({ auth: true }, async ({ db, user }) => {
 export const POST = handle({ auth: true }, async ({ db, user, ip }) => {
   const [u] = await db.select({ phone: schema.users.phone, name: schema.users.name }).from(schema.users).where(eq(schema.users.id, user.userId));
   if (!u) throw notFound();
-  const account = u.phone ?? u.name ?? user.userId;
+  // The label shown inside the authenticator app. Decrypted here and nowhere else.
+  const account = readPhone(u.phone) ?? u.name ?? user.userId;
   const { secret, otpauthUri } = await beginEnrolment(user.userId, account);
   await audit({ action: "auth.mfa_enrolment_started", actorUserId: user.userId, actorRole: user.role, entityType: "user", entityId: user.userId, ip });
   return { secret, otpauthUri, digits: 6, periodSeconds: 30, algorithm: "SHA1" };

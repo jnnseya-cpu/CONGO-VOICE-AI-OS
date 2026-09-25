@@ -1,5 +1,5 @@
 {
-  "id": "8844c183-7139-4443-bebd-54ddb29580dc",
+  "id": "0fde718a-7038-4bbf-9b73-8491230bef33",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2380,6 +2380,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "legal_hold_until": {
+          "name": "legal_hold_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "legal_hold_reason": {
+          "name": "legal_hold_reason",
+          "type": "varchar(240)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2388,7 +2400,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "files_kind_created_idx": {
+          "name": "files_kind_created_idx",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "files_user_id_users_id_fk": {
           "name": "files_user_id_users_id_fk",
@@ -2870,6 +2904,134 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.identifier_claims": {
+      "name": "identifier_claims",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_hash": {
+          "name": "value_hash",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_last4": {
+          "name": "value_last4",
+          "type": "varchar(4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code_hash": {
+          "name": "code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivered_by": {
+          "name": "delivered_by",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'voice'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "identifier_claims_user_idx": {
+          "name": "identifier_claims_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "identifier_claims_expiry_idx": {
+          "name": "identifier_claims_expiry_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "identifier_claims_user_id_users_id_fk": {
+          "name": "identifier_claims_user_id_users_id_fk",
+          "tableFrom": "identifier_claims",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -6455,7 +6617,25 @@
         },
         "phone": {
           "name": "phone",
-          "type": "varchar(32)",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_index": {
+          "name": "phone_index",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oidc_subject": {
+          "name": "oidc_subject",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oidc_issuer": {
+          "name": "oidc_issuer",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -6674,11 +6854,18 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_phone_unique": {
-          "name": "users_phone_unique",
+        "users_phone_index_unique": {
+          "name": "users_phone_index_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "phone"
+            "phone_index"
+          ]
+        },
+        "users_oidc_subject_unique": {
+          "name": "users_oidc_subject_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "oidc_subject"
           ]
         },
         "users_pseudo_id_unique": {

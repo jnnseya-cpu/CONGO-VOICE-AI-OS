@@ -7,6 +7,7 @@ import { ApiError, unauthorized } from "@server/core/errors";
 import { checkLockout, clearFailures, recordFailure } from "@server/core/lockout";
 import { audit } from "@server/core/audit";
 import { schema } from "@server/db/client";
+import { phoneLookup } from "@server/core/phone";
 import { publicUser } from "@server/core/users";
 
 const Body = z.union([
@@ -38,7 +39,7 @@ export const POST = handle({ limit: "auth" }, async ({ db, json, ip }) => {
     const byAccount = await checkLockout(db, "phone", body.phone);
     if (byAccount.locked) throw locked(byAccount.retryAfterSeconds);
 
-    const [found] = await db.select().from(schema.users).where(eq(schema.users.phone, body.phone));
+    const [found] = await db.select().from(schema.users).where(eq(schema.users.phoneIndex, phoneLookup(body.phone)));
     if (!found || found.status !== "active" || !verifyPin(body.pin, found.pinHash)) {
       const account = await recordFailure(db, "phone", body.phone);
       const address = await recordFailure(db, "ip", ip ?? "");

@@ -91,7 +91,21 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    phone: varchar("phone", { length: 32 }).unique(),
+    /**
+     * Encrypted at rest (core/phone.ts). Ciphertext is randomised per value, so
+     * uniqueness and lookup both live on `phoneIndex` rather than here.
+     */
+    phone: text("phone"),
+    /** Keyed digest of the number: lets the platform find an account without storing the number in the clear. */
+    phoneIndex: varchar("phone_index", { length: 64 }).unique(),
+    /**
+     * Subject claim from the institution's identity provider (IAM-002, SEC-02).
+     * Set once, by an administrator, on a staff account that already exists: a
+     * valid token from the ministry's directory proves who someone is, not what
+     * they are allowed to do here.
+     */
+    oidcSubject: varchar("oidc_subject", { length: 255 }).unique(),
+    oidcIssuer: varchar("oidc_issuer", { length: 255 }),
     name: varchar("name", { length: 160 }),
     isAnonymous: boolean("is_anonymous").default(false).notNull(),
     role: roleEnum("role").default("citizen").notNull(),
@@ -153,6 +167,38 @@ export const organisations = pgTable("organisations", {
   routingSkills: jsonb("routing_skills").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/**
+ * A one-time code sent to the number being added, and nothing else (SEC-04, FR-CH-40).
+ *
+ * Phones are shared and reassigned. Linking a second identifier to an account
+ * on the word of whoever is holding the handset would let the next owner of a
+ * recycled number inherit a household's health history. The code is sent to the
+ * identifier being claimed, so possession of that identifier is what proves the
+ * claim, and it is stored hashed because a leaked table of live codes is a
+ * table of live keys.
+ */
+export const identifierClaims = pgTable(
+  "identifier_claims",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    kind: varchar("kind", { length: 24 }).notNull(),
+    valueHash: varchar("value_hash", { length: 128 }).notNull(),
+    valueLast4: varchar("value_last4", { length: 4 }),
+    /** scrypt of the six-digit code. The code itself is never stored. */
+    codeHash: text("code_hash").notNull(),
+    /** How the code was delivered: a spoken call, or a text message. */
+    deliveredBy: varchar("delivered_by", { length: 16 }).default("voice").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("identifier_claims_user_idx").on(t.userId), index("identifier_claims_expiry_idx").on(t.expiresAt)],
+);
+
+export type IdentifierClaim = typeof identifierClaims.$inferSelect;
 
 export const citizenIdentifiers = pgTable(
   "citizen_identifiers",
@@ -219,8 +265,15 @@ export const files = pgTable("files", {
   mimeType: varchar("mime_type", { length: 120 }).notNull(),
   sizeBytes: integer("size_bytes").notNull(),
   sha256: varchar("sha256", { length: 64 }),
+  /**
+   * Set while an investigation, a complaint or a safeguarding case needs the
+   * original. Retention deletion skips these, and the hold has a visible expiry
+   * so it cannot quietly become permanent.
+   */
+  legalHoldUntil: timestamp("legal_hold_until", { withTimezone: true }),
+  legalHoldReason: varchar("legal_hold_reason", { length: 240 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [index("files_kind_created_idx").on(t.kind, t.createdAt)]);
 
 export const interactions = pgTable(
   "interactions",
