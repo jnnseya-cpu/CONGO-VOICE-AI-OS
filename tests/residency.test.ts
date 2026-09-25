@@ -194,6 +194,17 @@ describe("the inventory cannot fall behind the code", () => {
     }
   });
 
+  it("keeps the Word inventory in step with the declarations", () => {
+    // The .docx is what a ministry or a legal reviewer is actually sent. It is
+    // built from the same JSON as the Markdown, and regenerating it must not
+    // change the data underneath.
+    const json = JSON.parse(fs.readFileSync(path.join(ROOT, "docs/DATA_RESIDENCY.json"), "utf8")) as {
+      destinations: Array<{ id: string }>;
+    };
+    expect(json.destinations.map((d) => d.id).sort()).toEqual(destinations().map((d) => d.id).sort());
+    expect(fs.existsSync(path.join(ROOT, "docs/CONGO_VOICE_AI_OS_Data_Residency.docx"))).toBe(true);
+  });
+
   it("keeps docs/DATA_RESIDENCY.md identical to what the declarations generate", () => {
     const before = fs.readFileSync(path.join(ROOT, "docs/DATA_RESIDENCY.md"), "utf8");
     execFileSync("node", ["scripts/build-residency-doc.mjs"], { cwd: ROOT, encoding: "utf8" });

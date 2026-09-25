@@ -131,4 +131,18 @@ lines.push("");
 
 const out = path.join(ROOT, "docs/DATA_RESIDENCY.md");
 fs.writeFileSync(out, lines.join("\n"));
+
+// The same rows as data, for anything that renders the inventory elsewhere —
+// scripts/residency-docx.mjs builds the Word version from this rather than
+// re-parsing a Markdown table.
+const json = path.join(ROOT, "docs/DATA_RESIDENCY.json");
+fs.writeFileSync(
+  json,
+  JSON.stringify(
+    { destinations: entries.map((e) => ({ ...e, jurisdiction: jurisdictionLabel(e.jurisdictions), kindLabel: KIND[e.kind] ?? e.kind })) },
+    null,
+    1,
+  ) + "\n",
+);
+
 console.log(`${entries.length} destinations written to ${path.relative(ROOT, out)}`);

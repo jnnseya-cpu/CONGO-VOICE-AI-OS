@@ -84,7 +84,9 @@ and the same application. Steps 4 to 10 below are identical.
 
 Decide this before §1, because it constrains the region, the providers and the
 carriers all at once. `docs/DATA_RESIDENCY.md` is the full inventory — every
-destination, what it receives, and what is lost by refusing it.
+destination, what it receives, and what is lost by refusing it. `npm run
+residency:docx` produces the same inventory as a Word document, which is the
+form a ministry or a legal reviewer will ask for.
 
 The programme's intent is that everything stays in the DRC. No cloud region
 exists in the country, so the pilot runs from the nearest available one and

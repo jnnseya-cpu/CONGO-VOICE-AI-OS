@@ -1,0 +1,114 @@
+{
+ "destinations": [
+  {
+   "id": "self",
+   "kind": "self",
+   "sends": "Everything: transcripts, translations, case notes, recordings, photographs, phone numbers (encrypted), safeguarding records.",
+   "operator": "The programme, on the host it deploys to",
+   "jurisdictions": "[deploymentJurisdiction()]",
+   "onSafetyPath": true,
+   "ifRefused": "Nothing runs. This is the deployment itself.",
+   "jurisdiction": "same as the deployment (`DEPLOYMENT_JURISDICTION`)",
+   "kindLabel": "The deployment itself"
+  },
+  {
+   "id": "mock",
+   "kind": "ai_provider",
+   "sends": "Nothing. The offline rules provider runs in the same process and makes no network call.",
+   "operator": "The programme",
+   "jurisdictions": "[deploymentJurisdiction()]",
+   "onSafetyPath": true,
+   "ifRefused": "The platform has no fallback and cannot answer at all.",
+   "jurisdiction": "same as the deployment (`DEPLOYMENT_JURISDICTION`)",
+   "kindLabel": "AI provider"
+  },
+  {
+   "id": "anthropic",
+   "kind": "ai_provider",
+   "sends": "The French pivot of what the citizen said, and the protocol context, for understanding and explanation.",
+   "operator": "Anthropic PBC",
+   "jurisdictions": "[\"US\"]",
+   "onSafetyPath": false,
+   "ifRefused": "Understanding of free speech degrades to the offline rules provider. Danger-sign detection and severity are unaffected — they never used a model.",
+   "jurisdiction": "US",
+   "kindLabel": "AI provider"
+  },
+  {
+   "id": "gemini",
+   "kind": "ai_provider",
+   "sends": "The citizen's words for understanding, and voice recordings for transcription.",
+   "operator": "Google LLC",
+   "jurisdictions": "[\"US\"]",
+   "onSafetyPath": false,
+   "ifRefused": "One fewer understanding and transcription provider in the chain.",
+   "jurisdiction": "US",
+   "kindLabel": "AI provider"
+  },
+  {
+   "id": "openai",
+   "kind": "ai_provider",
+   "sends": "Voice recordings for transcription, the citizen's words for understanding, and text for speech synthesis.",
+   "operator": "OpenAI, L.L.C. — or a self-hosted endpoint when OPENAI_BASE_URL is set",
+   "jurisdictions": "selfHostedSpeechJurisdictions()",
+   "onSafetyPath": false,
+   "ifRefused": "No transcription: a voice call falls back to the fixed scripts and the keypad menu, and free speech is not understood.",
+   "jurisdiction": "US, or the declared location of a self-hosted endpoint (`AI_SELF_HOSTED_JURISDICTION`)",
+   "kindLabel": "AI provider"
+  },
+  {
+   "id": "google_tts",
+   "kind": "ai_provider",
+   "sends": "The French or localised answer text, to be spoken.",
+   "operator": "Google LLC",
+   "jurisdictions": "[\"US\"]",
+   "onSafetyPath": false,
+   "ifRefused": "Answers are spoken by the next configured synthesiser, or read from a recording where one exists.",
+   "jurisdiction": "US",
+   "kindLabel": "AI provider"
+  },
+  {
+   "id": "twilio",
+   "kind": "channel",
+   "sends": "The citizen's telephone number, call audio, SMS text, and WhatsApp messages where Twilio carries them.",
+   "operator": "Twilio Inc.",
+   "jurisdictions": "[\"US\"]",
+   "onSafetyPath": true,
+   "ifRefused": "No voice, and no SMS or WhatsApp through this carrier. An escalation cannot reach a worker by telephone.",
+   "jurisdiction": "US",
+   "kindLabel": "Communication channel"
+  },
+  {
+   "id": "meta",
+   "kind": "channel",
+   "sends": "The citizen's telephone number, their messages, voice notes and photographs.",
+   "operator": "Meta Platforms, Inc.",
+   "jurisdictions": "[\"US\"]",
+   "onSafetyPath": true,
+   "ifRefused": "No WhatsApp channel.",
+   "jurisdiction": "US",
+   "kindLabel": "Communication channel"
+  },
+  {
+   "id": "africastalking",
+   "kind": "channel",
+   "sends": "The citizen's telephone number and the text of reminders, answers and escalation notices.",
+   "operator": "Africa's Talking — declared base of operations, to be confirmed in procurement",
+   "jurisdictions": "[process.env.AFRICASTALKING_JURISDICTION?.trim().toUpperCase() || \"KE\"]",
+   "onSafetyPath": true,
+   "ifRefused": "No SMS. Reminders and escalation notices cannot be delivered by message.",
+   "jurisdiction": "KE (override with `AFRICASTALKING_JURISDICTION`)",
+   "kindLabel": "Communication channel"
+  },
+  {
+   "id": "log",
+   "kind": "channel",
+   "sends": "Nothing. A message is written to this deployment's own log instead of being delivered.",
+   "operator": "The programme",
+   "jurisdictions": "[deploymentJurisdiction()]",
+   "onSafetyPath": false,
+   "ifRefused": "Nothing; a deployment that serves citizens already reports log-only delivery as a failure.",
+   "jurisdiction": "same as the deployment (`DEPLOYMENT_JURISDICTION`)",
+   "kindLabel": "Communication channel"
+  }
+ ]
+}

@@ -23,7 +23,8 @@
     "crawl": "node scripts/crawl.mjs",
     "requirements:docx": "node scripts/requirements-docx.mjs",
     "preflight": "node scripts/preflight.mjs",
-    "residency:doc": "node scripts/build-residency-doc.mjs"
+    "residency:doc": "node scripts/build-residency-doc.mjs",
+    "residency:docx": "node scripts/residency-docx.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
