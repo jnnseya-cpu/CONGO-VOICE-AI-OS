@@ -1,5 +1,9 @@
 # Deployment
 
+> For the ordered go-live procedure — image, infrastructure, domain, review
+> board, preflight, channels — follow `docs/GO_LIVE.md`. This document is the
+> reference for each setting it mentions.
+
 CONGO VOICE AI OS is a single Next.js 16 application (frontend + API) with an embedded or external PostgreSQL database. It runs on any Node.js 22 host; the reference target is Google Cloud (Cloud Run or GKE + Cloud SQL + Cloud Storage), which matches the programme's portfolio conventions.
 
 ## 0. What this platform is not built on

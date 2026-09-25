@@ -69,3 +69,36 @@ variable "secret_names" {
   ]
   description = "Secret containers to create. Values are added by a person, never by Terraform."
 }
+
+# ── The web domain ───────────────────────────────────────────────────────────
+
+variable "domain" {
+  type        = string
+  default     = ""
+  description = <<-EOT
+    The domain citizens type, without a scheme: congovoice.cd.
+
+    Leave it empty and the service answers only on its generated run.app URL,
+    which is fine for staging and wrong for anything else: canonical links, the
+    sitemap, social images and — the one that breaks silently — the telephony
+    provider's webhook signatures are all computed against the public origin.
+  EOT
+}
+
+variable "manage_dns" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Whether Terraform owns the DNS zone for `domain`.
+
+    False when the zone lives with a registrar or a ministry's own DNS, which is
+    the common case for a .cd domain: Terraform then creates the domain mapping
+    and prints the records to add by hand.
+  EOT
+}
+
+variable "dns_zone_name" {
+  type        = string
+  default     = ""
+  description = "Existing Cloud DNS managed-zone name, when manage_dns is true."
+}

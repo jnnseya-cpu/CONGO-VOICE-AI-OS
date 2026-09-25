@@ -2,6 +2,17 @@ import type { MetadataRoute } from "next";
 import { PUBLIC_PAGES, SITE } from "@shared/site";
 import { allPosts, categories, tags } from "@server/blog/index";
 
+/**
+ * Rendered per request rather than at build time.
+ *
+ * These two files are the only place the platform writes its own origin into a
+ * document nobody re-reads. Generated statically, they take whatever
+ * NEXT_PUBLIC_SITE_URL happened to be set to on the build machine — which is
+ * how a service ends up serving a sitemap that points at a domain it is not on,
+ * and nobody notices until the pages stop being indexed.
+ */
+export const dynamic = "force-dynamic";
+
 /** Public programme pages, the citizen service entry points and every blog page. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

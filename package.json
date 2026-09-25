@@ -21,7 +21,8 @@
     "perf": "node scripts/perf-3g.mjs",
     "a11y": "node scripts/a11y.mjs",
     "crawl": "node scripts/crawl.mjs",
-    "requirements:docx": "node scripts/requirements-docx.mjs"
+    "requirements:docx": "node scripts/requirements-docx.mjs",
+    "preflight": "node scripts/preflight.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

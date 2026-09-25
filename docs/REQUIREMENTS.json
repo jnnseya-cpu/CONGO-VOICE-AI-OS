@@ -897,8 +897,8 @@
    "section": "Agentic architecture and AI governance (§7, §17)",
    "requirement": "Clinical Review Board (CRB): ≥ 2 Congolese physicians + 1 community health expert approve every health protocol version, emergency script, KB document and the health system prompt; nothing health-related ships without CRB sign-off recorded in protocol_versions.approved_by.",
    "status": "Programme",
-   "evidence": "src/server/ai/protocols/registry.ts",
-   "note": "The approval mechanism is built and every version records its approver. Constituting the clinical review board is a governance act; until then every protocol carries \"En attente du Comité de Revue Clinique\"."
+   "evidence": "src/server/ai/review/board.ts · src/app/(app)/admin/comite · tests/review-board.test.ts",
+   "note": "Seats, quorum by composition, sign-offs bound to a content digest, no self-approval, expiry on the review cadence, and one member able to suspend alone. Without a current sign-off the platform escalates and refers but does not assess. Seating the three members of the Comité de Revue Clinique is a governance act, not code."
   },
   {
    "id": "AI-11",
@@ -906,8 +906,8 @@
    "section": "Agentic architecture and AI governance (§7, §17)",
    "requirement": "Agronomy and Pedagogy panels: analogous review for agri KB and education content.",
    "status": "Programme",
-   "evidence": "src/server/ai/knowledge",
-   "note": "The approval mechanism exists for every knowledge document. Constituting agronomy and pedagogy panels is governance work."
+   "evidence": "src/server/ai/review/board.ts (BOARDS) · src/app/(app)/admin/comite",
+   "note": "The agronomy and pedagogy panels run on the same machinery as the clinical board, with their own seats and quorum. Appointing their members is governance work."
   },
   {
    "id": "AI-12",
@@ -1743,8 +1743,8 @@
    "section": "Delivery engineering (§20)",
    "requirement": "Environments: dev (ephemeral per PR preview for PWA), staging (full stack, synthetic data, sandbox telephony/WhatsApp), prod. IaC via Terraform; GitOps via Argo CD.",
    "status": "Built",
-   "evidence": "infra/main.tf · infra/environments · Dockerfile",
-   "note": "Environments are declared as Terraform in this repository, with a container image that runs the same way in each."
+   "evidence": "infra/main.tf · infra/environments · docs/GO_LIVE.md",
+   "note": "Environments, the database, the bucket, the secrets, the scheduler and the custom domain mapping are declared as Terraform, with an ordered runbook and a preflight check against the deployed origin."
   },
   {
    "id": "DO-03",

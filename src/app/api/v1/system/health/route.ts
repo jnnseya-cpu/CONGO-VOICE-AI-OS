@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@server/db/client";
 import { readiness } from "@server/core/status";
+import { clinicalReadiness } from "@server/ai/review/gate";
 import { sql } from "drizzle-orm";
 
 /** Liveness/readiness probe. */
@@ -11,11 +12,12 @@ export async function GET() {
     // Reachable is not the same as able to do the job: an escalation that
     // reaches nobody looks identical to a healthy service from outside.
     const ready = readiness();
-    if (!ready.ok) {
-      return NextResponse.json(
-        { status: "degraded", time: new Date().toISOString(), failing: ready.checks.filter((c) => !c.ok) },
-        { status: 503 },
-      );
+    // Whether anyone clinically accountable has signed the content is part of
+    // being able to do the job, not a separate concern (AI-10).
+    const checks = [...ready.checks, ...(await clinicalReadiness().catch(() => []))];
+    const failing = checks.filter((c) => !c.ok);
+    if (failing.length > 0) {
+      return NextResponse.json({ status: "degraded", time: new Date().toISOString(), failing }, { status: 503 });
     }
     return NextResponse.json({ status: "ok", time: new Date().toISOString() });
   } catch (err) {

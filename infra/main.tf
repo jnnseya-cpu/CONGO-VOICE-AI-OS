@@ -264,3 +264,59 @@ resource "google_cloud_scheduler_job" "workflow" {
     }
   }
 }
+
+# ── The web domain ───────────────────────────────────────────────────────────
+#
+# Cloud Run issues and renews a managed certificate once the domain is verified
+# and pointed at it, so there is no certificate resource here. What there is:
+# the mapping, and — when the zone is ours — the records that make it resolve.
+#
+# The domain has to exist before the platform is useful, and not only for the
+# look of it. `NEXT_PUBLIC_SITE_URL` is what canonical links, the sitemap, the
+# social images and the IVR callback URLs are built from, and the telephony
+# provider signs its webhooks over the full URL it called. A service reachable
+# on one origin and told it lives on another fails signature validation on every
+# inbound call, which looks like a telephony fault and is not one.
+
+resource "google_cloud_run_domain_mapping" "app" {
+  count    = var.domain == "" ? 0 : 1
+  name     = var.domain
+  location = var.region
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.app.name
+  }
+}
+
+# Apex records, when the zone is managed here. Cloud Run's apex mapping uses
+# four A and four AAAA addresses; they are stable and documented by the product.
+resource "google_dns_record_set" "apex_a" {
+  count        = var.manage_dns && var.domain != "" ? 1 : 0
+  name         = "${var.domain}."
+  type         = "A"
+  ttl          = 300
+  managed_zone = var.dns_zone_name
+  rrdatas      = ["216.239.32.21", "216.239.34.21", "216.239.36.21", "216.239.38.21"]
+}
+
+resource "google_dns_record_set" "apex_aaaa" {
+  count        = var.manage_dns && var.domain != "" ? 1 : 0
+  name         = "${var.domain}."
+  type         = "AAAA"
+  ttl          = 300
+  managed_zone = var.dns_zone_name
+  rrdatas      = ["2001:4860:4802:32::15", "2001:4860:4802:34::15", "2001:4860:4802:36::15", "2001:4860:4802:38::15"]
+}
+
+resource "google_dns_record_set" "www" {
+  count        = var.manage_dns && var.domain != "" ? 1 : 0
+  name         = "www.${var.domain}."
+  type         = "CNAME"
+  ttl          = 300
+  managed_zone = var.dns_zone_name
+  rrdatas      = ["ghs.googlehosted.com."]
+}

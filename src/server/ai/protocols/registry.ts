@@ -11,16 +11,45 @@ import { HEALTH_PROTOCOLS, getProtocol } from "./definitions";
 import { validateProtocol } from "./engine";
 import type { HealthProtocol } from "./types";
 
-const PENDING_APPROVER = "pending CRB";
+/**
+ * Registration records a protocol version; it does not approve it.
+ *
+ * This used to insert every version as `status: "approved"` with the string
+ * "pending CRB" in `approved_by`, which meant the platform's own record said a
+ * clinical decision tree had been signed off when nobody had looked at it. A
+ * newly registered version now sits in `review` with no approver, and only the
+ * Clinical Review Board's quorum moves it to `approved` (AI-10).
+ */
+const REGISTERED_STATUS = "review" as const;
 
 let registered: Promise<void> | undefined;
 
 /** Idempotent: records every protocol version that is not yet in the database. */
 export async function ensureProtocolsRegistered(): Promise<void> {
-  return (registered ??= registerAll().catch((err) => {
+  await (registered ??= registerAll().catch((err) => {
     registered = undefined;
     console.error("[protocols] registration failed", err);
   }));
+
+  // The promise above is remembered for the life of the process. If the
+  // database it wrote to is replaced underneath it — a restored snapshot, a
+  // failover to a fresh instance, a test reset — the catalogue is empty while
+  // this still believes the work is done, and every triage decision would then
+  // be replayed against a version nobody recorded. One indexed row is a cheap
+  // way never to be in that state.
+  try {
+    const db = await getDb();
+    const [any] = await db.select({ id: schema.protocolVersions.id }).from(schema.protocolVersions).limit(1);
+    if (!any) {
+      registered = undefined;
+      await (registered ??= registerAll().catch((err) => {
+        registered = undefined;
+        console.error("[protocols] registration failed", err);
+      }));
+    }
+  } catch (err) {
+    console.error("[protocols] registration check failed", err);
+  }
 }
 
 async function registerAll(): Promise<void> {
@@ -39,9 +68,9 @@ async function registerAll(): Promise<void> {
       module: "health",
       title: protocol.title,
       definition: protocol as unknown as Record<string, unknown>,
-      status: "approved",
-      approvedBy: PENDING_APPROVER,
-      approvedAt: new Date(),
+      status: REGISTERED_STATUS,
+      approvedBy: null,
+      approvedAt: null,
     });
   }
 }
@@ -80,13 +109,21 @@ export async function listProtocols(): Promise<ProtocolSummary[]> {
     .sort((a, b) => a.protocolId.localeCompare(b.protocolId));
 }
 
+/**
+ * Moves a version through its lifecycle. Note what it cannot do: it cannot
+ * record an approval on behalf of the board. `approvedBy` is written by the
+ * review board when a quorum is reached, and an administrator calling this with
+ * `status: "approved"` produces a version marked approved by nobody — which the
+ * clinical gate treats exactly like an unapproved one, because what the gate
+ * reads is the sign-off record, not this column.
+ */
 export async function setProtocolStatus(protocolId: string, version: string, status: LifecycleStatus, approvedBy?: string) {
   const db = await getDb();
   const [row] = await db
     .update(schema.protocolVersions)
     .set({
       status,
-      approvedBy: status === "approved" ? (approvedBy ?? PENDING_APPROVER) : undefined,
+      approvedBy: status === "approved" ? (approvedBy ?? null) : undefined,
       approvedAt: status === "approved" ? new Date() : undefined,
     })
     .where(and(eq(schema.protocolVersions.protocolId, protocolId), eq(schema.protocolVersions.version, version)))
@@ -94,7 +131,15 @@ export async function setProtocolStatus(protocolId: string, version: string, sta
   return row ?? null;
 }
 
-/** The live definition for a protocol id, refusing anything not approved in the database. */
+/**
+ * The live definition for a protocol id, refusing a draft or a retired version.
+ *
+ * This decides whether a protocol may be *run*; the review board decides what
+ * the platform may *say* about the result. The engine still computes a severity
+ * from an unsigned protocol, because the record of what the rules concluded is
+ * worth having — but `clinicalGate()` stops that conclusion reaching a citizen
+ * as anything less than an escalation.
+ */
 export async function loadApprovedProtocol(protocolId: string): Promise<HealthProtocol | null> {
   await ensureProtocolsRegistered();
   const definition = getProtocol(protocolId);

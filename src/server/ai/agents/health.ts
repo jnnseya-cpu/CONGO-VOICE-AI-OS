@@ -67,6 +67,7 @@ import {
 } from "../protocols";
 import { getProtocol } from "../protocols/definitions";
 import { ensureProtocolsRegistered, loadApprovedProtocol } from "../protocols/registry";
+import { UNSIGNED_GUIDANCE_FR, UNSIGNED_SUMMARY_FR, clinicalGate, type ClinicalGate } from "../review/gate";
 
 export interface HealthContext {
   province?: string | null;
@@ -117,6 +118,8 @@ export interface HealthTriageResult extends HealthAssessment {
   safeguardingCategories: SafeguardingCategory[];
   /** Neutral wording for ordinary notifications when the case is a safeguarding one. */
   safeguardingNotice: { title: string; body: string } | null;
+  /** Whether the clinical content behind this answer carries a board sign-off (AI-10). */
+  clinicalSignOff: ClinicalGate;
   /** Fixed emergency instructions in the citizen's language (severity 4 only). */
   emergencyScript: string | null;
   facility: HealthFacility | null;
@@ -448,6 +451,37 @@ export async function assessHealth(textFr: string, ctx: HealthContext, interacti
     understanding = SAFEGUARDING_NOTIFICATION_BODY;
     explanationSummary = SAFEGUARDING_NOTIFICATION_BODY;
   }
+  /*
+   * 10b. Clinical sign-off (AI-10).
+   *
+   * If the protocol or the prompts behind this answer are not covered by a
+   * current board approval, the platform is not entitled to tell anyone their
+   * situation is anything less than urgent. It escalates instead. A severity-4
+   * outcome is left alone: referring someone to a health centre immediately is
+   * the one judgement that cannot be made less safe by being unsigned.
+   */
+  const signOff = await clinicalGate(protocol.id);
+  const withheldAssessment = !signOff.mayReassure && severityLevel < 4;
+  if (withheldAssessment) {
+    guidanceFr = UNSIGNED_GUIDANCE_FR;
+    explanationSummary = UNSIGNED_SUMMARY_FR;
+    await emitEvent({
+      type: "ai.contract.violation",
+      aggregateType: "interaction",
+      aggregateId: interactionId,
+      module: "health",
+      classification: "internal",
+      actor: { type: "system" },
+      payload: {
+        rule: "AI-10",
+        reason: "clinical_content_not_signed_off",
+        protocolId: protocol.id,
+        protocolVersion: protocol.version,
+        severityLevel,
+        findings: signOff.findings,
+      },
+    });
+  }
   guidanceFr = withDisclaimer(guidanceFr, "fr");
 
   // 11. Confidence vector and human review.
@@ -462,7 +496,7 @@ export async function assessHealth(textFr: string, ctx: HealthContext, interacti
   };
   const lowestConfidence = Math.min(...Object.values(confidenceDimensions));
   const humanReviewRequired =
-    severityLevel >= 3 || safeguarding || uncited || safety.violations.length > 0 || (severityLevel >= 2 && lowestConfidence < 0.4);
+    severityLevel >= 3 || safeguarding || uncited || withheldAssessment || safety.violations.length > 0 || (severityLevel >= 2 && lowestConfidence < 0.4);
 
   const followUpAt = new Date(Date.now() + run.followUpHours * 3600 * 1000);
   const contract: HealthTriageContract = {
@@ -513,6 +547,7 @@ export async function assessHealth(textFr: string, ctx: HealthContext, interacti
     followUpQuestions: clarifications,
     confidence: round2(lowestConfidence),
     // Protocol engine surface.
+    clinicalSignOff: signOff,
     safetyViolations: safety.violations,
     protocolId: protocol.id,
     protocolVersion: protocol.version,

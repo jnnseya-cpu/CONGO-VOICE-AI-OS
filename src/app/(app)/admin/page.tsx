@@ -40,6 +40,9 @@ export default async function AdminPage() {
         subtitle="État technique, consommation, qualité et configuration de la plateforme."
         actions={
           <>
+            <Link href="/admin/comite" className="btn btn-ghost">
+              Comités de revue
+            </Link>
             <Link href="/admin/utilisateurs" className="btn btn-ghost">
               Utilisateurs
             </Link>

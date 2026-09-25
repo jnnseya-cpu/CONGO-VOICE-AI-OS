@@ -82,6 +82,42 @@ export const notificationStatusEnum = pgEnum("notification_status", [
 
 export const fileKindEnum = pgEnum("file_kind", ["audio", "image", "video", "document"]);
 
+/* ── Review boards (AI-10, AI-11, PRD §15.4) ─────────────────────────────── */
+
+/**
+ * A seat is what a member counts as when a quorum is computed. It is not a job
+ * title: the same person may be a doctor and still not hold the physician seat
+ * on this board, because the board's composition is an appointment, not a
+ * credential lookup.
+ */
+export const boardSeatEnum = pgEnum("board_seat", [
+  "physician",
+  "community_health_expert",
+  "agronomist",
+  "pedagogue",
+  "safeguarding_lead",
+]);
+
+/** The four kinds of artefact AI-10 says may not ship without sign-off. */
+export const reviewArtefactEnum = pgEnum("review_artefact_kind", [
+  "protocol_version",
+  "emergency_script",
+  "kb_document",
+  "system_prompt",
+]);
+
+export const reviewDecisionEnum = pgEnum("review_decision", ["approve", "reject", "request_changes"]);
+
+export const reviewSubmissionStatusEnum = pgEnum("review_submission_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "changes_requested",
+  "withdrawn",
+  "superseded",
+  "suspended",
+]);
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -892,6 +928,103 @@ export const featureFlags = pgTable(
 );
 
 export type FeatureFlag = typeof featureFlags.$inferSelect;
+
+/* ==========================================================================================
+ * REVIEW BOARDS (AI-10, AI-11, PRD §15.4)
+ *
+ * "Nothing health-related ships without CRB sign-off." That sentence is only
+ * true if the sign-off is a record rather than a string somebody typed, and if
+ * the thing that was signed can be shown to be the thing that shipped. So a
+ * sign-off names a person, a seat, a decision and the digest of the exact
+ * content in front of them; a change to the content invalidates it.
+ * ========================================================================================== */
+
+export const reviewBoards = pgTable("review_boards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Stable key used in code and URLs: crb, agronomy, pedagogy. */
+  key: varchar("key", { length: 32 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
+  module: moduleEnum("module").default("health").notNull(),
+  /** Seats that must approve, and how many of each: { physician: 2, community_health_expert: 1 }. */
+  requiredSeats: jsonb("required_seats").$type<Record<string, number>>().notNull(),
+  /** How long an approval stands before the artefact must be looked at again. */
+  reviewCadenceDays: integer("review_cadence_days").default(365).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const reviewBoardMembers = pgTable(
+  "review_board_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boardId: uuid("board_id").references(() => reviewBoards.id, { onDelete: "cascade" }).notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    seat: boardSeatEnum("seat").notNull(),
+    /** Registration or licence number, so "a physician" is a checkable claim. */
+    credential: varchar("credential", { length: 120 }),
+    appointedBy: uuid("appointed_by"),
+    appointedAt: timestamp("appointed_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedReason: text("revoked_reason"),
+  },
+  (t) => [index("review_board_members_idx").on(t.boardId, t.userId)],
+);
+
+export const reviewSubmissions = pgTable(
+  "review_submissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    boardId: uuid("board_id").references(() => reviewBoards.id, { onDelete: "cascade" }).notNull(),
+    artefactKind: reviewArtefactEnum("artefact_kind").notNull(),
+    /** Protocol id, script key, KB document id or prompt name. */
+    artefactId: varchar("artefact_id", { length: 160 }).notNull(),
+    artefactVersion: varchar("artefact_version", { length: 48 }).notNull(),
+    /** SHA-256 of the exact content under review. */
+    contentDigest: varchar("content_digest", { length: 64 }).notNull(),
+    title: varchar("title", { length: 240 }).notNull(),
+    changeNote: text("change_note"),
+    submittedBy: uuid("submitted_by"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
+    status: reviewSubmissionStatusEnum("status").default("pending").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    /** When the approval lapses and the artefact must be reviewed again. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    suspendedBy: uuid("suspended_by"),
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    suspendReason: text("suspend_reason"),
+  },
+  (t) => [
+    index("review_submissions_artefact_idx").on(t.artefactKind, t.artefactId, t.artefactVersion),
+    index("review_submissions_board_idx").on(t.boardId, t.status),
+  ],
+);
+
+/** Insert-only: a sign-off is never edited, only superseded by a later submission. */
+export const reviewSignoffs = pgTable(
+  "review_signoffs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    submissionId: uuid("submission_id").references(() => reviewSubmissions.id, { onDelete: "cascade" }).notNull(),
+    boardId: uuid("board_id").references(() => reviewBoards.id, { onDelete: "cascade" }).notNull(),
+    memberUserId: uuid("member_user_id").references(() => users.id).notNull(),
+    seat: boardSeatEnum("seat").notNull(),
+    decision: reviewDecisionEnum("decision").notNull(),
+    comment: text("comment"),
+    /** What the signatory actually had in front of them. */
+    contentDigest: varchar("content_digest", { length: 64 }).notNull(),
+    signedAt: timestamp("signed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("review_signoffs_submission_idx").on(t.submissionId)],
+);
+
+export type ReviewBoard = typeof reviewBoards.$inferSelect;
+export type ReviewBoardMember = typeof reviewBoardMembers.$inferSelect;
+export type ReviewSubmission = typeof reviewSubmissions.$inferSelect;
+export type ReviewSignoff = typeof reviewSignoffs.$inferSelect;
+export type BoardSeat = (typeof boardSeatEnum.enumValues)[number];
+export type ReviewArtefactKind = (typeof reviewArtefactEnum.enumValues)[number];
+export type ReviewDecision = (typeof reviewDecisionEnum.enumValues)[number];
+export type ReviewSubmissionStatus = (typeof reviewSubmissionStatusEnum.enumValues)[number];
 
 export const promptVersions = pgTable(
   "prompt_versions",

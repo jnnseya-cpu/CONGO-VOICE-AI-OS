@@ -22,7 +22,12 @@ export type Permission =
   | "feedback:create"
   | "autosave:write"
   | "language:review"
-  | "language:export";
+  | "language:export"
+  /* Review boards (AI-10, AI-11). Holding the permission is not enough to sign:
+     the board's own membership decides that, and it is checked separately. */
+  | "review:read"
+  | "review:submit"
+  | "review:sign";
 
 const CITIZEN: Permission[] = [
   "interaction:create",
@@ -32,14 +37,14 @@ const CITIZEN: Permission[] = [
   "autosave:write",
 ];
 
-const FIELD_OFFICER: Permission[] = [...CITIZEN, "case:read", "case:write", "case:escalate", "case:assign", "language:review"];
+const FIELD_OFFICER: Permission[] = [...CITIZEN, "case:read", "case:write", "case:escalate", "case:assign", "language:review", "review:read", "review:sign"];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   citizen: CITIZEN,
   chw: [...FIELD_OFFICER, "dashboard:health"],
   agri_officer: [...FIELD_OFFICER, "dashboard:agri"],
   teacher: [...FIELD_OFFICER, "dashboard:edu"],
-  ngo: [...CITIZEN, "case:read", "dashboard:gov", "dashboard:health", "dashboard:agri", "dashboard:edu", "report:export", "language:review", "language:export"],
+  ngo: [...CITIZEN, "case:read", "dashboard:gov", "dashboard:health", "dashboard:agri", "dashboard:edu", "report:export", "language:review", "language:export", "review:read", "review:sign"],
   gov_admin: [
     ...FIELD_OFFICER,
     "interaction:read_all",
@@ -51,6 +56,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "audit:read",
     "notification:broadcast",
     "language:export",
+    "review:submit",
   ],
   platform_admin: [
     ...FIELD_OFFICER,
@@ -66,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "user:manage",
     "notification:broadcast",
     "language:export",
+    "review:submit",
   ],
 };
 

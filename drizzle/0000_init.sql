@@ -1,3 +1,4 @@
+CREATE TYPE "public"."board_seat" AS ENUM('physician', 'community_health_expert', 'agronomist', 'pedagogue', 'safeguarding_lead');--> statement-breakpoint
 CREATE TYPE "public"."case_status" AS ENUM('open', 'open_emergency', 'assigned', 'acknowledged', 'in_progress', 'needs_follow_up', 'reassigned', 'escalated', 'escalated_up', 'resolved', 'closed', 'cancelled', 'duplicate');--> statement-breakpoint
 CREATE TYPE "public"."channel_type" AS ENUM('pwa', 'ivr', 'whatsapp', 'ussd', 'sms', 'assisted', 'android');--> statement-breakpoint
 CREATE TYPE "public"."file_kind" AS ENUM('audio', 'image', 'video', 'document');--> statement-breakpoint
@@ -7,6 +8,9 @@ CREATE TYPE "public"."lifecycle_status" AS ENUM('draft', 'review', 'approved', '
 CREATE TYPE "public"."module_type" AS ENUM('health', 'agriculture', 'education', 'general');--> statement-breakpoint
 CREATE TYPE "public"."notification_channel" AS ENUM('in_app', 'sms', 'whatsapp', 'email');--> statement-breakpoint
 CREATE TYPE "public"."notification_status" AS ENUM('queued', 'sent', 'failed', 'read');--> statement-breakpoint
+CREATE TYPE "public"."review_artefact_kind" AS ENUM('protocol_version', 'emergency_script', 'kb_document', 'system_prompt');--> statement-breakpoint
+CREATE TYPE "public"."review_decision" AS ENUM('approve', 'reject', 'request_changes');--> statement-breakpoint
+CREATE TYPE "public"."review_submission_status" AS ENUM('pending', 'approved', 'rejected', 'changes_requested', 'withdrawn', 'superseded', 'suspended');--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('citizen', 'chw', 'agri_officer', 'teacher', 'ngo', 'gov_admin', 'platform_admin');--> statement-breakpoint
 CREATE TYPE "public"."severity_level" AS ENUM('low', 'medium', 'high', 'critical');--> statement-breakpoint
 CREATE TABLE "acu_ledger" (
@@ -778,6 +782,61 @@ CREATE TABLE "reports" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "review_board_members" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"board_id" uuid NOT NULL,
+	"user_id" uuid NOT NULL,
+	"seat" "board_seat" NOT NULL,
+	"credential" varchar(120),
+	"appointed_by" uuid,
+	"appointed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"revoked_at" timestamp with time zone,
+	"revoked_reason" text
+);
+--> statement-breakpoint
+CREATE TABLE "review_boards" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"key" varchar(32) NOT NULL,
+	"name" varchar(160) NOT NULL,
+	"module" "module_type" DEFAULT 'health' NOT NULL,
+	"required_seats" jsonb NOT NULL,
+	"review_cadence_days" integer DEFAULT 365 NOT NULL,
+	"active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "review_boards_key_unique" UNIQUE("key")
+);
+--> statement-breakpoint
+CREATE TABLE "review_signoffs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"submission_id" uuid NOT NULL,
+	"board_id" uuid NOT NULL,
+	"member_user_id" uuid NOT NULL,
+	"seat" "board_seat" NOT NULL,
+	"decision" "review_decision" NOT NULL,
+	"comment" text,
+	"content_digest" varchar(64) NOT NULL,
+	"signed_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "review_submissions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"board_id" uuid NOT NULL,
+	"artefact_kind" "review_artefact_kind" NOT NULL,
+	"artefact_id" varchar(160) NOT NULL,
+	"artefact_version" varchar(48) NOT NULL,
+	"content_digest" varchar(64) NOT NULL,
+	"title" varchar(240) NOT NULL,
+	"change_note" text,
+	"submitted_by" uuid,
+	"submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"status" "review_submission_status" DEFAULT 'pending' NOT NULL,
+	"decided_at" timestamp with time zone,
+	"expires_at" timestamp with time zone,
+	"suspended_by" uuid,
+	"suspended_at" timestamp with time zone,
+	"suspend_reason" text
+);
+--> statement-breakpoint
 CREATE TABLE "risk_assessments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"interaction_id" uuid,
@@ -967,6 +1026,12 @@ ALTER TABLE "kb_chunks" ADD CONSTRAINT "kb_chunks_document_id_kb_documents_id_fk
 ALTER TABLE "learner_profiles" ADD CONSTRAINT "learner_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "organisations" ADD CONSTRAINT "organisations_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_board_members" ADD CONSTRAINT "review_board_members_board_id_review_boards_id_fk" FOREIGN KEY ("board_id") REFERENCES "public"."review_boards"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_board_members" ADD CONSTRAINT "review_board_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_signoffs" ADD CONSTRAINT "review_signoffs_submission_id_review_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."review_submissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_signoffs" ADD CONSTRAINT "review_signoffs_board_id_review_boards_id_fk" FOREIGN KEY ("board_id") REFERENCES "public"."review_boards"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_signoffs" ADD CONSTRAINT "review_signoffs_member_user_id_users_id_fk" FOREIGN KEY ("member_user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_submissions" ADD CONSTRAINT "review_submissions_board_id_review_boards_id_fk" FOREIGN KEY ("board_id") REFERENCES "public"."review_boards"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_case_id_cases_id_fk" FOREIGN KEY ("case_id") REFERENCES "public"."cases"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "territories" ADD CONSTRAINT "territories_province_code_provinces_code_fk" FOREIGN KEY ("province_code") REFERENCES "public"."provinces"("code") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -1012,6 +1077,10 @@ CREATE INDEX "notifications_scheduled_idx" ON "notifications" USING btree ("sche
 CREATE INDEX "prompt_versions_idx" ON "prompt_versions" USING btree ("name","version");--> statement-breakpoint
 CREATE INDEX "protocol_versions_idx" ON "protocol_versions" USING btree ("protocol_id","version");--> statement-breakpoint
 CREATE INDEX "rate_limit_window_idx" ON "rate_limit_counters" USING btree ("window_start");--> statement-breakpoint
+CREATE INDEX "review_board_members_idx" ON "review_board_members" USING btree ("board_id","user_id");--> statement-breakpoint
+CREATE INDEX "review_signoffs_submission_idx" ON "review_signoffs" USING btree ("submission_id");--> statement-breakpoint
+CREATE INDEX "review_submissions_artefact_idx" ON "review_submissions" USING btree ("artefact_kind","artefact_id","artefact_version");--> statement-breakpoint
+CREATE INDEX "review_submissions_board_idx" ON "review_submissions" USING btree ("board_id","status");--> statement-breakpoint
 CREATE INDEX "schedules_due_idx" ON "schedules" USING btree ("status","scheduled_for");--> statement-breakpoint
 CREATE INDEX "service_directory_geo_idx" ON "service_directory" USING btree ("province","type");--> statement-breakpoint
 CREATE INDEX "sessions_channel_ref_idx" ON "sessions" USING btree ("channel","channel_ref");--> statement-breakpoint

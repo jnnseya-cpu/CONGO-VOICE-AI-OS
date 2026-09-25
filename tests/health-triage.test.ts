@@ -211,14 +211,20 @@ describe("health triage (offline provider)", () => {
     expect(await approvedDocIds(["KB-HE-FEVER-01", "KB-INEXISTANT-99"])).toEqual(new Set(["KB-HE-FEVER-01"]));
   });
 
-  it("records every protocol version on first use", async () => {
+  it("records every protocol version on first use, without approving it", async () => {
     const db = await getDb();
     const rows = await db.select().from(schema.protocolVersions);
     expect(rows.length).toBeGreaterThanOrEqual(10);
     for (const row of rows) {
-      expect(row.status).toBe("approved");
-      expect(row.approvedBy).toBe("pending CRB");
+      // Registration is a record, not a signature. This used to insert every
+      // version as "approved" by the string "pending CRB", so the platform's own
+      // catalogue said a clinical decision tree had been signed off when nobody
+      // had read it. An approver is now written only by the Clinical Review
+      // Board reaching a quorum (AI-10), and no test here does that.
+      expect(row.approvedBy).toBeNull();
       expect(row.module).toBe("health");
+      // adult_fever is walked through the lifecycle by the test above.
+      if (row.protocolId !== "adult_fever") expect(row.status).toBe("review");
     }
   });
 });

@@ -42,17 +42,27 @@ Every claim below is reproducible from this repository.
 | 200 events captured over 72 hours replay exactly once | `tests/offline-capacity.test.ts` |
 | Every requirement identifier in both PRDs has a row | `tests/requirements.test.ts`, `docs/REQUIREMENTS.md` |
 | The platform runs with no API keys of any kind | the offline provider, and every test above |
+| No clinical content is used to reassure without a board sign-off | `tests/review-board.test.ts` (26 cases) |
+| A deployed origin is checked before traffic reaches it | `npm run preflight -- <origin>` |
 
 ## 2. What is not ready
 
 None of these is a defect in the code. Each is a reason not to open the service
 to the public today.
 
-1. **No clinical authority has approved the protocols.** Every protocol version
-   records an approver and every one currently reads *"En attente du Comité de
-   Revue Clinique"*. The mechanism is built; the board is not constituted. A
-   national triage service whose decision trees nobody clinically accountable
-   has signed is not a service you open to a country.
+1. **No clinical authority has approved the protocols.** The board itself is now
+   built and enforced (`src/server/ai/review/board.ts`, console at
+   `/admin/comite`): two physicians and one community health expert, a quorum
+   that is a composition rather than a count, sign-offs bound to the digest of
+   what was read, no self-approval, and one member able to suspend alone. Until
+   three people are appointed and have signed, a pilot or production deployment
+   **escalates and refers but does not assess** — it will not tell anyone their
+   situation is less than urgent on nobody's authority, and the readiness probe
+   reports the deployment degraded.
+
+   What remains is the governance act: naming the members. That is an
+   appointment, not a project — but until it happens the platform is a referral
+   service, not a triage service.
 
 2. **Language quality is unmeasured in four of the five languages.** The gates
    exist and an unmeasured language is treated as a failure — it falls back to
@@ -102,7 +112,9 @@ without them.
 
 In order of what blocks hardest:
 
-1. A constituted clinical review board that has signed each protocol version.
+1. Three people appointed to the Clinical Review Board, who have signed each
+   protocol version, fixed script, knowledge document and health prompt at
+   `/admin/comite`. The machinery is built and enforced; the seats are empty.
 2. Measured language quality above the gate in all five languages, with the
    corpus authored and the emergency scripts recorded by native speakers.
 3. The adversarial corpus at its specified size, authored with those same

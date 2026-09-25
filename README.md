@@ -57,7 +57,9 @@ The programme has a public, indexable surface separate from the operating system
 - `docs/MASTER_SPECIFICATION.md` — the complete developer-ready specification (vision, users, command centres, agents, modules, data model, APIs, security, funding model, roadmap) with the requirement → implementation map.
 - `docs/ARCHITECTURE.md` — how a citizen turn flows through the system; provider routing; degraded modes.
 - `docs/API.md` — endpoint reference for `/api/v1` and the channel webhooks.
+- `docs/GO_LIVE.md` — the ordered runbook: what ships where, the domain, the migration, constituting the review board, preflight, connecting the channels.
 - `docs/DEPLOYMENT.md` — Google Cloud / any Node host, PostgreSQL, storage, telephony and WhatsApp configuration.
+- `docs/LAUNCH_READINESS.md` — the go/no-go, what is proven and what is not.
 - `docs/SEO.md` — search and answer-engine machinery, the scoring rubric, and the off-site work no codebase can do.
 - `docs/LANGUAGES.md` — language coverage, learning loop, quality gates.
 - `docs/PROJECT_REQUIREMENTS.md` — the founding brief, preserved.

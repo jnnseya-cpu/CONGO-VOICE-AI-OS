@@ -37,7 +37,7 @@ const ROUTES = [
   "/notifications", "/notifications/envoyer", "/parametres", "/rapports", "/recherche",
   "/ressources", "/langues", "/cas", "/cas/nouveau", "/tableau-de-bord",
   "/tableau-de-bord/sante", "/tableau-de-bord/agriculture", "/tableau-de-bord/education",
-  "/admin", "/admin/audit", "/admin/utilisateurs", "/connexion", "/aide",
+  "/admin", "/admin/audit", "/admin/utilisateurs", "/admin/comite", "/connexion", "/aide",
   "/blog", "/services", "/programme", "/gouvernance", "/financement", "/partenaires",
   "/acces", "/langues-nationales", "/contact", "/confidentialite", "/conditions",
   "/accessibilite",
