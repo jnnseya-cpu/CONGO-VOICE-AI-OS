@@ -95,6 +95,148 @@ export function sanitiseHealthGuidance(text: string): SafetyCheck {
   return { ok: violations.length === 0, violations, sanitised: kept.join(" ").trim() };
 }
 
+/* ==========================================================================================
+ * CONTENT BOUNDARIES (AI-19)
+ * ========================================================================================== */
+
+/**
+ * Subjects a national service does not advise on.
+ *
+ * Not because the questions are illegitimate, but because a state-funded voice
+ * in five languages telling a rural household who to vote for, which church is
+ * true, or what to do about a court summons is a different and far more
+ * dangerous product than the one being funded.
+ */
+export type BoundaryTopic = "political" | "religious" | "legal" | "financial";
+
+const BOUNDARY_PATTERNS: Array<{ topic: BoundaryTopic; re: RegExp }> = [
+  { topic: "political", re: /\b(pour qui (?:je )?(?:dois|doit|devrais) voter|quel parti|voter pour|candidat|[ée]lections?|opposition politique|president(?:e|ielle)?\b)/i },
+  { topic: "religious", re: /\b(quelle [ée]glise|quelle religion|est-ce que dieu|le vrai dieu|prier pour gu[ée]rir|p[ée]ch[ée]|pasteur dit)/i },
+  { topic: "legal", re: /\b(porter plainte|avocat|tribunal|proc[èe]s|convocation (?:au|de la) police|mes droits? l[ée]gaux)/i },
+  { topic: "financial", re: /\b(dois-je (?:investir|emprunter)|cr[ée]dit bancaire|pr[êe]t (?:bancaire|[àa] int[ée]r[êe]t)|placer mon argent|cryptomonnaie)/i },
+];
+
+export function detectBoundaryTopics(text: string): BoundaryTopic[] {
+  const t = normaliseForMatching(text);
+  return [...new Set(BOUNDARY_PATTERNS.filter((b) => b.re.test(t)).map((b) => b.topic))];
+}
+
+/** What is said instead: a plain refusal that still points somewhere useful. */
+export const BOUNDARY_RESPONSES: Record<BoundaryTopic, Record<LanguageCode, string>> = {
+  political: {
+    fr: "Ce service ne donne pas de conseil politique et ne dit pas pour qui voter. Je peux vous aider sur la santé, l'agriculture ou l'école.",
+    ln: "Service oyo epesaka toli ya politiki te mpe elobaka te nani ya kopona. Nakoki kosalisa yo na santé, bilanga to kelasi.",
+    kg: "Kisalu yai ke pesa ndongisila ya politiki ve. Mono lenda sadisa nge na mavimpi, bilanga to nzo-nkanda.",
+    sw: "Huduma hii haitoi ushauri wa kisiasa wala kusema umpigie nani kura. Naweza kukusaidia kuhusu afya, kilimo au shule.",
+    lua: "Mudimu eu kawena ufila mibelu ya politike. Ndi mua kukuambuluisha ku makalenga a bukole, madimi anyi kalasa.",
+  },
+  religious: {
+    fr: "Ce service ne donne pas de conseil religieux. Je peux vous aider sur la santé, l'agriculture ou l'école.",
+    ln: "Service oyo epesaka toli ya lingomba te. Nakoki kosalisa yo na santé, bilanga to kelasi.",
+    kg: "Kisalu yai ke pesa ndongisila ya dibundu ve. Mono lenda sadisa nge na mavimpi, bilanga to nzo-nkanda.",
+    sw: "Huduma hii haitoi ushauri wa kidini. Naweza kukusaidia kuhusu afya, kilimo au shule.",
+    lua: "Mudimu eu kawena ufila mibelu ya ntendelelu. Ndi mua kukuambuluisha ku bukole, madimi anyi kalasa.",
+  },
+  legal: {
+    fr: "Ce service ne donne pas de conseil juridique. Adressez-vous à un service d'aide légale. Je reste disponible pour la santé, l'agriculture ou l'école.",
+    ln: "Service oyo epesaka toli ya mibeko te. Kende epai ya bato ya aide légale. Nazali awa mpo na santé, bilanga to kelasi.",
+    kg: "Kisalu yai ke pesa ndongisila ya nsiku ve. Kwenda na bantu ya lusadisu ya nsiku. Mono kele awa sambu na mavimpi, bilanga to nzo-nkanda.",
+    sw: "Huduma hii haitoi ushauri wa kisheria. Nenda kwa huduma ya msaada wa kisheria. Nipo kwa afya, kilimo au shule.",
+    lua: "Mudimu eu kawena ufila mibelu ya mikandu. Ndayi kudi bantu ba diambuluisha dia mikandu. Ndi muikale bua bukole, madimi anyi kalasa.",
+  },
+  financial: {
+    fr: "Ce service ne donne pas de conseil financier. Je peux vous aider sur la santé, l'agriculture ou l'école.",
+    ln: "Service oyo epesaka toli ya mbongo te. Nakoki kosalisa yo na santé, bilanga to kelasi.",
+    kg: "Kisalu yai ke pesa ndongisila ya mbongo ve. Mono lenda sadisa nge na mavimpi, bilanga to nzo-nkanda.",
+    sw: "Huduma hii haitoi ushauri wa kifedha. Naweza kukusaidia kuhusu afya, kilimo au shule.",
+    lua: "Mudimu eu kawena ufila mibelu ya makuta. Ndi mua kukuambuluisha ku bukole, madimi anyi kalasa.",
+  },
+};
+
+/* ==========================================================================================
+ * UNSUPPORTED CLAIMS (AI-15)
+ * ========================================================================================== */
+
+/**
+ * Claims a public service must not make, whichever model produced them.
+ *
+ * `sanitiseHealthGuidance` already removes a prescription. This catches the
+ * other half of the problem: sentences that are not prescriptions but are still
+ * promises — a cure, a certainty, a yield, a price. They are what a citizen
+ * repeats to a neighbour, and what a programme is held to afterwards.
+ *
+ * Deterministic patterns rather than a model, because a guard that itself
+ * hallucinates guards nothing.
+ */
+interface ClaimRule {
+  id: string;
+  modules: Array<"health" | "agriculture" | "education" | "general">;
+  re: RegExp;
+  /** True when a citation makes the sentence acceptable (a figure from an approved source). */
+  citationCures: boolean;
+}
+
+const CLAIM_RULES: ClaimRule[] = [
+  // Narrow on purpose: "40 % des enfants guérissent seuls" is a statement about
+  // the world, "ce traitement guérit" is a promise the programme would own.
+  { id: "cure_promise", modules: ["health"], re: /\b(gu[ée]rison\s+garantie|gu[ée]ri[a-z]*\s+d[ée]finitivement|cure\s+d[ée]finitive|soigne\s+d[ée]finitivement|vous\s+gu[ée]rirez|ce\s+(?:traitement|rem[èe]de|produit|m[ée]dicament)\s+gu[ée]ri)/i, citationCures: false },
+  // No trailing word boundary: "efficace à 100 %." ends on a symbol.
+  { id: "certainty", modules: ["health", "agriculture"], re: /\b(garanti(?:e|s|es)?\b|sans\s+aucun\s+risque|aucun\s+danger|totalement\s+s[ûu]r|toujours\s+efficace|100\s*%|cent\s+pour\s+cent)/i, citationCures: false },
+  { id: "diagnosis_assertion", modules: ["health"], re: /\b(vous\s+avez\s+(?:certainement|s[ûu]rement|bien)\s+(?:le|la|un|une)|c'est\s+(?:certainement|s[ûu]rement)\s+(?:le|la|un|une)\s+\w+|il\s+s'agit\s+(?:certainement|s[ûu]rement)\s+d)/i, citationCures: false },
+  { id: "stop_treatment", modules: ["health"], re: /\b(arr[êe]tez\s+(?:votre|le|ce|les)\s+traitement|ne\s+prenez\s+plus\s+(?:vos|vos\s+)?(?:m[ée]dicaments?|comprim[ée]s))\b/i, citationCures: false },
+  { id: "invented_evidence", modules: ["health", "agriculture", "education", "general"], re: /\b(selon\s+une\s+[ée]tude|les\s+[ée]tudes\s+montrent|d'apr[èe]s\s+l'OMS|selon\s+l'OMS|la\s+science\s+prouve)\b/i, citationCures: true },
+  { id: "uncited_statistic", modules: ["health", "agriculture"], re: /\b\d{1,3}\s*%\s+(?:des|de\s+la|du|d'entre)\b/i, citationCures: true },
+  { id: "guaranteed_yield", modules: ["agriculture"], re: /\b(rendement\s+garanti|doubler(?:a|ez|ai|ons|iez)?\s+(?:votre|ta|la)\s+r[ée]colte|vous\s+gagnerez|b[ée]n[ée]fice\s+assur[ée])\b/i, citationCures: false },
+  { id: "price_promise", modules: ["agriculture"], re: /\b(le\s+prix\s+sera|vous\s+vendrez\s+[àa]|prix\s+garanti)\b/i, citationCures: false },
+  { id: "uncited_dose_rate", modules: ["agriculture"], re: /\b\d+(?:[.,]\d+)?\s*(?:ml|l|g|kg)\s*(?:\/|par)\s*(?:litre|l\b|ha\b|hectare|plante|pied)\b/i, citationCures: true },
+];
+
+export interface ClaimCheck {
+  ok: boolean;
+  /** Rule ids that fired, for the audit trail and the safety dashboard. */
+  violations: string[];
+  /** The sentences that must not be delivered as written. */
+  sentences: string[];
+}
+
+/**
+ * Checks an outbound answer for claims it cannot support. A citation rescues
+ * only the rules where a source genuinely settles the question: a figure can be
+ * cited, a promise of cure cannot.
+ */
+export function checkOutboundClaims(
+  text: string,
+  opts: { module: "health" | "agriculture" | "education" | "general"; citations?: string[] },
+): ClaimCheck {
+  const hasCitation = (opts.citations ?? []).length > 0;
+  const violations: string[] = [];
+  const sentences: string[] = [];
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    for (const rule of CLAIM_RULES) {
+      if (!rule.modules.includes(opts.module)) continue;
+      if (rule.citationCures && hasCitation) continue;
+      if (rule.re.test(sentence)) {
+        violations.push(rule.id);
+        sentences.push(sentence.trim());
+        break;
+      }
+    }
+  }
+  return { ok: violations.length === 0, violations: [...new Set(violations)], sentences };
+}
+
+/**
+ * The answer given instead, when a claim cannot be supported. It says less
+ * rather than something unsupported, and routes the citizen to a person.
+ */
+export const CLAIM_FALLBACK: Record<LanguageCode, string> = {
+  fr: "Je ne peux pas confirmer cette information avec une source approuvée. Je préfère ne rien affirmer. Une personne du programme va revoir votre demande et vous répondre.",
+  ln: "Nakoki kondima likambo yango te na liboso ya source endimami. Malamu naloba eloko te. Moto ya programme akotala likambo na yo mpe akoyanola.",
+  kg: "Mono lenda ndima ve diambu yayi na source ya kundima. Mbote mono tuba ve. Muntu ya programme ta tala diambu na nge mpe ta vutula.",
+  sw: "Siwezi kuthibitisha jambo hili kwa chanzo kilichoidhinishwa. Ni afadhali nisiseme. Mtu wa programu atapitia ombi lako na kukujibu.",
+  lua: "Tshiena mua kujadika bualu ebu ne tshidi tshitabujibue. Mbimpe tshiamba bualu. Muntu wa programme neatangile lukonko luebe ne neakuandamune.",
+};
+
 export const DISCLAIMERS: Record<LanguageCode, string> = {
   fr: "Ce service oriente et informe ; il ne remplace pas un agent de santé.",
   ln: "Service oyo epesi toli ; ezali na esika ya monganga te.",
@@ -234,7 +376,14 @@ export type SafeguardingCategory =
   | "negligence"
   | "auto_agression"
   | "foyer_dangereux"
-  | "mariage_precoce";
+  | "mariage_precoce"
+  /**
+   * An adult isolating a child and asking for secrecy. Named separately from
+   * sexual violence because it is what is disclosed first, long before anything
+   * a child would call abuse, and because "do not tell your parents" is the one
+   * sentence common to almost every case.
+   */
+  | "grooming";
 
 /** Disclosure keywords in the five platform languages. Detection is intentionally broad. */
 export const SAFEGUARDING_KEYWORDS: Record<SafeguardingCategory, string[]> = {
@@ -266,8 +415,24 @@ export const SAFEGUARDING_KEYWORDS: Record<SafeguardingCategory, string[]> = {
     "ata muntu mosi ve ke tala yandi",
     "kakuena muntu udi umulama",
   ],
+  grooming: [
+    // The request for secrecy, which is the part a child repeats.
+    "ne dis rien à tes parents", "ne dis pas à tes parents", "ne le dis pas à tes parents", "ne rien dire à mes parents", "sans que mes parents le sachent",
+    "sans le dire à mes parents", "ne le dites à personne mais", "c'est notre secret", "notre secret", "garde le secret", "garder le secret",
+    "tu peux garder le secret", "m'a demandé de ne rien dire", "il m'a dit de ne rien dire", "elle m'a dit de ne rien dire",
+    // Isolation and contact outside any legitimate setting.
+    "rester seul avec lui", "rester seule avec lui", "rester seul avec elle", "rester seule avec elle",
+    "seul avec moi après les cours", "seule avec moi après les cours", "me demande de venir chez lui", "me demande de venir chez elle",
+    "m'écrit la nuit", "m'envoie des messages la nuit", "me demande des photos", "envoie-moi une photo de toi", "m'a offert de l'argent pour",
+    "kobomba sekele", "koloba na baboti na yo te", "azali kosenga ngai bafoto",
+    "usimwambie mzazi", "ni siri yetu", "anataka nibaki naye peke yangu", "ananiomba picha",
+    "kubumba kinsweki", "kuzabisa bibuti na nge ve",
+    "kubuela baledi bebe to", "udi ulomba bimfuanyi",
+  ],
   auto_agression: [
     "me suicider", "suicide", "me tuer", "en finir avec la vie", "je veux mourir", "je veux me faire du mal", "me faire du mal", "plus envie de vivre", "j'ai avalé", "j'ai bu du poison",
+    // Said plainly, and far more often than the clinical words above.
+    "je ne veux plus vivre", "je ne veux plus de la vie", "pour en finir", "mettre fin à mes jours", "je préfère mourir", "la vie ne vaut plus", "je veux disparaître", "je veux disparaitre",
     "nalingi komiboma", "nalingi kokufa", "namelaki ngenge",
     "nataka kujiua", "kujiua", "nataka kufa", "nimekunywa sumu",
     "mono ke zola kudifwa", "mono ke zola kufwa",
@@ -297,11 +462,13 @@ export interface SafeguardingDetection {
 
 /** Keyword pass across the five languages; the model flag is merged on top of it. */
 export function detectSafeguarding(text: string): SafeguardingDetection {
-  const t = text.toLowerCase();
+  // Folded like the danger signs: a disclosure must not be missed because a
+  // phone keyboard produced a curly apostrophe or dropped an accent.
+  const t = normaliseForMatching(text);
   const categories: SafeguardingCategory[] = [];
   const matchedTerms: string[] = [];
   for (const [category, keys] of Object.entries(SAFEGUARDING_KEYWORDS) as Array<[SafeguardingCategory, string[]]>) {
-    const hits = keys.filter((k) => t.includes(k));
+    const hits = keys.filter((k) => t.includes(normaliseForMatching(k)));
     if (hits.length) {
       categories.push(category);
       matchedTerms.push(...hits);

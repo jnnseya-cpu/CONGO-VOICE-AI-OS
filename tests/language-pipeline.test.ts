@@ -23,6 +23,8 @@ import {
 import { FIXED_SCRIPTS, deliverScript, missingRecordings, scriptAudioPath, scriptText } from "@server/ai/language/scripts";
 import { LANGUAGES } from "@shared/types";
 
+const LANGUAGE_CODES = LANGUAGES.map((l) => l.code);
+
 describe("which language was spoken (FR-LG-01)", () => {
   it("confirms rather than guesses when the two candidates are close", () => {
     const tie = { language: "ln" as const, confidence: 0.62, alternative: { language: "kg" as const, confidence: 0.55 } };
@@ -169,7 +171,7 @@ describe("a reply fits in one breath (FR-CH-04)", () => {
 describe("fixed scripts (FR-LG-08, NFR-A-01, AI-14)", () => {
   it("has approved wording in every platform language", () => {
     for (const key of Object.keys(FIXED_SCRIPTS) as Array<keyof typeof FIXED_SCRIPTS>) {
-      for (const language of LANGUAGES) {
+      for (const language of LANGUAGE_CODES) {
         const text = scriptText(key, language);
         expect(text.trim().length, `${key}/${language}`).toBeGreaterThan(10);
       }
@@ -194,6 +196,6 @@ describe("fixed scripts (FR-LG-08, NFR-A-01, AI-14)", () => {
     expect(scriptAudioPath("emergency_alert", "ln", "male")).toBe("/audio/scripts/ln/emergency_alert.male.mp3");
     const missing = missingRecordings();
     // Every script in every language, until the language panel records them.
-    expect(missing.length).toBe(Object.keys(FIXED_SCRIPTS).length * LANGUAGES.length);
+    expect(missing.length).toBe(Object.keys(FIXED_SCRIPTS).length * LANGUAGE_CODES.length);
   });
 });

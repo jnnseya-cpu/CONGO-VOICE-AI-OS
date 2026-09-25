@@ -28,9 +28,10 @@ import { openCase, shouldAutoCreateCase } from "./workflow";
 import { isDegradedMode } from "@server/core/metering";
 import { getProfileContext, rememberLanguage } from "./personalisation";
 import { recordSample, retrieveLearningContext } from "./learning";
-import { dedupeSentences, EMERGENCY_MESSAGES, withDisclaimer } from "../safety";
+import { BOUNDARY_RESPONSES, CLAIM_FALLBACK, checkOutboundClaims, dedupeSentences, detectBoundaryTopics, EMERGENCY_MESSAGES, withDisclaimer } from "../safety";
 import { confidenceVector, planClarification, type ConfidenceVector } from "../language/confidence";
 import { toSpokenText } from "../language/voice";
+import { scriptText } from "../language/scripts";
 
 export interface InteractionInput {
   user: { userId: string; role: Role; language: LanguageCode; province?: string | null } | null;
@@ -233,6 +234,61 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     }
     if (health) actionFr = withDisclaimer(actionFr, "fr");
     actionFr = dedupeSentences(actionFr);
+
+    /**
+     * AI-15. The prescription filter already runs inside the health agent. This
+     * catches the other half: sentences that are not prescriptions but are
+     * still promises — a cure, a certainty, a yield, a price. They are what a
+     * citizen repeats to a neighbour, so the platform says less instead.
+     *
+     * An emergency is exempt: its wording is an approved constant, not
+     * generated, and nothing may stand between a danger sign and the
+     * instruction.
+     */
+    /**
+     * AI-19. Some questions are answered by declining. A state-funded voice
+     * telling a rural household who to vote for, which church is true, or what
+     * to do about a court summons is a different and far more dangerous product
+     * than the one being funded. Health still comes first: a danger sign inside
+     * the same message is handled before the boundary applies.
+     */
+    const boundaries = emergency ? [] : detectBoundaryTopics(textFr);
+    if (boundaries.length > 0) {
+      actionFr = BOUNDARY_RESPONSES[boundaries[0]].fr;
+      risk.flags.push(...boundaries.map((b) => `hors_perimetre:${b}`));
+    }
+
+    const claims = emergency
+      ? { ok: true, violations: [] as string[], sentences: [] as string[] }
+      : checkOutboundClaims(actionFr, { module: service, citations: health?.citations ?? agriculture?.citations ?? education?.citations ?? [] });
+    if (!claims.ok) {
+      actionFr = CLAIM_FALLBACK.fr;
+      risk.flags.push(...claims.violations.map((v) => `claim:${v}`));
+      risk.escalationRequired = true;
+      risk.humanReviewRequired = true;
+      risk.escalationReason = risk.escalationReason ?? "Affirmation non étayée retirée de la réponse";
+      await audit({
+        action: "ai.claim_blocked",
+        actorUserId: userId,
+        entityType: "interaction",
+        entityId: interactionId,
+        after: { module: service, violations: claims.violations, sentences: claims.sentences.slice(0, 3) },
+        systemEvent: "claim_guard",
+      });
+    } else if (!emergency && boundaries.length === 0 && risk.confidenceBand === "scripted") {
+      /**
+       * AI-03. Below the second band the platform has not understood well
+       * enough to answer. A hedged wrong answer is still a wrong answer someone
+       * may act on, so it says only what is safe to say and asks a person.
+       */
+      actionFr = `${scriptText("no_understanding", "fr")} ${scriptText("human_handover", "fr")}`;
+      risk.escalationRequired = true;
+      risk.humanReviewRequired = true;
+      risk.escalationReason = risk.escalationReason ?? "Compréhension insuffisante : réponse scriptée et revue humaine";
+    } else if (!emergency && boundaries.length === 0 && risk.confidenceBand === "caution") {
+      actionFr = `${actionFr} Je ne suis pas certain d'avoir bien compris. Voulez-vous parler à une personne ?`;
+      actionFr = dedupeSentences(actionFr);
+    }
     const followUps = [
       ...clarification.questions.slice(1),
       ...(health?.followUpQuestions ?? agriculture?.followUpQuestions ?? education?.followUpQuestions ?? []),

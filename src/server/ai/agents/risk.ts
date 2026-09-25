@@ -41,6 +41,8 @@ export interface RiskResult {
   escalationReason: string | null;
   lowConfidence: boolean;
   confidence: number;
+  /** AI-03: which of the two low-confidence policies applies to this turn. */
+  confidenceBand: ConfidenceBand;
   /** Final protocol severity after the "raise only" rule; null outside protocol-driven modules. */
   severityLevel: SeverityLevel | null;
   riskBand: RiskBand | null;
@@ -62,6 +64,26 @@ const LEVEL_BAND: Record<SeverityLevel, RiskBand> = { 0: "self_care", 1: "routin
 
 /** Modules where every recommendation must cite an approved source. */
 const CITATION_REQUIRED: ModuleType[] = ["health", "agriculture"];
+
+/**
+ * AI-03: two bands, not one flag.
+ *
+ * Below the first, the answer is still given but carries a caution and an offer
+ * to speak to a person. Below the second, the platform has not understood well
+ * enough to answer at all: it says only what is safe to say from a script, and
+ * a human is asked to look. The difference matters — a hedged wrong answer is
+ * still a wrong answer someone may act on.
+ */
+export const CONFIDENCE_CAUTION_THRESHOLD = 0.6;
+export const CONFIDENCE_SCRIPTED_THRESHOLD = 0.4;
+
+export type ConfidenceBand = "ok" | "caution" | "scripted";
+
+export function confidenceBandFor(confidence: number): ConfidenceBand {
+  if (confidence < CONFIDENCE_SCRIPTED_THRESHOLD) return "scripted";
+  if (confidence < CONFIDENCE_CAUTION_THRESHOLD) return "caution";
+  return "ok";
+}
 
 export function scoreRisk(input: RiskInput): RiskResult {
   const threshold = input.lowConfidenceThreshold ?? 0.55;
@@ -98,8 +120,10 @@ export function scoreRisk(input: RiskInput): RiskResult {
   }
 
   const confidence = Math.min(input.languageConfidence, input.domainConfidence);
-  const lowConfidence = confidence < threshold;
+  const confidenceBand = confidenceBandFor(confidence);
+  const lowConfidence = confidence < threshold || confidenceBand !== "ok";
   if (lowConfidence) flags.push("confiance_faible");
+  if (confidenceBand === "scripted") flags.push("mode_scripte");
   if (input.safetyViolations?.length) flags.push("contenu_filtre");
 
   let level: Severity = score >= 0.85 ? "critical" : score >= 0.6 ? "high" : score >= 0.35 ? "medium" : "low";
@@ -148,6 +172,8 @@ export function scoreRisk(input: RiskInput): RiskResult {
     level === "high" ||
     blocked ||
     Boolean(input.safeguarding) ||
+    // AI-03: understood too poorly to answer — a person looks at it, in every module.
+    confidenceBand === "scripted" ||
     (input.module === "health" && lowConfidence && score >= 0.35);
   if (escalationRequired && !reason) {
     reason = input.safeguarding
@@ -170,6 +196,7 @@ export function scoreRisk(input: RiskInput): RiskResult {
     escalationReason: escalationRequired ? reason : null,
     lowConfidence,
     confidence: Number(confidence.toFixed(2)),
+    confidenceBand,
     severityLevel,
     riskBand,
     citationsOk,
