@@ -859,6 +859,40 @@ export const protocolVersions = pgTable(
   (t) => [index("protocol_versions_idx").on(t.protocolId, t.version)],
 );
 
+/**
+ * Feature flags and staged rollout (DO-04, AI-17).
+ *
+ * Nothing here is a convenience switch. A module, a language or a channel is
+ * turned on for one province at a time because the people who answer the
+ * escalations are in that province, and a prompt change reaches a small share
+ * of traffic first because the failures that matter — a danger sign missed, a
+ * language that degraded — do not show up in an offline evaluation.
+ */
+export const featureFlags = pgTable(
+  "feature_flags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: varchar("key", { length: 96 }).notNull().unique(),
+    description: text("description"),
+    enabled: boolean("enabled").default(false).notNull(),
+    /** Empty means "everywhere": a scope list narrows, it never widens. */
+    modules: jsonb("modules").$type<string[]>().default([]).notNull(),
+    languages: jsonb("languages").$type<string[]>().default([]).notNull(),
+    channels: jsonb("channels").$type<string[]>().default([]).notNull(),
+    provinces: jsonb("provinces").$type<string[]>().default([]).notNull(),
+    /** 0–100. The same citizen always falls the same side of the line. */
+    rolloutPercent: integer("rollout_percent").default(100).notNull(),
+    /** When a staged rollout began, and how long it must hold before it may widen. */
+    canaryStartedAt: timestamp("canary_started_at", { withTimezone: true }),
+    canaryDays: integer("canary_days").default(7).notNull(),
+    updatedBy: uuid("updated_by"),
+    ...timestamps,
+  },
+  (t) => [index("feature_flags_enabled_idx").on(t.enabled)],
+);
+
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+
 export const promptVersions = pgTable(
   "prompt_versions",
   {

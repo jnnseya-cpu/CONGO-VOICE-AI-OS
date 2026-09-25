@@ -35,10 +35,18 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Migrations are safe to apply while the previous version serves
+        run: npm run db:check
+
       - name: Tests
         # Everything runs offline against the embedded database and the rules
         # provider, so no API key and no service container are needed.
         run: npm test
+
+      - name: Coverage thresholds
+        # NFR-010: eighty per cent on the deterministic domain and policy code,
+        # and every branch of every safety rule pack proven reachable.
+        run: npm run test:coverage
 
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high

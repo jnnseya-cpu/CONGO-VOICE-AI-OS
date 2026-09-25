@@ -24,6 +24,7 @@ import { checkAcuCaps } from "./metering";
 import { overdueDataRequests, sweepExpiredMedia } from "./privacy";
 import { dailyReviewSample } from "@server/ai/agents/learning";
 import { downgradedLanguages } from "@server/ai/language/gates";
+import { canariesDue } from "./flags";
 import { pruneIdentifierClaims } from "./identifiers";
 import { pruneAuthAttempts } from "./lockout";
 import { pruneRateLimitCounters } from "./rate-limit";
@@ -275,6 +276,7 @@ export interface SchedulerReport {
   overdueDataRequests: number;
   securityCountersPruned: number;
   mediaDeleted: number;
+  canariesDue: number;
   qualityReviewSampled: number;
   languagesDowngraded: number;
   errors: Array<{ step: string; message: string }>;
@@ -338,6 +340,23 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
       body: `${review.lowConfidenceTotal} échange(s) à faible confiance ce jour-là. L'échantillon retenu est trié du moins sûr au plus sûr.`,
       payload: { day: review.day, sampled: review.items.length, lowConfidenceTotal: review.lowConfidenceTotal, target: review.target },
       dedupeKey: `quality-review:${review.day}`,
+    });
+  }
+
+  /**
+   * AI-17. A staged rollout that has served its window is reported, never
+   * widened automatically: deciding that nothing bad happened rests on case
+   * reviews and override rates that nothing in this process can see.
+   */
+  const canaries = await step("canaries", errors, () => canariesDue(now), []);
+  if (canaries.length > 0) {
+    await notifyRole("platform_admin", {
+      type: "reminder",
+      channel: "in_app",
+      title: `${canaries.length} déploiement(s) progressif(s) arrivés à échéance`,
+      body: canaries.map((c) => `${c.key} : ${c.rolloutPercent} % depuis ${c.elapsedDays} jour(s)`).join(" | ").slice(0, 900),
+      payload: { canaries },
+      dedupeKey: `canaries:${now.toISOString().slice(0, 10)}`,
     });
   }
 
@@ -417,6 +436,7 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
     overdueDataRequests: overdue.length,
     securityCountersPruned: pruned,
     mediaDeleted: retention.deleted,
+    canariesDue: canaries.length,
     qualityReviewSampled: review.items.length,
     languagesDowngraded: downgraded.length,
     errors,

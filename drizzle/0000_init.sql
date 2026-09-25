@@ -311,6 +311,24 @@ CREATE TABLE "event_store" (
 	CONSTRAINT "event_store_event_id_unique" UNIQUE("event_id")
 );
 --> statement-breakpoint
+CREATE TABLE "feature_flags" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"key" varchar(96) NOT NULL,
+	"description" text,
+	"enabled" boolean DEFAULT false NOT NULL,
+	"modules" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"languages" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"channels" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"provinces" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"rollout_percent" integer DEFAULT 100 NOT NULL,
+	"canary_started_at" timestamp with time zone,
+	"canary_days" integer DEFAULT 7 NOT NULL,
+	"updated_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "feature_flags_key_unique" UNIQUE("key")
+);
+--> statement-breakpoint
 CREATE TABLE "feedback" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"interaction_id" uuid,
@@ -968,6 +986,7 @@ CREATE INDEX "citizen_identifiers_kind_hash_idx" ON "citizen_identifiers" USING 
 CREATE INDEX "consents_user_purpose_idx" ON "consents" USING btree ("user_id","purpose");--> statement-breakpoint
 CREATE INDEX "event_store_type_idx" ON "event_store" USING btree ("event_type","occurred_at");--> statement-breakpoint
 CREATE INDEX "event_store_aggregate_idx" ON "event_store" USING btree ("aggregate_type","aggregate_id");--> statement-breakpoint
+CREATE INDEX "feature_flags_enabled_idx" ON "feature_flags" USING btree ("enabled");--> statement-breakpoint
 CREATE INDEX "files_kind_created_idx" ON "files" USING btree ("kind","created_at");--> statement-breakpoint
 CREATE INDEX "glossaries_module_term_idx" ON "glossaries" USING btree ("module","term_fr");--> statement-breakpoint
 CREATE INDEX "glossaries_status_idx" ON "glossaries" USING btree ("status");--> statement-breakpoint
