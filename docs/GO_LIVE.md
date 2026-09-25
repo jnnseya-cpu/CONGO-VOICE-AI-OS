@@ -42,6 +42,44 @@ rejects that reasoning, the split is real work and this runbook changes.
 
 ---
 
+## 0b. Choosing a host
+
+The rest of this runbook assumes Google Cloud Run, because the Terraform in
+`infra/` targets it. That is a decision, so here is the reasoning and what would
+overturn it.
+
+| Host | Verdict |
+|---|---|
+| **Cloud Run** | Use this. The infrastructure is declared, including the domain mapping, and Cloud Scheduler drives the maintenance endpoint. |
+| **Firebase App Hosting** | Fine — it *is* Cloud Run with a build pipeline in front, and `apphosting.yaml` is in the repository. Simpler to operate, less control over the network and the schedule. |
+| **A VPS or colo** | Viable, and the right answer in one case: data residency (below). The Dockerfile runs anywhere. |
+| **Vercel** | No. See below. |
+
+**Why not Vercel.** `src/server/channels/background.ts` exists because an
+operator kills a USSD session after a few seconds and a telephony webhook must
+acknowledge immediately, so the citizen's answer is produced *after* the
+response is sent and delivered over SMS or WhatsApp. That requires a process
+that stays alive past the response, holding tracked promises. A platform whose
+functions are frozen when the response returns would drop that answer silently,
+which is the worst possible failure mode: the citizen hears the call end
+normally and nothing ever arrives. Two smaller reasons point the same way:
+`min_instances` is deliberately never zero because a cold start on an IVR call
+is a citizen listening to silence, and `scripts.ts` reads `public/audio/…` from
+disk at runtime to decide whether a human recording of an emergency script
+exists.
+
+**When a VPS is right.** There is no Google Cloud region in the DRC;
+`europe-west1` is Belgium. If the programme is required to keep citizen health
+data inside the country, that settles it, and no amount of encryption at rest
+changes where the bytes are. The cost is that backups, TLS renewal, patching,
+scaling, monitoring and the restore exercise become the programme's own work —
+and NFR-005, the recovery-time objective, is unproven today precisely because
+nobody has yet restored from a backup. Choosing a VPS makes that debt the
+operator's rather than the platform's; it does not pay it.
+
+**What does not change.** Whichever is chosen, it is the same container image
+and the same application. Steps 4 to 10 below are identical.
+
 ## 1. Decide the four inputs
 
 Write these down before touching anything. Everything else follows from them.
