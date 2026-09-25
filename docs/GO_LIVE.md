@@ -10,6 +10,43 @@ pilot** onto a real domain safely.
 
 ---
 
+## 0a. The machine you run from
+
+Cloud Shell (<https://shell.cloud.google.com>) is the least trouble: it is
+already authenticated, and `gcloud`, `docker`, `git` and Node are there. Two
+things about it are not obvious and both cost time:
+
+**Terraform is not preinstalled.** It used to be. Install it into `$HOME`, which
+is the only directory that survives a session reset — an `apt install` does not:
+
+```bash
+mkdir -p ~/bin && cd /tmp
+TF=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['current_version'])")
+curl -sLO "https://releases.hashicorp.com/terraform/${TF}/terraform_${TF}_linux_amd64.zip"
+unzip -oq "terraform_${TF}_linux_amd64.zip" -d ~/bin && rm -f terraform_*.zip
+grep -q 'HOME/bin' ~/.bashrc || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+export PATH="$HOME/bin:$PATH" && terraform version
+```
+
+**The project ID is not the project name.** Creating a project called "Congo
+Voice" produces an id like `congo-voice-478213`. Every command below wants the
+id. Find it, set it, and check that billing is actually attached — every step
+after this one fails with an unhelpful error if it is not:
+
+```bash
+gcloud projects list          # the PROJECT_ID column, not NAME
+export PROJECT=<your-project-id>
+export REGION=africa-south1
+export DOMAIN=congovoicecd.com
+gcloud config set project $PROJECT
+gcloud billing projects describe $PROJECT   # billingEnabled must be true
+```
+
+A local machine works too; it needs `gcloud`, `terraform`, `docker`, `git` and
+Node 22, and `gcloud auth login` plus `gcloud auth configure-docker
+$REGION-docker.pkg.dev`.
+
 ## 0. What ships where
 
 There is one question people ask first, so it is answered first.
