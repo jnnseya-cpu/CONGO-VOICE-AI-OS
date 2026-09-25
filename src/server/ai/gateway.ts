@@ -52,6 +52,22 @@ function order(envName: string, fallback: string[]): string[] {
   return v ? v.split(",").map((s) => s.trim()).filter(Boolean) : fallback;
 }
 
+/**
+ * A credential that exists but is blank is not a configured provider.
+ *
+ * Secret Manager containers are created by Terraform and filled in by a person,
+ * so a deployment that has not been given a vendor key yet still mounts the
+ * variable — as an empty string, or as the single space someone used as a
+ * placeholder. Both are truthy enough to register a provider that then fails
+ * every call with a 401, which reads as an outage rather than as a key nobody
+ * has supplied. Trimming here keeps that deployment on the offline provider,
+ * which is the honest answer.
+ */
+function configured(raw: string | undefined): string | undefined {
+  const value = raw?.trim();
+  return value ? value : undefined;
+}
+
 export interface CallMeta {
   interactionId?: string | null;
   /** Scripted / degraded mode: only the offline rules provider is used (ACU cap, provider outage policy). */
@@ -91,26 +107,29 @@ export class AiGateway {
 
   private async register() {
     const mock = new MockProvider();
-    if (this.allowed("anthropic") && (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)) {
+    if (this.allowed("anthropic") && (configured(process.env.ANTHROPIC_API_KEY) || configured(process.env.ANTHROPIC_AUTH_TOKEN))) {
       const { AnthropicProvider } = await import("./providers/anthropic");
       this.registry.llm.set("anthropic", new AnthropicProvider());
     }
-    if (this.allowed("gemini") && process.env.GEMINI_API_KEY) {
+    const gemini = configured(process.env.GEMINI_API_KEY);
+    if (this.allowed("gemini") && gemini) {
       const { GeminiProvider } = await import("./providers/gemini");
-      const g = new GeminiProvider(process.env.GEMINI_API_KEY);
+      const g = new GeminiProvider(gemini);
       this.registry.llm.set("gemini", g);
       this.registry.stt.set("gemini", g);
     }
-    if (this.allowed("openai") && process.env.OPENAI_API_KEY) {
+    const openai = configured(process.env.OPENAI_API_KEY);
+    if (this.allowed("openai") && openai) {
       const { OpenAiProvider } = await import("./providers/openai");
-      const o = new OpenAiProvider(process.env.OPENAI_API_KEY);
+      const o = new OpenAiProvider(openai);
       this.registry.llm.set("openai", o);
       this.registry.stt.set("openai", o);
       this.registry.tts.set("openai", o);
     }
-    if (this.allowed("google_tts") && process.env.GOOGLE_TTS_API_KEY) {
+    const googleTts = configured(process.env.GOOGLE_TTS_API_KEY);
+    if (this.allowed("google_tts") && googleTts) {
       const { GoogleTtsProvider } = await import("./providers/google-speech");
-      this.registry.tts.set("google_tts", new GoogleTtsProvider(process.env.GOOGLE_TTS_API_KEY));
+      this.registry.tts.set("google_tts", new GoogleTtsProvider(googleTts));
     }
     if (this.allowed("mock") && process.env.AI_ALLOW_MOCK !== "false") {
       this.registry.llm.set("mock", mock);

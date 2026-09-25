@@ -172,6 +172,32 @@ Write these down before touching anything. Everything else follows from them.
 
 ## 2. Build an image, by digest
 
+The registry has to exist before anything can be pushed into it, and §3 creates
+it. Break the circle with a targeted apply first — this touches nothing else:
+
+```bash
+cd infra
+terraform init -backend-config="bucket=$PROJECT-tfstate"
+terraform apply -var-file=environments/pilot.tfvars \
+  -target=google_project_service.required \
+  -target=google_artifact_registry_repository.app
+cd ..
+```
+
+New projects run Cloud Build as the Compute Engine default service account,
+which can push nowhere and write no logs until it is told it may:
+
+```bash
+PN=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
+for role in artifactregistry.writer logging.logWriter; do
+  gcloud projects add-iam-policy-binding $PROJECT \
+    --member="serviceAccount:$PN-compute@developer.gserviceaccount.com" \
+    --role="roles/$role" --condition=None >/dev/null
+done
+```
+
+Then:
+
 ```bash
 npm ci
 npm run typecheck && npm run lint && npm test
@@ -182,8 +208,9 @@ Shell gives you a 5 GB home directory, which a Next.js build plus `node_modules`
 plus Docker layers does not comfortably fit in:
 
 ```bash
-gcloud builds submit --config cloudbuild.yaml \
-  --substitutions=_REGION=africa-south1,_SITE_URL=https://congovoicecd.com
+# _TAG, because $SHORT_SHA is empty for a build that no trigger started.
+gcloud builds submit --config cloudbuild.yaml --substitutions=\
+_REGION=$REGION,_SITE_URL=https://$DOMAIN,_TAG=$(git rev-parse --short HEAD)
 
 # Deploy by digest, never by tag: a tag can be moved under you.
 gcloud artifacts docker images describe \
@@ -202,7 +229,7 @@ It also holds the database password in clear, so it must never sit in a working
 copy where it can be committed.
 
 ```bash
-gcloud storage buckets create gs://$PROJECT-tfstate --location=africa-south1 \
+gcloud storage buckets create gs://$PROJECT-tfstate --location=$REGION \
   --uniform-bucket-level-access --public-access-prevention
 gcloud storage buckets update gs://$PROJECT-tfstate --versioning
 
@@ -210,33 +237,66 @@ cd infra
 cp environments/pilot.tfvars.example environments/pilot.tfvars
 # Fill in: project_id, image (the digest from §2), public_url, domain.
 terraform init -backend-config="bucket=$PROJECT-tfstate"
-terraform plan  -var-file=environments/pilot.tfvars
-terraform apply -var-file=environments/pilot.tfvars
 ```
 
-This creates the Cloud Run service, a PostgreSQL instance reachable only over a
-private address, the media bucket, the service account, the scheduler job, and
-**empty** secrets. Fill each one:
+**This is two applies, not one, and the order is forced.** A Cloud Run service
+cannot deploy referencing a secret version that does not exist, and the
+`DATABASE_URL` it needs cannot be written until the database has an address. So:
+everything except the service, then the secret values, then the service.
 
 ```bash
-terraform output secrets_to_populate
-printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add cvos-pilot-session-secret      --data-file=-
-printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add cvos-pilot-data-encryption-key --data-file=-
+# Phase one: the database, the network, the bucket, the identity, and the
+# secret CONTAINERS — which Terraform creates empty, on purpose.
+terraform apply -var-file=environments/pilot.tfvars \
+  -target=google_sql_database_instance.main \
+  -target=google_sql_database.app \
+  -target=google_sql_user.app \
+  -target=google_storage_bucket.media \
+  -target=google_service_account.app \
+  -target=google_storage_bucket_iam_member.app_media \
+  -target=google_project_iam_member.app_sql \
+  -target=google_secret_manager_secret.app \
+  -target=google_secret_manager_secret_iam_member.app
+```
 
-# DATABASE_URL has to be composed: the instance has no public address, so this
-# is reachable only from inside the service's VPC.
+Fifteen to twenty minutes, nearly all of it the PostgreSQL instance. When it
+sits on `google_sql_database_instance` for ten minutes it is working, not hung.
+
+Then the values. Terraform never writes a secret value — a person does:
+
+```bash
+terraform output secrets_to_populate        # the exact container names
 terraform output database_private_ip
-printf '%s' "postgresql://cvos_app:<password>@<private-ip>:5432/cvos?sslmode=require" \
-  | gcloud secrets versions add cvos-pilot-database-url --data-file=-
 
-# …and one version per remaining secret.
+printf '%s' "$(openssl rand -hex 32)" | \
+  gcloud secrets versions add congovoice-pilot-session_secret --data-file=-
+printf '%s' "$(openssl rand -hex 32)" | \
+  gcloud secrets versions add congovoice-pilot-data_encryption_key --data-file=-
+printf '%s' "$(openssl rand -hex 32)" | \
+  gcloud secrets versions add congovoice-pilot-cron_secret --data-file=-
+
+# DATABASE_URL is composed, not generated: the instance has no public address,
+# so this string resolves only from inside the service's VPC.
+printf '%s' "postgresql://cvos_app:$TF_VAR_db_password@<private-ip>:5432/cvos?sslmode=require" \
+  | gcloud secrets versions add congovoice-pilot-database_url --data-file=-
 ```
 
-The Terraform also creates the image repository and enables the APIs, so §2's
-push target exists before you push to it:
+The three vendor keys — `anthropic_api_key`, `gemini_api_key`,
+`openai_api_key` — still need a version each, because Cloud Run will not mount a
+secret that has none. An empty one is a legitimate answer: the gateway treats a
+blank credential as *not configured* and stays on the offline provider rather
+than registering a vendor whose every call would 401.
 
 ```bash
-terraform output image_repository   # europe-west1-docker.pkg.dev/<project>/cvos
+for k in anthropic_api_key gemini_api_key openai_api_key; do
+  printf '' | gcloud secrets versions add "congovoice-pilot-$k" --data-file=-
+done
+```
+
+```bash
+# Phase two: everything else — the service, its public invoker, the scheduler
+# job and the domain mapping.
+terraform apply -var-file=environments/pilot.tfvars
 ```
 
 > **The data encryption key is not rotatable by editing it.** Phone numbers are
