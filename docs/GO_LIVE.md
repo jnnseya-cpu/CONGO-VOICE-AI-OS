@@ -286,6 +286,23 @@ curl -X POST https://congovoice.cd/api/v1/admin/review/members \
 4. Confirm: `/admin/comite` shows the board **constituted** and nothing
    outstanding, and `/api/v1/system/health` returns 200.
 
+Steps 1–4 and the first citizen journeys can be rehearsed end to end:
+
+```bash
+REHEARSAL_ADMIN=+243… REHEARSAL_PHYSICIANS=+243…,+243… \
+REHEARSAL_CHW=+243… REHEARSAL_WORKER=+243… \
+npm run rehearsal -- https://congovoice.cd
+```
+
+It signs in over HTTP as each person, seats the board, has the members sign
+every piece of health content, then asks the platform real questions as an
+anonymous citizen and follows the case into a worker's queue: a danger sign
+graded as an emergency with the rules that fired named, an ordinary case
+assessed rather than withheld, agriculture answered without an unregistered
+chemical rate, education answered, the case acknowledged by a health worker,
+and the maintenance job verifying the audit chain. Everything it does, a person
+would do on the day — so a green run is the platform working, not a mock of it.
+
 A quorum approves. **One member suspends, alone and immediately** — that is the
 rollback power, and it is the button to use when something is found in the
 field, not a code change.
@@ -308,6 +325,7 @@ failure and prints what to fix.
 Then the three checks that need a browser:
 
 ```bash
+npm run rehearsal -- https://congovoice.cd  # 28 checks: seated, signed, answering
 npm run smoke -- https://congovoice.cd    # 37 behavioural checks
 npm run crawl -- https://congovoice.cd    # every page, console errors, broken links
 npm run a11y  -- https://congovoice.cd    # WCAG 2.2 A/AA, fails on one violation

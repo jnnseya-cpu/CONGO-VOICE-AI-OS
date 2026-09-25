@@ -24,7 +24,8 @@
     "requirements:docx": "node scripts/requirements-docx.mjs",
     "preflight": "node scripts/preflight.mjs",
     "residency:doc": "node scripts/build-residency-doc.mjs",
-    "residency:docx": "node scripts/residency-docx.mjs"
+    "residency:docx": "node scripts/residency-docx.mjs",
+    "rehearsal": "node scripts/pilot-rehearsal.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
