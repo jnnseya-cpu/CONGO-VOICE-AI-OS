@@ -442,6 +442,43 @@ fi
 SERVICE_URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
 note "answering at $SERVICE_URL"
 
+# A revision that passes its probe is serving; it is not necessarily working.
+# The probe asks one endpoint, and a page that throws on render returns a 500
+# that nothing here would otherwise notice — so ask the pages a citizen lands
+# on, and print the reason rather than leaving it in the console.
+step "Checking the pages a citizen actually reaches"
+SMOKE_BAD=0
+while IFS='|' read -r path label; do
+  [[ -n "$path" ]] || continue
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${SERVICE_URL}${path}" || echo 000)
+  if [[ "$code" == 200 ]]; then
+    note "$code  $label"
+  else
+    note "$code  $label   <-- not serving"
+    SMOKE_BAD=$((SMOKE_BAD + 1))
+  fi
+done <<'PAGES'
+/|home
+/sante|health module
+/connexion|sign in
+/api/v1/system/ready|deployment readiness
+PAGES
+
+if (( SMOKE_BAD > 0 )); then
+  printf '\n'
+  note "$SMOKE_BAD page(s) failed. What the server said:"
+  printf '\n'
+  LIVE_REVISION=$(gc run revisions list --service="$SERVICE" --region="$REGION" \
+    --sort-by='~createTime' --limit=1 --format='value(name)' 2>/dev/null || true)
+  gc logging read \
+    "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE}\"${LIVE_REVISION:+ AND resource.labels.revision_name=\"$LIVE_REVISION\"} AND severity>=WARNING" \
+    --freshness=10m --limit=40 --order=asc \
+    --format='value(severity,textPayload,jsonPayload.message,jsonPayload.error)' \
+    | sed 's/^/   /' || note "(no log lines returned)"
+  printf '\n'
+  note "The service is deployed and reachable; these pages are failing inside it."
+fi
+
 step "Scheduled work"
 # Cloud Scheduler is not offered in every region, and africa-south1 is one that
 # refuses it. That is survivable in a way the service's own region is not,
