@@ -68,6 +68,55 @@ function configured(raw: string | undefined): string | undefined {
   return value ? value : undefined;
 }
 
+/**
+ * A per-provider deadline, so one slow vendor cannot hold a citizen's turn.
+ *
+ * There was none. A provider that accepted a connection and never answered hung
+ * the whole turn for as long as the platform in front of it allowed — which,
+ * now that the request ceiling is Cloud Run's maximum, is an hour, on an
+ * instance that can serve nobody else meanwhile. Raising that ceiling was right,
+ * and it is only safe because of this: the ceiling exists so nothing external
+ * ends a conversation, and this exists so the platform still ends one that has
+ * stopped going anywhere.
+ *
+ * A timeout is not a failure of the turn. It is a failure of one provider, and
+ * the chain continues to the next — ending at the offline provider, which always
+ * answers. A citizen describing a child's symptoms gets the deterministic
+ * answer, late, rather than nothing at all.
+ *
+ * The audio call gets longer than the text one because it carries a recording
+ * upward over a connection that may be a village's only bar of signal.
+ */
+function deadlineMs(capability: "llm" | "stt" | "tts"): number {
+  const fallback = capability === "stt" ? 90_000 : capability === "tts" ? 45_000 : 60_000;
+  const raw = Number(process.env.AI_PROVIDER_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+export class ProviderTimeout extends Error {
+  constructor(providerKey: string, ms: number) {
+    super(`${providerKey} did not answer within ${Math.round(ms / 1000)}s`);
+    this.name = "ProviderTimeout";
+  }
+}
+
+async function withDeadline<T>(providerKey: string, capability: "llm" | "stt" | "tts", work: Promise<T>): Promise<T> {
+  const ms = deadlineMs(capability);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new ProviderTimeout(providerKey, ms)), ms);
+      }),
+    ]);
+  } finally {
+    // Without this the process holds a pending timer per call, and a busy
+    // instance accumulates them until the event loop will not drain.
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export interface CallMeta {
   interactionId?: string | null;
   /** Scripted / degraded mode: only the offline rules provider is used (ACU cap, provider outage policy). */
@@ -215,7 +264,7 @@ export class AiGateway {
     for (const provider of chain) {
       const started = Date.now();
       try {
-        const result = await provider.generateJson(req);
+        const result = await withDeadline(provider.key, "llm", provider.generateJson(req));
         await this.log({ capability: hasImages ? "vision" : "llm", providerKey: provider.key, model: result.model, interactionId: meta.interactionId, inputTokens: result.inputTokens, outputTokens: result.outputTokens, durationMs: Date.now() - started, success: true });
         return { ...result, providerKey: provider.key };
       } catch (err) {
@@ -240,7 +289,7 @@ export class AiGateway {
     for (const provider of [...chain, ...fallback]) {
       const started = Date.now();
       try {
-        const result = await provider.transcribe(req);
+        const result = await withDeadline(provider.key, "stt", provider.transcribe(req));
         await this.log({ capability: "stt", providerKey: provider.key, model: result.model, interactionId: meta.interactionId, audioSeconds: result.audioSeconds, durationMs: Date.now() - started, success: true });
         return { ...result, providerKey: provider.key };
       } catch (err) {
@@ -260,7 +309,7 @@ export class AiGateway {
     for (const provider of chain) {
       const started = Date.now();
       try {
-        const result = await provider.synthesize(req);
+        const result = await withDeadline(provider.key, "tts", provider.synthesize(req));
         if (!result) continue;
         await this.log({ capability: "tts", providerKey: provider.key, model: result.model, interactionId: meta.interactionId, durationMs: Date.now() - started, success: true });
         return { ...result, providerKey: provider.key };

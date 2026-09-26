@@ -23,6 +23,7 @@ import { assessHealth, attachSafeguardingCase, type HealthTriageResult } from ".
 import { assessAgriculture, type AgricultureAssessmentPlus } from "./agriculture";
 import { assessEducation, type EducationAssessmentPlus } from "./education";
 import { detectClusters } from "./clusters";
+import { classifyCourtesy } from "./courtesy";
 import { scoreRisk } from "./risk";
 import { openCase, shouldAutoCreateCase } from "./workflow";
 import { isDegradedMode } from "@server/core/metering";
@@ -236,6 +237,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
     // 6. Risk scoring (deterministic).
     const domainConfidence = health?.confidence ?? agriculture?.confidence ?? education?.confidence ?? general?.confidence ?? 0.5;
+    const courtesy = classifyCourtesy(transcript);
+
     const risk = scoreRisk({
       module: service,
       health,
@@ -250,6 +253,9 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       citations: health?.citations,
       safeguarding: health?.safeguarding ?? education?.safeguarding,
       humanReviewRequired: health?.humanReviewRequired,
+      // Decided on what the citizen actually said, before translation and
+      // before any model's reading of it.
+      courtesy: courtesy.courtesy,
     });
 
     // 7. Compose the seven-part answer (French), then localise.

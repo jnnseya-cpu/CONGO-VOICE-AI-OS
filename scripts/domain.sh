@@ -77,12 +77,14 @@ step "Backend service"
 # upload, a transcription, a language decision, an answer and a speech synthesis
 # — routinely more than thirty seconds, and much more on the first request to a
 # cold instance. The load balancer closed the connection mid-request and the
-# browser reported a network failure, which looks like the citizen's signal
-# rather than our configuration.
+# browser reported a network failure, which reaches the citizen as their own
+# signal failing rather than as our configuration.
 #
-# 300s matches Cloud Run's own request timeout, so the platform decides when a
-# turn has taken too long, not the hop in front of it.
-BACKEND_TIMEOUT="${BACKEND_TIMEOUT:-300}"
+# Set to Cloud Run's own maximum so the two agree. There is no "unlimited" to
+# choose: every hop has a ceiling, and raising each to its own maximum is the
+# honest version of removing the limit. What must never end a conversation is a
+# hop in front of the platform deciding it has waited long enough.
+BACKEND_TIMEOUT="${BACKEND_TIMEOUT:-3600}"
 if exists gc compute backend-services describe "$BACKEND" --global; then
   current=$(gc compute backend-services describe "$BACKEND" --global --format='value(timeoutSec)')
   if [[ "$current" == "$BACKEND_TIMEOUT" ]]; then

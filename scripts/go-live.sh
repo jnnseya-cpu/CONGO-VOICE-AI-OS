@@ -383,10 +383,19 @@ done
 # The certificate authority the application verifies the database against.
 SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 
-# --timeout=300 is stated rather than defaulted, and the load balancer in front
-# of this is set to match. A spoken turn is an upload, a transcription, an
-# answer and a speech synthesis; the platform must be the thing that decides it
-# has taken too long, not a hop in front of it closing the connection.
+# The request timeout is set to Cloud Run's maximum, and the load balancer in
+# front of it is set to match.
+#
+# There is no "unlimited" to choose here: every hop has a ceiling, and the
+# honest thing is to raise each one to its own maximum rather than to imply a
+# limit has been removed. Cloud Run's is 3600 seconds; the load balancer's is
+# set to the same number so neither cuts the other off.
+#
+# The point is not that a turn should take an hour. It is that when a citizen
+# describes a child's symptoms over a weak connection, the thing that ends the
+# conversation must be the conversation finishing — not a hop in front of the
+# platform deciding it has waited long enough and closing the socket, which
+# reaches the citizen as a network failure they will read as their own.
 #
 # --allow-unauthenticated: the service answers citizens on the open internet and
 # telephony webhooks from providers holding no Google credentials. Every
@@ -426,7 +435,7 @@ if ! gc run deploy "$SERVICE" \
   --vpc-egress=private-ranges-only \
   --port=8080 \
   --cpu=1 --memory=1Gi \
-  --timeout=300 \
+  --timeout="${REQUEST_TIMEOUT:-3600}" \
   --min-instances="${MIN_INSTANCES:-1}" \
   --max-instances="${MAX_INSTANCES:-10}" \
   --allow-unauthenticated \

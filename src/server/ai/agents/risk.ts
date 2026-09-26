@@ -31,6 +31,12 @@ export interface RiskInput {
   safeguarding?: boolean;
   /** Human review already demanded upstream (contract violation, prohibited claim…). */
   humanReviewRequired?: boolean;
+  /**
+   * The citizen said something courteous rather than asking anything — "merci",
+   * "mbote", "asante". Decided deterministically before any model runs, and
+   * only ever consulted when nothing else in this input carries risk.
+   */
+  courtesy?: boolean;
 }
 
 export interface RiskResult {
@@ -126,9 +132,37 @@ export function scoreRisk(input: RiskInput): RiskResult {
   if (confidenceBand === "scripted") flags.push("mode_scripte");
   if (input.safetyViolations?.length) flags.push("contenu_filtre");
 
+  /**
+   * A courtesy is exempt only when the raw inputs carry nothing.
+   *
+   * This is decided here, from what the caller passed, rather than after the
+   * rules below — because those rules raise a level and the raise then
+   * propagates into the protocol severity, so a check placed after them sees an
+   * alarming input that the rules themselves manufactured. That is precisely how
+   * "merci" became an urgent health case: nothing was wrong with the message,
+   * and the escalation was assembled from its own low confidence.
+   *
+   * Every genuine signal disables it: a danger sign, a protocol severity above
+   * "advice", a safeguarding disclosure, filtered content, an upstream demand
+   * for review, or a missing citation. None of those can be reached by being
+   * polite.
+   */
+  const rawSeverity = input.severityLevel ?? null;
+  const courtesyExempt =
+    Boolean(input.courtesy) &&
+    !input.safeguarding &&
+    !input.humanReviewRequired &&
+    !(input.safetyViolations?.length) &&
+    !(input.health?.emergencyFlags?.length) &&
+    (rawSeverity === null || rawSeverity <= 1) &&
+    score < 0.35;
+  if (courtesyExempt) flags.push("politesse");
+
   let level: Severity = score >= 0.85 ? "critical" : score >= 0.6 ? "high" : score >= 0.35 ? "medium" : "low";
-  // Health with low confidence never stays "low": a human should look.
-  if (input.module === "health" && lowConfidence && level === "low") level = "medium";
+  // Health with low confidence never stays "low": a human should look. Unless
+  // nothing was asked, in which case low confidence is the absence of a
+  // question rather than a failure to understand one.
+  if (input.module === "health" && lowConfidence && level === "low" && !courtesyExempt) level = "medium";
 
   // Deterministic protocol severity: it sets the floor. Rules above may only raise it.
   let severityLevel: SeverityLevel | null = null;
@@ -167,14 +201,20 @@ export function scoreRisk(input: RiskInput): RiskResult {
     if (severityLevel !== null && severityLevel < 3) severityLevel = 3;
   }
 
+  // A blocked recommendation is a real signal, and it is only known after the
+  // citation check above — so the exemption decided earlier still yields to it.
+  const exemptCourtesy = courtesyExempt && !blocked;
+
   const escalationRequired =
     level === "critical" ||
     level === "high" ||
     blocked ||
     Boolean(input.safeguarding) ||
-    // AI-03: understood too poorly to answer — a person looks at it, in every module.
-    confidenceBand === "scripted" ||
-    (input.module === "health" && lowConfidence && score >= 0.35);
+    // AI-03: understood too poorly to answer — a person looks at it, in every
+    // module. Unless nothing was asked, in which case there is nothing to
+    // understand and nobody to wake.
+    (confidenceBand === "scripted" && !exemptCourtesy) ||
+    (input.module === "health" && lowConfidence && score >= 0.35 && !exemptCourtesy);
   if (escalationRequired && !reason) {
     reason = input.safeguarding
       ? "Divulgation relevant du dispositif de protection"

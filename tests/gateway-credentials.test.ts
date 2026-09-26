@@ -50,3 +50,31 @@ describe("a blank credential is not a configured provider", () => {
     expect(await providers()).toContain("gemini");
   });
 });
+
+describe("one slow provider does not hold a citizen's turn", () => {
+  /**
+   * There was no timeout anywhere in the gateway. A vendor that accepted a
+   * connection and never answered hung the whole turn for as long as the
+   * platform in front of it allowed — an hour, on an instance serving nobody
+   * else. The request ceiling was raised so that nothing external ends a
+   * conversation; this is what makes that safe.
+   */
+  it("gives up on a provider and lets the chain continue", async () => {
+    const { ProviderTimeout } = await import("@server/ai/gateway");
+    const err = new ProviderTimeout("some_vendor", 60_000);
+    expect(err.name).toBe("ProviderTimeout");
+    expect(err.message).toContain("some_vendor");
+    // The operator reading a log needs the number, not "timed out".
+    expect(err.message).toContain("60s");
+  });
+
+  it("still answers from the offline provider when every vendor is unreachable", async () => {
+    clear();
+    // No keys at all is the same shape as every key timing out: the chain ends
+    // at the offline provider, which always answers.
+    const gateway = aiGateway();
+    const status = await gateway.status();
+    expect(status.llm).toContain("mock");
+    expect(status.offlineMode).toBe(true);
+  });
+});

@@ -68,6 +68,29 @@ wants one. It is not the supported path and this runbook does not use it.
 
 ---
 
+## 0. How long a conversation may take
+
+Two hops can end a citizen's turn before the platform does, and both are set to
+their maximum so that neither ever does.
+
+| Where | Variable | Default | Why |
+|---|---|---|---|
+| Cloud Run service | `REQUEST_TIMEOUT` | 3600 s | Cloud Run's own maximum. |
+| Load balancer backend | `BACKEND_TIMEOUT` | 3600 s | Defaults to **30 s**, which cut every spoken turn short and reached the browser as "Failed to fetch". |
+
+There is no "unlimited" to choose: every hop has a ceiling, and raising each to
+its own maximum is the honest version of removing the limit.
+
+Raising them is only safe because the platform keeps its own, shorter deadline
+per AI provider (`AI_PROVIDER_TIMEOUT_MS`: 60 s text, 90 s audio, 45 s speech).
+A vendor that accepts a connection and never answers would otherwise hold an
+instance for the full hour. When one provider runs out of time the chain moves
+to the next and ends at the offline provider, which always answers — so a
+citizen describing a child's symptoms gets the deterministic answer late rather
+than nothing at all.
+
+---
+
 ## 0a. The machine you run from
 
 Cloud Shell (<https://shell.cloud.google.com>) is the least trouble: it is
