@@ -443,14 +443,25 @@ SERVICE_URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='v
 note "answering at $SERVICE_URL"
 
 step "Scheduled work"
-SCHED_OK=yes
-if exists gc scheduler jobs describe "$SCHEDULER_JOB" --location="$REGION"; then
-  note "exists: $SCHEDULER_JOB"
-else
+# Cloud Scheduler is not offered in every region, and africa-south1 is one that
+# refuses it. That is survivable in a way the service's own region is not,
+# because the job reaches the platform over HTTPS: it can sit anywhere. What is
+# NOT survivable is having no job at all — reminders, the SLA sweep, retention
+# deletions and audit verification all hang off it, and nothing else notices
+# they stopped.
+SCHED_OK=no
+SCHED_REGION=""
+for candidate in "$REGION" ${CRON_REGION:-} europe-west1 us-central1; do
+  [[ -n "$candidate" ]] || continue
+  if exists gc scheduler jobs describe "$SCHEDULER_JOB" --location="$candidate"; then
+    SCHED_OK=yes; SCHED_REGION="$candidate"
+    note "exists: $SCHEDULER_JOB in $candidate"
+    break
+  fi
   # A run that overlaps the next is worse than one that is skipped: every step
   # is independent and idempotent, but two sweeps at once double the work.
-  gc scheduler jobs create http "$SCHEDULER_JOB" \
-    --location="$REGION" \
+  if gc scheduler jobs create http "$SCHEDULER_JOB" \
+    --location="$candidate" \
     --schedule="*/5 * * * *" \
     --time-zone="Africa/Kinshasa" \
     --uri="${PUBLIC_URL}/api/v1/workflow/run" \
@@ -459,10 +470,14 @@ else
     --oidc-service-account-email="$SA_EMAIL" \
     --oidc-token-audience="${PUBLIC_URL}/api/v1/workflow/run" \
     --attempt-deadline=320s \
-    --max-retry-attempts=1 >/dev/null \
-  && note "created: $SCHEDULER_JOB (every 5 minutes, Africa/Kinshasa)" \
-  || { SCHED_OK=no; note "Cloud Scheduler refused this region. Reminders, the SLA sweep and retention will not run until this is solved."; }
-fi
+    --max-retry-attempts=1 >/dev/null 2>&1
+  then
+    SCHED_OK=yes; SCHED_REGION="$candidate"
+    note "created: $SCHEDULER_JOB in $candidate (every 5 minutes, Africa/Kinshasa)"
+    break
+  fi
+  note "$candidate does not offer Cloud Scheduler"
+done
 
 # ── 9. The domain, which is allowed to fail ──────────────────────────────────
 #
@@ -509,12 +524,18 @@ else
   note "  b) A region that offers mappings — with the latency and the"
   note "     residency change in docs/DATA_RESIDENCY.md written down first."
 fi
-if [[ "$SCHED_OK" != yes ]]; then
+if [[ "$SCHED_OK" == yes && "$SCHED_REGION" != "$REGION" ]]; then
   printf '\n'
-  note "Cloud Scheduler did not accept ${REGION}. Until it is running, nothing"
-  note "sweeps SLAs, sends reminders or applies retention. Create the job in a"
-  note "region that supports it — it calls the platform over HTTPS, so it does"
-  note "not have to sit in the same region as the service."
+  note "The scheduler job runs from ${SCHED_REGION}, because ${REGION} does not"
+  note "offer Cloud Scheduler. It calls the platform over HTTPS and sends no"
+  note "citizen data — only the instruction to run a sweep — so this does not"
+  note "change what docs/DATA_RESIDENCY.md declares."
+elif [[ "$SCHED_OK" != yes ]]; then
+  printf '\n'
+  note "No region accepted the scheduler job. Until one does, nothing sweeps"
+  note "SLAs, sends reminders, applies retention or verifies the audit chain,"
+  note "and nothing else will notice. Set CRON_REGION to a region that offers"
+  note "Cloud Scheduler and run this again."
 fi
 printf '\n'
 note "Do NOT run 'npm run seed' against this database — it is synthetic"

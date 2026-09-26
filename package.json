@@ -28,7 +28,8 @@
     "rehearsal": "node scripts/pilot-rehearsal.mjs",
     "go-live": "bash scripts/go-live.sh",
     "teardown": "bash scripts/teardown.sh",
-    "set-ai-keys": "bash scripts/set-ai-keys.sh"
+    "set-ai-keys": "bash scripts/set-ai-keys.sh",
+    "domain": "bash scripts/domain.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

@@ -54,9 +54,18 @@ read -r -p "  Type the project id to confirm: " typed
 [[ "$typed" == "$PROJECT" ]] || { printf '\n  Not confirmed. Nothing was deleted.\n\n'; exit 1; }
 
 step "Scheduler job"
-if exists gc scheduler jobs describe "${NAME}-workflow" --location="$REGION"; then
-  gc scheduler jobs delete "${NAME}-workflow" --location="$REGION" --quiet && note "deleted"
-else gone "${NAME}-workflow"; fi
+# It may not be in the service's region: not every region offers Cloud
+# Scheduler, so go-live.sh places it in the first one that accepts it.
+sched_found=no
+for loc in "$REGION" ${CRON_REGION:-} europe-west1 us-central1; do
+  [[ -n "$loc" ]] || continue
+  if exists gc scheduler jobs describe "${NAME}-workflow" --location="$loc"; then
+    gc scheduler jobs delete "${NAME}-workflow" --location="$loc" --quiet && note "deleted (from $loc)"
+    sched_found=yes
+    break
+  fi
+done
+[[ "$sched_found" == yes ]] || gone "${NAME}-workflow"
 
 step "Domain mapping"
 if exists gc beta run domain-mappings describe --domain="$DOMAIN" --region="$REGION"; then
@@ -112,6 +121,39 @@ else gone "${NAME}-private-ip"; fi
 if exists gc compute networks describe "${NAME}-net"; then
   gc compute networks delete "${NAME}-net" --quiet && note "network deleted"
 else gone "${NAME}-net"; fi
+
+step "Load balancer and domain"
+# Front to back: a forwarding rule pins its proxy, a proxy its map and
+# certificate, a backend its endpoint group. Deleting out of order fails with a
+# resource-in-use error that names the wrong thing.
+for rule in "${NAME}-https-rule" "${NAME}-http-rule"; do
+  if exists gc compute forwarding-rules describe "$rule" --global; then
+    gc compute forwarding-rules delete "$rule" --global --quiet && note "deleted: $rule"
+  else gone "$rule"; fi
+done
+if exists gc compute target-https-proxies describe "${NAME}-https" --global; then
+  gc compute target-https-proxies delete "${NAME}-https" --global --quiet && note "deleted: https proxy"
+else gone "https proxy"; fi
+if exists gc compute target-http-proxies describe "${NAME}-http" --global; then
+  gc compute target-http-proxies delete "${NAME}-http" --global --quiet && note "deleted: http proxy"
+else gone "http proxy"; fi
+for map in "${NAME}-urlmap" "${NAME}-redirect"; do
+  if exists gc compute url-maps describe "$map" --global; then
+    gc compute url-maps delete "$map" --global --quiet && note "deleted: $map"
+  else gone "$map"; fi
+done
+if exists gc compute ssl-certificates describe "${NAME}-cert" --global; then
+  gc compute ssl-certificates delete "${NAME}-cert" --global --quiet && note "deleted: certificate"
+else gone "certificate"; fi
+if exists gc compute backend-services describe "${NAME}-backend" --global; then
+  gc compute backend-services delete "${NAME}-backend" --global --quiet && note "deleted: backend"
+else gone "backend"; fi
+if exists gc compute network-endpoint-groups describe "${NAME}-neg" --region="$REGION"; then
+  gc compute network-endpoint-groups delete "${NAME}-neg" --region="$REGION" --quiet && note "deleted: endpoint group"
+else gone "endpoint group"; fi
+if exists gc compute addresses describe "${NAME}-ip" --global; then
+  gc compute addresses delete "${NAME}-ip" --global --quiet && note "deleted: static address"
+else gone "static address"; fi
 
 step "Image registry"
 if exists gc artifacts repositories describe cvos --location="$REGION"; then
