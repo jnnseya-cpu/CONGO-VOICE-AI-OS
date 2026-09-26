@@ -39,9 +39,6 @@ SCHEDULER_JOB="${NAME}-workflow"
 REPO=cvos
 DB_PASSWORD_SECRET="cvos-${ENVIRONMENT}-db-password"
 DB_CA_SECRET="${NAME}-db_ca"
-# Cloud Run mounts a secret as a file here, so the container can verify the
-# database's certificate instead of being told not to bother.
-DB_CA_PATH="/etc/ssl/cloudsql/server-ca.pem"
 export PUBLIC_URL="https://${DOMAIN}"
 MEDIA_BACKSTOP_DAYS="${MEDIA_BACKSTOP_DAYS:-400}"
 
@@ -220,10 +217,13 @@ gc secrets add-iam-policy-binding "$DB_CA_SECRET" \
   --member="serviceAccount:${SA_EMAIL}" \
   --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || true
 
-# uselibpqcompat=true with verify-ca and a CA file: the chain is verified, the
-# hostname is not — correct here, because the certificate names the instance and
-# we connect to its private address.
-DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_IP}:5432/${DB_NAME}?uselibpqcompat=true&sslmode=verify-ca&sslrootcert=${DB_CA_PATH}"
+# No TLS parameters in the URL, deliberately. pg assigns a parsed connection
+# string over the config it was handed, so a single sslmode= silently discards
+# the ssl object carrying the CA — which is what made the first attempt at this
+# fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE even once the CA was present. The
+# application reads DATABASE_CA_CERT and configures TLS itself; it also strips
+# these parameters defensively, so an older stored URL still works.
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_IP}:5432/${DB_NAME}"
 
 if exists gc sql databases describe "$DB_NAME" --instance="$DB_INSTANCE"; then
   note "exists: database $DB_NAME"
@@ -310,7 +310,7 @@ for key in "${SECRET_KEYS[@]}"; do
       note "already correct: $key"
     else
       add_version "$secret" "$DATABASE_URL"
-      note "composed: $key (verify-ca against the instance CA)"
+      note "composed: $key"
     fi
     continue
   fi
@@ -379,9 +379,8 @@ for key in "${SECRET_KEYS[@]}"; do
   env_name=$(tr '[:lower:]' '[:upper:]' <<<"$key")
   SECRET_REFS+="${SECRET_REFS:+,}${env_name}=${NAME}-${key}:latest"
 done
-# A path rather than a variable name mounts the secret as a file, which is what
-# sslrootcert in DATABASE_URL points at.
-SECRET_REFS+=",${DB_CA_PATH}=${DB_CA_SECRET}:latest"
+# The certificate authority the application verifies the database against.
+SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 
 # --allow-unauthenticated: the service answers citizens on the open internet and
 # telephony webhooks from providers holding no Google credentials. Every
