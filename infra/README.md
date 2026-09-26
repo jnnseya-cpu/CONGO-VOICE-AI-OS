@@ -1,4 +1,13 @@
-# Infrastructure
+# Infrastructure — optional, not the supported path
+
+**The supported way to deploy is `scripts/go-live.sh`, which uses `gcloud` and
+nothing else.** See `docs/GO_LIVE.md` §0. It needs no third-party tool, keeps no
+state file, and therefore never writes the database password into one.
+
+What follows is a Terraform description of the same estate, kept for anyone who
+wants declarative state and drift detection and is willing to take on Terraform
+as a dependency. The two are alternatives: run one or the other, never both
+against the same project, or each will fight the other's changes.
 
 Declarative definition of what the platform runs on (DO-02). Applying it is a
 deliberate act by someone with the credentials; nothing here runs from CI.

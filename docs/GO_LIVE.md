@@ -12,36 +12,59 @@ pilot** onto a real domain safely.
 
 ## 0. Run it as one command
 
-Everything from §2 to §3 is scripted. Doing it by hand means twenty pasted
-blocks into a shell that resets its working directory and its `core/project`
-between commands, and a paste that drops one character fails in a way that looks
-like an entirely different problem.
-
 ```bash
 git clone https://github.com/jnnseya-cpu/CONGO-VOICE-AI-OS.git
 cd CONGO-VOICE-AI-OS
 PROJECT=<your-project-id> bash scripts/go-live.sh
 ```
 
-It installs Terraform if it is missing, checks billing, enables the APIs,
-creates the state bucket, generates and stores the database password, fills in
-the variables file, creates the registry, builds the image, pins it by digest,
-creates the database and the secret containers, fills every secret, and brings
-the service up. It prints the service URL and the DNS records to add.
+**`gcloud` only.** No Terraform, no state file, no third-party tool: everything
+the script runs is the Google CLI that Cloud Shell already has, so there is
+nothing new to install, license or trust.
 
-Every step checks before it acts, so **it is safe to run again** after any
-failure: it skips what exists and resumes at the first thing that does not.
-Nothing is destroyed. No `gcloud` call depends on ambient configuration.
+It checks billing, enables the APIs, creates the registry, grants Cloud Build
+what a new project does not give it, builds the image, pins it by digest,
+creates the VPC and the private peering, creates PostgreSQL with no public
+address, creates the media bucket and the service identity, creates and fills
+all seven secrets, deploys the service, creates the scheduler job, and maps the
+domain. It prints the service URL and the DNS records to add.
 
-To supply a real vendor key rather than run on the offline provider:
+Every step checks whether its resource exists before creating it, so **it is
+safe to run again** after any failure: it skips what is there and resumes at the
+first thing missing. Nothing is deleted.
+
+To supply a real vendor key instead of running on the offline provider:
 
 ```bash
 export ANTHROPIC_API_KEY=sk-...      # or GEMINI_API_KEY / OPENAI_API_KEY
 PROJECT=<your-project-id> bash scripts/go-live.sh
 ```
 
-The rest of this document is what the script does, and why, step by step. Read
-it when something fails or when you need to do one part by hand.
+Other settings it takes from the environment, all with working defaults:
+`REGION`, `DOMAIN`, `ENVIRONMENT`, `DB_TIER`, `MIN_INSTANCES`, `MAX_INSTANCES`,
+`DATA_RESIDENCY`, `DEPLOYMENT_JURISDICTION`, `MEDIA_BACKSTOP_DAYS`.
+
+### What choosing gcloud over Terraform costs
+
+Stated here rather than discovered later. There is no declarative state, so
+nothing computes a diff before it acts, nothing reports drift when somebody
+changes a setting in the console, and nothing tears the estate down in one
+command. In exchange there is no state bucket holding the database password in
+clear, no state file to lose, and no vendor.
+
+The teardown is therefore written out rather than left as an exercise:
+
+```bash
+bash scripts/teardown.sh     # deletes the estate, and the citizen data in it
+```
+
+It refuses to run until you type the project id. It deletes the data encryption
+key, which no database backup can compensate for — every stored phone number is
+encrypted with a key derived from it and found through a blind index derived
+from it.
+
+`infra/` still holds a Terraform description of the same estate for anyone who
+wants one. It is not the supported path and this runbook does not use it.
 
 ---
 

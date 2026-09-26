@@ -25,7 +25,9 @@
     "preflight": "node scripts/preflight.mjs",
     "residency:doc": "node scripts/build-residency-doc.mjs",
     "residency:docx": "node scripts/residency-docx.mjs",
-    "rehearsal": "node scripts/pilot-rehearsal.mjs"
+    "rehearsal": "node scripts/pilot-rehearsal.mjs",
+    "go-live": "bash scripts/go-live.sh",
+    "teardown": "bash scripts/teardown.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -66,7 +68,7 @@
     "typescript": "^5",
     "vitest": "^5.0.0"
   },
-  "description": "Plateforme nationale d'inclusion numérique vocale en santé, agriculture et éducation — République Démocratique du Congo.",
+  "description": "Plateforme nationale d'inclusion num\u00e9rique vocale en sant\u00e9, agriculture et \u00e9ducation \u2014 R\u00e9publique D\u00e9mocratique du Congo.",
   "engines": {
     "node": ">=22.12.0 <23",
     "npm": ">=10"

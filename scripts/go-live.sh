@@ -4,15 +4,19 @@
 #
 #   bash scripts/go-live.sh
 #
-# Written because doing this by hand means twenty pasted blocks into a Cloud
-# Shell that resets its working directory and its `core/project` between
-# commands, and a paste that drops a character fails in a way that looks like a
-# different problem entirely.
+# gcloud only. No Terraform, no state file, no third-party tool: everything
+# here is the Google CLI that Cloud Shell already has, so there is nothing new
+# to install, license or trust.
 #
-# Every step is idempotent and checked before it runs, so this is safe to run
-# again after any failure: it skips what already exists and resumes at the first
-# thing that does not. Nothing is destroyed. No gcloud call relies on ambient
-# configuration — --project is passed explicitly every time.
+# What that costs, stated plainly rather than discovered later: there is no
+# declarative state, so nothing computes a diff, warns about drift, or tears the
+# estate down in one command. Each step therefore checks whether its resource
+# already exists and skips it if so — which makes this safe to run again after
+# any failure, resuming at the first thing that is missing. Nothing is deleted.
+# scripts/teardown.sh removes what this created, in dependency order.
+#
+# No gcloud call relies on ambient configuration: --project is passed every
+# time, and every path is absolute. A Cloud Shell reset cannot break a run.
 #
 set -euo pipefail
 
@@ -20,12 +24,29 @@ PROJECT="${PROJECT:-congo-voice}"
 REGION="${REGION:-africa-south1}"
 DOMAIN="${DOMAIN:-congovoicecd.com}"
 ENVIRONMENT="${ENVIRONMENT:-pilot}"
-PREFIX="congovoice-${ENVIRONMENT}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INFRA="$REPO_ROOT/infra"
-TFVARS="environments/${ENVIRONMENT}.tfvars"
-STATE_BUCKET="${PROJECT}-tfstate"
+
+NAME="congovoice-${ENVIRONMENT}"
+NETWORK="${NAME}-net"
+PEERING_RANGE="${NAME}-private-ip"
+DB_INSTANCE="${NAME}-pg"
+DB_NAME=cvos
+DB_USER=cvos_app
+DB_TIER="${DB_TIER:-db-custom-2-7680}"
+MEDIA_BUCKET="${NAME}-media"
+SERVICE_ACCOUNT_ID="${NAME}-app"
+SERVICE="$NAME"
+SCHEDULER_JOB="${NAME}-workflow"
+REPO=cvos
 DB_PASSWORD_SECRET="cvos-${ENVIRONMENT}-db-password"
+PUBLIC_URL="https://${DOMAIN}"
+MEDIA_BACKSTOP_DAYS="${MEDIA_BACKSTOP_DAYS:-400}"
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SA_EMAIL="${SERVICE_ACCOUNT_ID}@${PROJECT}.iam.gserviceaccount.com"
+IMAGE_PATH="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/app"
+
+# Env var name → secret name. The application reads the former; Secret Manager
+# holds the latter. Cloud Run refuses to start if any of these has no version.
 SECRET_KEYS=(session_secret data_encryption_key database_url cron_secret
              anthropic_api_key gemini_api_key openai_api_key)
 
@@ -33,262 +54,377 @@ step() { printf '\n\033[1m── %s\033[0m\n' "$*"; }
 note() { printf '   %s\n' "$*"; }
 die()  { printf '\n\033[31mSTOPPED: %s\033[0m\n' "$*" >&2; exit 1; }
 gc()   { gcloud "$@" --project="$PROJECT"; }
+exists() { "$@" >/dev/null 2>&1; }
 
-# ── 0. The machine ───────────────────────────────────────────────────────────
+# ── 0. The machine and the project ───────────────────────────────────────────
 
-step "Checking the machine"
+step "Checking the project"
 command -v gcloud >/dev/null || die "gcloud is not installed."
-if ! command -v terraform >/dev/null; then
-  note "Terraform is not installed. Installing into ~/bin, which survives a Cloud Shell reset."
-  mkdir -p "$HOME/bin"
-  tf_version=$(curl -fsS https://checkpoint-api.hashicorp.com/v1/check/terraform \
-    | python3 -c "import json,sys;print(json.load(sys.stdin)['current_version'])")
-  tmp=$(mktemp -d)
-  curl -fsSLo "$tmp/tf.zip" \
-    "https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip"
-  unzip -oq "$tmp/tf.zip" -d "$HOME/bin"
-  rm -rf "$tmp"
-  grep -q 'HOME/bin' "$HOME/.bashrc" 2>/dev/null \
-    || echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
-fi
-export PATH="$HOME/bin:$PATH"
-note "$(terraform version | head -1)"
-
-step "Checking the project and its billing"
-gcloud config set project "$PROJECT" >/dev/null 2>&1 || true
 gcloud projects describe "$PROJECT" --format='value(projectId)' >/dev/null \
-  || die "Project '$PROJECT' does not exist, or this account cannot see it. Run: gcloud projects list"
-billing=$(gcloud billing projects describe "$PROJECT" --format='value(billingEnabled)')
-[[ "$billing" == "True" ]] \
-  || die "Billing is not enabled on '$PROJECT'. Link an account at https://console.cloud.google.com/billing and run this again."
+  || die "Project '$PROJECT' does not exist or this account cannot see it. Run: gcloud projects list"
+[[ "$(gcloud billing projects describe "$PROJECT" --format='value(billingEnabled)')" == "True" ]] \
+  || die "Billing is not enabled on '$PROJECT'. Link an account at https://console.cloud.google.com/billing, then run this again."
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
-note "project $PROJECT ($PROJECT_NUMBER), billing enabled, region $REGION"
+note "$PROJECT ($PROJECT_NUMBER) · $REGION · $DOMAIN · stage $ENVIRONMENT"
 
 # ── 1. APIs ──────────────────────────────────────────────────────────────────
 
-step "Enabling the APIs"
-wanted=(run sqladmin secretmanager cloudscheduler artifactregistry
-        servicenetworking compute dns iam cloudbuild)
+step "APIs"
 enabled=$(gc services list --enabled --format='value(config.name)')
-for api in "${wanted[@]}"; do
-  if grep -qx "$api.googleapis.com" <<<"$enabled"; then
-    note "already on: $api"
+for api in run sqladmin secretmanager cloudscheduler artifactregistry \
+           servicenetworking compute dns iam cloudbuild storage; do
+  if grep -qx "${api}.googleapis.com" <<<"$enabled"; then
+    note "on: $api"
   else
-    gc services enable "$api.googleapis.com" && note "enabled: $api"
+    gc services enable "${api}.googleapis.com" && note "enabled: $api"
   fi
 done
 
-# ── 2. Terraform state, and the database password ────────────────────────────
-
-step "Terraform state bucket"
-if gc storage buckets describe "gs://$STATE_BUCKET" >/dev/null 2>&1; then
-  note "already exists: gs://$STATE_BUCKET"
-else
-  gc storage buckets create "gs://$STATE_BUCKET" --location="$REGION" \
-    --uniform-bucket-level-access --public-access-prevention
-  gc storage buckets update "gs://$STATE_BUCKET" --versioning
-  note "created: gs://$STATE_BUCKET (versioned, private)"
-fi
-
-step "Database password"
-if gc secrets describe "$DB_PASSWORD_SECRET" >/dev/null 2>&1; then
-  note "already stored in Secret Manager: $DB_PASSWORD_SECRET"
-else
-  openssl rand -base64 32 | tr -d '\n' \
-    | gc secrets create "$DB_PASSWORD_SECRET" --data-file=- --replication-policy=automatic
-  note "generated and stored: $DB_PASSWORD_SECRET"
-fi
-# Terraform reads it from the environment, so it never lands in a file that
-# could be committed.
-export TF_VAR_db_password="$(gc secrets versions access latest --secret="$DB_PASSWORD_SECRET")"
-[[ -n "$TF_VAR_db_password" ]] || die "Could not read $DB_PASSWORD_SECRET."
-
-# ── 3. The variables file ────────────────────────────────────────────────────
-
-step "Variables file"
-cd "$INFRA"
-if [[ ! -f "$TFVARS" ]]; then
-  cp "environments/${ENVIRONMENT}.tfvars.example" "$TFVARS"
-  note "created $TFVARS from the example"
-fi
-python3 - "$TFVARS" "$PROJECT" "$REGION" "$DOMAIN" <<'PY'
-import re, sys
-path, project, region, domain = sys.argv[1:5]
-s = open(path).read()
-def setvar(src, name, value):
-    line = f'{name} = "{value}"'
-    pattern = rf'^{name}\s*=.*$'
-    return re.sub(pattern, line, src, count=1, flags=re.M) if re.search(pattern, src, re.M) else src + "\n" + line + "\n"
-for name, value in (("project_id", project), ("region", region), ("domain", domain),
-                    ("public_url", f"https://{domain}")):
-    s = setvar(s, name, value)
-open(path, "w").write(s)
-PY
-note "project_id=$PROJECT region=$REGION domain=$DOMAIN"
-
-step "Terraform init"
-terraform init -input=false -backend-config="bucket=$STATE_BUCKET" >/dev/null
-note "backend: gs://$STATE_BUCKET"
-
-# ── 4. The registry, before anything is pushed to it ─────────────────────────
+# ── 2. The image registry ────────────────────────────────────────────────────
 
 step "Image registry"
-terraform apply -input=false -auto-approve -var-file="$TFVARS" \
-  -target=google_project_service.required \
-  -target=google_artifact_registry_repository.app >/dev/null
-note "$(terraform output -raw image_repository)"
+if exists gc artifacts repositories describe "$REPO" --location="$REGION"; then
+  note "exists: $IMAGE_PATH"
+else
+  gc artifacts repositories create "$REPO" --location="$REGION" \
+    --repository-format=docker --description="CONGO VOICE AI OS container images."
+  note "created: $IMAGE_PATH"
+fi
 
 step "Cloud Build permissions"
 # A new project runs Cloud Build as the Compute Engine default account, which
-# may push nowhere and write no logs until it is told it may.
+# can push nowhere and write no logs until it is told it may.
+CB_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 for role in artifactregistry.writer logging.logWriter; do
   gcloud projects add-iam-policy-binding "$PROJECT" \
-    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-    --role="roles/$role" --condition=None >/dev/null
-  note "granted roles/$role"
+    --member="serviceAccount:${CB_SA}" --role="roles/${role}" \
+    --condition=None >/dev/null && note "roles/${role}"
 done
 
-# ── 5. The image ─────────────────────────────────────────────────────────────
+# ── 3. The image ─────────────────────────────────────────────────────────────
 
-step "Building the image (this is the slow one — 3 to 15 minutes)"
+step "Image (3 to 15 minutes on a first build)"
 cd "$REPO_ROOT"
 TAG=$(git rev-parse --short HEAD)
-IMAGE_PATH="${REGION}-docker.pkg.dev/${PROJECT}/cvos/app"
-if gc artifacts docker images describe "${IMAGE_PATH}:${TAG}" >/dev/null 2>&1; then
-  note "an image for $TAG is already in the registry; not rebuilding"
+if exists gc artifacts docker images describe "${IMAGE_PATH}:${TAG}"; then
+  note "already built for $TAG; not rebuilding"
 else
+  # The public origin is inlined into the browser bundle, so it is a build
+  # argument, not a runtime variable. An image built without it is silently wrong.
   gc builds submit --config cloudbuild.yaml \
-    --substitutions="_REGION=${REGION},_SITE_URL=https://${DOMAIN},_TAG=${TAG}"
+    --substitutions="_REGION=${REGION},_SITE_URL=${PUBLIC_URL},_TAG=${TAG}"
 fi
 DIGEST=$(gc artifacts docker images describe "${IMAGE_PATH}:${TAG}" \
   --format='value(image_summary.digest)')
-[[ "$DIGEST" == sha256:* ]] || die "Could not read the image digest for tag $TAG."
-note "digest $DIGEST"
+[[ "$DIGEST" == sha256:* ]] || die "Could not read the digest for tag $TAG."
+# By digest, never by tag: a tag can be moved under a running service.
+IMAGE="${IMAGE_PATH}@${DIGEST}"
+note "$DIGEST"
 
-# Deploy by digest, never by tag: a tag can be moved under a running service.
-cd "$INFRA"
-python3 - "$TFVARS" "${IMAGE_PATH}@${DIGEST}" <<'PY'
-import re, sys
-path, image = sys.argv[1:3]
-s = open(path).read()
-s = re.sub(r'^image\s*=.*$', f'image = "{image}"', s, count=1, flags=re.M)
-open(path, "w").write(s)
-PY
-note "pinned in $TFVARS"
+# ── 4. Network: the database is never reachable from the internet ────────────
 
-# ── 6. Everything except the service ─────────────────────────────────────────
+step "Private network"
+if exists gc compute networks describe "$NETWORK"; then
+  note "exists: $NETWORK"
+else
+  gc compute networks create "$NETWORK" --subnet-mode=auto >/dev/null
+  note "created: $NETWORK"
+fi
 
-step "Database, bucket, identity, secret containers (10 to 20 minutes — PostgreSQL is the slow part)"
-terraform apply -input=false -auto-approve -var-file="$TFVARS" \
-  -target=google_sql_database_instance.main \
-  -target=google_sql_database.app \
-  -target=google_sql_user.app \
-  -target=google_storage_bucket.media \
-  -target=google_service_account.app \
-  -target=google_storage_bucket_iam_member.app_media \
-  -target=google_project_iam_member.app_sql \
-  -target=google_secret_manager_secret.app \
-  -target=google_secret_manager_secret_iam_member.app
-DB_IP=$(terraform output -raw database_private_ip)
-[[ -n "$DB_IP" ]] || die "The database has no private address yet."
-note "database private address: $DB_IP"
+if exists gc compute addresses describe "$PEERING_RANGE" --global; then
+  note "exists: $PEERING_RANGE"
+else
+  gc compute addresses create "$PEERING_RANGE" --global \
+    --purpose=VPC_PEERING --prefix-length=16 --network="$NETWORK" >/dev/null
+  note "created: $PEERING_RANGE"
+fi
 
-# ── 7. Secret values ─────────────────────────────────────────────────────────
+if gc services vpc-peerings list --network="$NETWORK" \
+     --format='value(reservedPeeringRanges)' 2>/dev/null | grep -q "$PEERING_RANGE"; then
+  note "peering already connected"
+else
+  gc services vpc-peerings connect --service=servicenetworking.googleapis.com \
+    --network="$NETWORK" --ranges="$PEERING_RANGE" >/dev/null
+  note "peering connected"
+fi
+
+# ── 5. The database ──────────────────────────────────────────────────────────
+
+step "Database password"
+if exists gc secrets describe "$DB_PASSWORD_SECRET"; then
+  note "already in Secret Manager: $DB_PASSWORD_SECRET"
+else
+  openssl rand -base64 32 | tr -d '\n' \
+    | gc secrets create "$DB_PASSWORD_SECRET" --data-file=- --replication-policy=automatic
+  note "generated: $DB_PASSWORD_SECRET"
+fi
+DB_PASSWORD="$(gc secrets versions access latest --secret="$DB_PASSWORD_SECRET")"
+[[ -n "$DB_PASSWORD" ]] || die "Could not read $DB_PASSWORD_SECRET."
+
+step "PostgreSQL (10 to 20 minutes on a first run — this is the slow one)"
+if exists gc sql instances describe "$DB_INSTANCE"; then
+  note "exists: $DB_INSTANCE"
+else
+  # --edition=enterprise is stated, not defaulted: some regions now create a new
+  # instance as ENTERPRISE_PLUS, which accepts only db-perf-optimized-* tiers
+  # and rejects db-custom-* with a 400.
+  #
+  # --ssl-mode=ENCRYPTED_ONLY, not TRUSTED_CLIENT_CERTIFICATE_REQUIRED: the
+  # application connects with sslmode=require, which encrypts but presents no
+  # client certificate. Requiring one would refuse every connection it makes.
+  gc sql instances create "$DB_INSTANCE" \
+    --database-version=POSTGRES_16 \
+    --region="$REGION" \
+    --edition=enterprise \
+    --tier="$DB_TIER" \
+    --network="projects/${PROJECT}/global/networks/${NETWORK}" \
+    --no-assign-ip \
+    --availability-type=zonal \
+    --storage-auto-increase \
+    --backup-start-time=02:00 \
+    --enable-point-in-time-recovery \
+    --retained-backups-count=30 \
+    --retained-transaction-log-days=7 \
+    --database-flags=log_min_duration_statement=1000 \
+    --ssl-mode=ENCRYPTED_ONLY \
+    --deletion-protection
+  note "created: $DB_INSTANCE"
+fi
+DB_IP=$(gc sql instances describe "$DB_INSTANCE" --format='value(ipAddresses[0].ipAddress)')
+[[ -n "$DB_IP" ]] || die "The database has no private address."
+note "private address: $DB_IP"
+
+if exists gc sql databases describe "$DB_NAME" --instance="$DB_INSTANCE"; then
+  note "exists: database $DB_NAME"
+else
+  gc sql databases create "$DB_NAME" --instance="$DB_INSTANCE" >/dev/null
+  note "created: database $DB_NAME"
+fi
+
+if gc sql users list --instance="$DB_INSTANCE" --format='value(name)' | grep -qx "$DB_USER"; then
+  note "exists: user $DB_USER"
+else
+  gc sql users create "$DB_USER" --instance="$DB_INSTANCE" --password="$DB_PASSWORD" >/dev/null
+  note "created: user $DB_USER"
+fi
+
+# ── 6. Media, and who may touch it ───────────────────────────────────────────
+
+step "Media bucket"
+if exists gc storage buckets describe "gs://${MEDIA_BUCKET}"; then
+  note "exists: gs://${MEDIA_BUCKET}"
+else
+  gc storage buckets create "gs://${MEDIA_BUCKET}" --location="$REGION" \
+    --uniform-bucket-level-access --public-access-prevention >/dev/null
+  gc storage buckets update "gs://${MEDIA_BUCKET}" --versioning >/dev/null
+  # A backstop only. The application deletes on its own retention schedule and
+  # audits each deletion; this catches anything it never learned about.
+  lifecycle=$(mktemp)
+  cat > "$lifecycle" <<JSON
+{"rule":[{"action":{"type":"Delete"},"condition":{"age":${MEDIA_BACKSTOP_DAYS}}}]}
+JSON
+  gc storage buckets update "gs://${MEDIA_BUCKET}" --lifecycle-file="$lifecycle" >/dev/null
+  rm -f "$lifecycle"
+  note "created: gs://${MEDIA_BUCKET} (private, versioned, ${MEDIA_BACKSTOP_DAYS}-day backstop)"
+fi
+
+step "Service identity"
+if exists gc iam service-accounts describe "$SA_EMAIL"; then
+  note "exists: $SA_EMAIL"
+else
+  gc iam service-accounts create "$SERVICE_ACCOUNT_ID" \
+    --display-name="CONGO VOICE AI OS (${ENVIRONMENT})" >/dev/null
+  note "created: $SA_EMAIL"
+fi
+gc storage buckets add-iam-policy-binding "gs://${MEDIA_BUCKET}" \
+  --member="serviceAccount:${SA_EMAIL}" --role=roles/storage.objectAdmin >/dev/null
+note "granted: objectAdmin on the media bucket"
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member="serviceAccount:${SA_EMAIL}" --role=roles/cloudsql.client \
+  --condition=None >/dev/null
+note "granted: cloudsql.client"
+
+# ── 7. Secrets ───────────────────────────────────────────────────────────────
 #
-# Terraform creates the containers; it never writes a value. Cloud Run refuses
-# to start a service mounting a secret with no version, so every one needs a
-# version — including a vendor key nobody has supplied. An empty version is the
-# honest answer there: the gateway reads a blank credential as "not configured"
-# and stays on the offline provider rather than registering a vendor whose every
-# call would fail with a 401.
+# Containers are created here; values are written by a person, or generated. A
+# vendor key nobody has supplied gets a blank version: Cloud Run refuses to
+# start a service mounting a secret with no version at all, and the gateway
+# reads a blank credential as "not configured", staying on the offline provider
+# rather than registering a vendor whose every call would fail with a 401.
 
-step "Secret values"
-has_version() { [[ -n "$(gc secrets versions list "$1" --filter='state=enabled' --format='value(name)' --limit=1)" ]]; }
+step "Secrets"
 add_version() { printf '%s' "$2" | gc secrets versions add "$1" --data-file=- >/dev/null; }
-# Secret Manager rejects a zero-byte payload in some API versions, and Cloud Run
-# still needs a version to exist. A single space is accepted everywhere and the
-# gateway trims it, so it reaches the application as "not configured" either way.
 add_blank_version() {
+  # Secret Manager refuses a zero-byte payload in some API versions. A single
+  # space is accepted everywhere and the gateway trims it, so it reaches the
+  # application as "not configured" either way.
   add_version "$1" "" 2>/dev/null || add_version "$1" " "
 }
 
 for key in "${SECRET_KEYS[@]}"; do
-  name="${PREFIX}-${key}"
-  if has_version "$name"; then
+  secret="${NAME}-${key}"
+  if ! exists gc secrets describe "$secret"; then
+    gc secrets create "$secret" --replication-policy=automatic >/dev/null
+    note "created container: $key"
+  fi
+  gc secrets add-iam-policy-binding "$secret" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role=roles/secretmanager.secretAccessor >/dev/null
+
+  if [[ -n "$(gc secrets versions list "$secret" --filter='state=enabled' --format='value(name)' --limit=1)" ]]; then
     note "already set: $key"
     continue
   fi
   case "$key" in
     session_secret|data_encryption_key|cron_secret)
-      add_version "$name" "$(openssl rand -hex 32)"; note "generated: $key" ;;
+      add_version "$secret" "$(openssl rand -hex 32)"; note "generated: $key" ;;
     database_url)
-      add_version "$name" "postgresql://cvos_app:${TF_VAR_db_password}@${DB_IP}:5432/cvos?sslmode=require"
+      add_version "$secret" "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_IP}:5432/${DB_NAME}?sslmode=require"
       note "composed: $key" ;;
     *)
-      # An existing environment variable wins: `export ANTHROPIC_API_KEY=...`
-      # before running this loads a real key instead of an empty placeholder.
+      # An exported variable wins: `export ANTHROPIC_API_KEY=...` before running
+      # this loads a real key instead of a blank placeholder.
       env_name=$(tr '[:lower:]' '[:upper:]' <<<"$key")
       value="${!env_name:-}"
       if [[ -n "$value" ]]; then
-        add_version "$name" "$value"; note "loaded from \$$env_name: $key"
+        add_version "$secret" "$value"; note "loaded from \$${env_name}: $key"
       else
-        add_blank_version "$name"; note "left blank (offline provider): $key"
+        add_blank_version "$secret"; note "blank, offline provider: $key"
       fi ;;
   esac
 done
 
 # ── 8. The service ───────────────────────────────────────────────────────────
 
-step "The service and its scheduler job"
-terraform apply -input=false -auto-approve -var-file="$TFVARS" \
-  -target=google_cloud_run_v2_service.app \
-  -target=google_cloud_run_v2_service_iam_member.public \
-  -target=google_cloud_scheduler_job.workflow
-SERVICE_URL=$(terraform output -raw service_url)
-note "the platform answers at $SERVICE_URL"
+step "Cloud Run service"
+# ^@^ as the delimiter because DATA_RESIDENCY is itself a comma-separated list,
+# and the default delimiter would split it into two broken variables.
+ENV_VARS="^@^NODE_ENV=production"
+ENV_VARS+="@STORAGE_DRIVER=gcs"
+ENV_VARS+="@GCS_BUCKET=${MEDIA_BUCKET}"
+ENV_VARS+="@TRUSTED_PROXY_HOPS=1"
+ENV_VARS+="@NEXT_PUBLIC_SITE_URL=${PUBLIC_URL}"
+# Not a label: pilot and prod are the stages at which the platform assumes a
+# real citizen is on the other end. An escalation must be able to reach a
+# person, clinical content must carry a review-board sign-off, and a log-only
+# notification provider fails loudly instead of pretending it sent something.
+ENV_VARS+="@DEPLOYMENT_STAGE=${ENVIRONMENT}"
+# Declared, never inferred from the region: the platform refuses to guess a
+# jurisdiction from a region name. See docs/DATA_RESIDENCY.md.
+ENV_VARS+="@DATA_RESIDENCY=${DATA_RESIDENCY:-ZA,US}"
+ENV_VARS+="@DEPLOYMENT_JURISDICTION=${DEPLOYMENT_JURISDICTION:-ZA}"
+# So the maintenance endpoint can tell the scheduler's own identity token from
+# anybody else's. Without these it refuses every scheduled run.
+ENV_VARS+="@CRON_OIDC_AUDIENCE=${PUBLIC_URL}/api/v1/workflow/run"
+ENV_VARS+="@CRON_SERVICE_ACCOUNT=${SA_EMAIL}"
+
+SECRET_REFS=""
+for key in "${SECRET_KEYS[@]}"; do
+  env_name=$(tr '[:lower:]' '[:upper:]' <<<"$key")
+  SECRET_REFS+="${SECRET_REFS:+,}${env_name}=${NAME}-${key}:latest"
+done
+
+# --allow-unauthenticated: the service answers citizens on the open internet and
+# telephony webhooks from providers holding no Google credentials. Every
+# /api/v1 route still enforces its own session and permission check in handle().
+gc run deploy "$SERVICE" \
+  --image="$IMAGE" \
+  --region="$REGION" \
+  --service-account="$SA_EMAIL" \
+  --network="$NETWORK" \
+  --subnet="$NETWORK" \
+  --vpc-egress=private-ranges-only \
+  --port=8080 \
+  --cpu=1 --memory=1Gi \
+  --min-instances="${MIN_INSTANCES:-1}" \
+  --max-instances="${MAX_INSTANCES:-10}" \
+  --allow-unauthenticated \
+  --set-env-vars="$ENV_VARS" \
+  --set-secrets="$SECRET_REFS" \
+  --quiet
+SERVICE_URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
+note "answering at $SERVICE_URL"
+
+# Never zero instances where calls are answered: a cold start on an emergency
+# call is a citizen waiting.
+
+step "Scheduled work"
+SCHED_OK=yes
+if exists gc scheduler jobs describe "$SCHEDULER_JOB" --location="$REGION"; then
+  note "exists: $SCHEDULER_JOB"
+else
+  # A run that overlaps the next is worse than one that is skipped: every step
+  # is independent and idempotent, but two sweeps at once double the work.
+  gc scheduler jobs create http "$SCHEDULER_JOB" \
+    --location="$REGION" \
+    --schedule="*/5 * * * *" \
+    --time-zone="Africa/Kinshasa" \
+    --uri="${PUBLIC_URL}/api/v1/workflow/run" \
+    --http-method=POST \
+    --headers="Content-Type=application/json" \
+    --oidc-service-account-email="$SA_EMAIL" \
+    --oidc-token-audience="${PUBLIC_URL}/api/v1/workflow/run" \
+    --attempt-deadline=320s \
+    --max-retry-attempts=1 >/dev/null \
+  && note "created: $SCHEDULER_JOB (every 5 minutes, Africa/Kinshasa)" \
+  || { SCHED_OK=no; note "Cloud Scheduler refused this region. Reminders, the SLA sweep and retention will not run until this is solved."; }
+fi
 
 # ── 9. The domain, which is allowed to fail ──────────────────────────────────
 #
 # Cloud Run domain mappings are not offered in every region, and a region that
-# does not offer them refuses the mapping rather than the service. Attempting it
-# last, and separately, means an unsupported region costs a warning instead of
-# the whole run — the platform is already up and answering by this point.
+# does not offer them refuses the mapping, not the service. Attempting it last
+# and separately means an unsupported region costs a warning, not the run.
 
-step "The domain mapping for $DOMAIN"
+step "Domain mapping for $DOMAIN"
 DOMAIN_OK=yes
-if ! terraform apply -input=false -auto-approve -var-file="$TFVARS"; then
+if exists gc beta run domain-mappings describe --domain="$DOMAIN" --region="$REGION"; then
+  note "already mapped"
+elif gc beta run domain-mappings create --service="$SERVICE" --domain="$DOMAIN" \
+       --region="$REGION" >/dev/null 2>&1; then
+  note "created"
+else
   DOMAIN_OK=no
-  note "The mapping did not apply. Everything else is up."
+  note "not available here. Everything else is up."
 fi
+
+# ── Done ─────────────────────────────────────────────────────────────────────
 
 step "Done"
 printf '\n'
 note "The platform answers at: $SERVICE_URL"
 printf '\n'
 if [[ "$DOMAIN_OK" == yes ]]; then
-  note "DNS records to add at your registrar for $DOMAIN:"
-  terraform output -json dns_records_to_create 2>/dev/null | python3 -c \
-    "import json,sys; [print('     ' + r) for r in json.load(sys.stdin)]" \
-    || note "     (re-run: terraform output dns_records_to_create)"
+  note "DNS records to add at your registrar for ${DOMAIN}:"
+  gc beta run domain-mappings describe --domain="$DOMAIN" --region="$REGION" \
+    --format='value(status.resourceRecords.flatten())' | sed 's/^/     /'
   printf '\n'
-  note "Then, once the records resolve and the certificate is issued:"
-  note "  curl -sI https://$DOMAIN | head -3"
-  note "  npm run preflight -- https://$DOMAIN"
+  note "Then, once they resolve and the managed certificate is issued:"
+  note "  curl -sI ${PUBLIC_URL} | head -3"
+  note "  npm run preflight -- ${PUBLIC_URL}"
 else
-  note "$DOMAIN is NOT mapped yet. The service is reachable on its run.app URL,"
-  note "which is enough to test the platform but not to launch on: the telephony"
-  note "provider signs each webhook over the full URL it called, and the image"
-  note "was built believing it lives at https://$DOMAIN."
+  note "${DOMAIN} is NOT mapped. The service is reachable on its run.app URL,"
+  note "which is enough to test but not to launch on: the telephony provider"
+  note "signs each webhook over the full URL it called, and this image was"
+  note "built believing it lives at ${PUBLIC_URL}."
   printf '\n'
-  note "Two ways forward — see docs/GO_LIVE.md §4:"
-  note "  a) Put a global external Application Load Balancer in front of the"
-  note "     service with a Google-managed certificate for $DOMAIN. This works"
-  note "     in every region and is the usual answer for a .cd domain."
-  note "  b) Deploy in a region that offers domain mappings, accepting the"
-  note "     latency and the change to the residency posture in"
-  note "     docs/DATA_RESIDENCY.md. Do not do this silently."
+  note "Two ways forward — docs/GO_LIVE.md §4:"
+  note "  a) A global external Application Load Balancer in front of the"
+  note "     service, with a Google-managed certificate. Works in every"
+  note "     region, and is the answer for a .cd domain."
+  note "  b) A region that offers mappings — with the latency and the"
+  note "     residency change in docs/DATA_RESIDENCY.md written down first."
+fi
+if [[ "$SCHED_OK" != yes ]]; then
+  printf '\n'
+  note "Cloud Scheduler did not accept ${REGION}. Until it is running, nothing"
+  note "sweeps SLAs, sends reminders or applies retention. Create the job in a"
+  note "region that supports it — it calls the platform over HTTPS, so it does"
+  note "not have to sit in the same region as the service."
 fi
 printf '\n'
 note "Do NOT run 'npm run seed' against this database — it is synthetic"
-note "demonstration data. Create the real accounts in /admin/utilisateurs."
+note "demonstration data in five languages, and it refuses to run in"
+note "production. Create the real accounts in /admin/utilisateurs, each with"
+note "a PIN that is not 1234."
 printf '\n'
