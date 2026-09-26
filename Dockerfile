@@ -17,6 +17,12 @@ COPY . .
 # — links look right in the markup and go to the wrong host.
 ARG NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+# The commit this image was built from. The service worker's cache version is
+# stamped with it, which is what lets a browser notice that a new build exists:
+# a worker whose bytes never change is never reinstalled, and its cache is never
+# cleared.
+ARG BUILD_ID
+ENV BUILD_ID=${BUILD_ID}
 # A build must not reach a real database; the embedded one is used for prerendering.
 ENV NODE_ENV=production
 RUN npm run build

@@ -67,7 +67,14 @@ const nextConfig: NextConfig = {
    * deployment.
    */
   outputFileTracingIncludes: {
-    "*": ["node_modules/@google-cloud/storage/**"],
+    "*": [
+      "node_modules/@google-cloud/storage/**",
+      // The service worker's source is read at runtime by its route. A file the
+      // tracer does not carry is a 500 on /sw.js, which takes offline support
+      // with it — and this repository has already shipped one missing file that
+      // every gate passed over.
+      "src/app/sw.js/sw-source.js",
+    ],
   },
   headers: async () => [
     {
