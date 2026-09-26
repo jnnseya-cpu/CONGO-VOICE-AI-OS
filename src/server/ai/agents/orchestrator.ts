@@ -82,13 +82,28 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
   // 1. Autosave the raw request before any processing.
   let audioFileId: string | null = null;
+  let storageFailure: string | null = null;
   if (input.audio) {
-    const stored = await storeUpload(input.audio.data, input.audio.mimeType, "voice");
-    const [f] = await db
-      .insert(schema.files)
-      .values({ userId, kind: "audio", storageKey: stored.key, mimeType: input.audio.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256 })
-      .returning();
-    audioFileId = f.id;
+    // Archiving the recording must not decide whether the citizen gets an answer.
+    //
+    // This ran outside the pipeline's own error handling, so a storage driver
+    // that could not load turned every spoken question into a 500 and left a
+    // parent describing a child's symptoms looking at "Erreur interne". The
+    // recording is evidence; the answer is the service. Losing the first is bad
+    // and recorded. Losing the second is the platform failing at its purpose.
+    try {
+      const stored = await storeUpload(input.audio.data, input.audio.mimeType, "voice");
+      const [f] = await db
+        .insert(schema.files)
+        .values({ userId, kind: "audio", storageKey: stored.key, mimeType: input.audio.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256 })
+        .returning();
+      audioFileId = f.id;
+    } catch (err) {
+      // Never silently: an unsaved recording is a gap in the record, so it is
+      // logged, audited and carried onto the interaction row below.
+      storageFailure = err instanceof Error ? err.message : String(err);
+      console.error("[orchestrator] the voice recording could not be stored:", err);
+    }
   }
   const [row] = await db
     .insert(schema.interactions)
@@ -111,6 +126,18 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
   const meta: { interactionId: string; scripted: boolean } = { interactionId, scripted };
   const save = (patch: Partial<typeof schema.interactions.$inferInsert>) =>
     db.update(schema.interactions).set({ ...patch, updatedAt: new Date() }).where(eq(schema.interactions.id, interactionId));
+
+  if (storageFailure) {
+    await audit({
+      action: "file.store_failed",
+      actorUserId: userId,
+      entityType: "interaction",
+      entityId: interactionId,
+      systemEvent: "storage_error",
+      after: { kind: "audio", message: storageFailure.slice(0, 200) },
+    }).catch(() => undefined);
+    await save({ errorMessage: `recording_not_stored: ${storageFailure}`.slice(0, 500) }).catch(() => undefined);
+  }
 
   try {
     // 2. Speech to text.
