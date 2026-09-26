@@ -146,6 +146,50 @@ export function extractEntities(textFr: string): HealthEntities {
  * ------------------------------------------------------------------------------------- */
 
 /** Ordered rules: the first match wins, most specific first. */
+
+/**
+ * A stated body temperature, in Celsius, when the citizen actually gave one.
+ *
+ * The word "température" used to be enough to route a message to the fever
+ * protocol whatever number followed it, so "mon enfant a une température de 36
+ * degrés" — a normal reading — was handled as fever and escalated. A parent who
+ * measured and reported a normal temperature was told, in effect, that
+ * measuring had made things worse.
+ *
+ * The opposite error was worse. A low reading also matched the word and was
+ * treated as fever, when hypothermia in a young infant is a danger sign in the
+ * other direction: an infant whose body is cold needs warming and a clinic, not
+ * advice about fever.
+ *
+ * Only a number with a degree marker, or one written close to the word
+ * temperature, is read. A bare "3" in "enfant de 3 ans" is an age, and 30–45 is
+ * the only range a body temperature can plausibly be in — a reading outside it
+ * is a transcription artefact and is ignored rather than acted on.
+ */
+export function readTemperature(textFr: string): number | null {
+  const t = textFr.toLowerCase().replace(/,/g, ".");
+  const patterns = [
+    /(\d{2}(?:\.\d)?)\s*(?:°|degr[ée]s?\b|deg\b)/,
+    /temp[ée]rature[^\d]{0,20}(\d{2}(?:\.\d)?)/,
+    /(\d{2}(?:\.\d)?)\s*(?:°\s*)?c\b/,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(t);
+    if (!m) continue;
+    const value = Number(m[1]);
+    if (Number.isFinite(value) && value >= 30 && value <= 45) return value;
+  }
+  return null;
+}
+
+/** IMCI axillary thresholds. Written here once so no page re-derives a clinical rule. */
+export const TEMPERATURE = {
+  /** At or above this is fever. */
+  fever: 37.5,
+  /** Below this is hypothermia — a danger sign in a young infant, not a mild fever. */
+  hypothermia: 35.5,
+} as const;
+
 export function selectProtocolId(textFr: string, entities: HealthEntities): string {
   const t = textFr.toLowerCase();
   const injury = /plaie|blessure|coupure|brûl|brul|morsure|serpent|nyoka|nioka|fracture|cassé|casse|accident|couteau|machette|mputa|mpota|jeraha|kuungua|kuumwa|chute|tombé|tombe|saigne|hémorragie/.test(t);
@@ -155,8 +199,22 @@ export function selectProtocolId(textFr: string, entities: HealthEntities): stri
   const malnutrition = /malnutrition|muac|périmètre brachial|perimetre brachial|bracelet|maigre|amaigri|kwashiorkor|marasme|utapiamlo|ne grossit pas|poids/.test(t);
   const diarrhoea = /diarrh|selles|pulupulu|kuhara|déshydrat|deshydrat|sro|ors|choléra|cholera|tuvi/.test(t);
   const respiratory = /toux|tousse|respir|pneumonie|souffle|poitrine|kikohozi|kosukola|kupema|tshikosolo|asthme/.test(t);
-  const fever = /fièvre|fievre|palu|malaria|homa|malali ya moto|mwini|luya|température|temperature|chaud/.test(t);
+  // A stated number decides; the words only decide when no number was given.
+  // Otherwise "une température de 36 degrés" — normal — is handled as fever.
+  const stated = readTemperature(textFr);
+  const feverWords = /fièvre|fievre|palu|malaria|homa|malali ya moto|mwini|luya|chaud/.test(t);
+  const temperatureWord = /température|temperature/.test(t);
+  const hypothermia = stated !== null && stated < TEMPERATURE.hypothermia;
+  const fever =
+    stated !== null
+      ? stated >= TEMPERATURE.fever
+      : feverWords || temperatureWord;
 
+  // A cold infant is a danger sign, and routing it to the fever protocol would
+  // have offered advice for the opposite problem.
+  if (hypothermia && (newborn || entities.subject === "child_under_5" || (entities.ageMonths !== null && entities.ageMonths < 60))) {
+    return "newborn_danger_signs";
+  }
   if (newborn) return "newborn_danger_signs";
   if (pregnancy) return "pregnancy_danger_signs";
   if (injury) return "injury_bleeding";
