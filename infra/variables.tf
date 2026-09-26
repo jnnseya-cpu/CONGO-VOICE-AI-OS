@@ -68,6 +68,20 @@ variable "db_tier" {
   default = "db-custom-2-7680"
 }
 
+variable "db_edition" {
+  type    = string
+  default = "ENTERPRISE"
+  validation {
+    condition     = contains(["ENTERPRISE", "ENTERPRISE_PLUS"], var.db_edition)
+    error_message = "db_edition must be ENTERPRISE or ENTERPRISE_PLUS."
+  }
+  description = <<-EOT
+    Cloud SQL edition, honoured in prod only; every other stage is ENTERPRISE.
+    ENTERPRISE_PLUS requires a db-perf-optimized-* tier — db_tier must change
+    with it or the API rejects the instance with a 400.
+  EOT
+}
+
 variable "db_password" {
   type        = string
   sensitive   = true

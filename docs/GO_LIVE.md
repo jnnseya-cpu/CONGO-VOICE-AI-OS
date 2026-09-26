@@ -10,6 +10,41 @@ pilot** onto a real domain safely.
 
 ---
 
+## 0. Run it as one command
+
+Everything from §2 to §3 is scripted. Doing it by hand means twenty pasted
+blocks into a shell that resets its working directory and its `core/project`
+between commands, and a paste that drops one character fails in a way that looks
+like an entirely different problem.
+
+```bash
+git clone https://github.com/jnnseya-cpu/CONGO-VOICE-AI-OS.git
+cd CONGO-VOICE-AI-OS
+PROJECT=<your-project-id> bash scripts/go-live.sh
+```
+
+It installs Terraform if it is missing, checks billing, enables the APIs,
+creates the state bucket, generates and stores the database password, fills in
+the variables file, creates the registry, builds the image, pins it by digest,
+creates the database and the secret containers, fills every secret, and brings
+the service up. It prints the service URL and the DNS records to add.
+
+Every step checks before it acts, so **it is safe to run again** after any
+failure: it skips what exists and resumes at the first thing that does not.
+Nothing is destroyed. No `gcloud` call depends on ambient configuration.
+
+To supply a real vendor key rather than run on the offline provider:
+
+```bash
+export ANTHROPIC_API_KEY=sk-...      # or GEMINI_API_KEY / OPENAI_API_KEY
+PROJECT=<your-project-id> bash scripts/go-live.sh
+```
+
+The rest of this document is what the script does, and why, step by step. Read
+it when something fails or when you need to do one part by hand.
+
+---
+
 ## 0a. The machine you run from
 
 Cloud Shell (<https://shell.cloud.google.com>) is the least trouble: it is

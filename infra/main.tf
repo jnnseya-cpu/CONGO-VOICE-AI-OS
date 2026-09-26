@@ -117,7 +117,13 @@ resource "google_sql_database_instance" "main" {
   depends_on          = [google_service_networking_connection.private_vpc]
 
   settings {
-    tier              = var.db_tier
+    tier = var.db_tier
+    # Stated, not defaulted. Some regions — africa-south1 among them — now
+    # create a new Postgres instance as ENTERPRISE_PLUS, an edition that
+    # accepts only db-perf-optimized-* tiers and refuses db-custom-* with a
+    # 400. ENTERPRISE is what a pilot needs and what var.db_tier describes;
+    # moving to Plus is a deliberate capacity decision, not a default.
+    edition           = var.environment == "prod" ? var.db_edition : "ENTERPRISE"
     availability_type = var.environment == "prod" ? "REGIONAL" : "ZONAL"
     disk_autoresize   = true
 
