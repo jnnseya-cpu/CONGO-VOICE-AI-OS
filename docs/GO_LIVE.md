@@ -335,7 +335,16 @@ printf '%s' "$(openssl rand -hex 32)" | \
 
 # DATABASE_URL is composed, not generated: the instance has no public address,
 # so this string resolves only from inside the service's VPC.
-printf '%s' "postgresql://cvos_app:$TF_VAR_db_password@<private-ip>:5432/cvos?sslmode=require" \
+#
+# uselibpqcompat=true&sslmode=verify-ca&sslrootcert=... and not sslmode=require.
+# node-postgres 8.23 treats `require` as full verification where libpq only
+# encrypted, and Cloud SQL signs its certificate with a per-instance CA that
+# nothing else trusts — so `require` now fails with
+# UNABLE_TO_VERIFY_LEAF_SIGNATURE. The answer is to give the container the CA
+# (mounted as a file from Secret Manager) rather than to stop verifying:
+# verify-ca checks the chain and skips the hostname, which is right when the
+# certificate names the instance and the connection is to its private address.
+printf '%s' "postgresql://cvos_app:$TF_VAR_db_password@<private-ip>:5432/cvos?uselibpqcompat=true&sslmode=verify-ca&sslrootcert=/etc/ssl/cloudsql/server-ca.pem" \
   | gcloud secrets versions add congovoice-pilot-database_url --data-file=-
 ```
 

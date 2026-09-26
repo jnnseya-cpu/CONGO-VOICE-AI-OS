@@ -89,6 +89,9 @@ done
 if exists gc secrets describe "cvos-${ENVIRONMENT}-db-password"; then
   gc secrets delete "cvos-${ENVIRONMENT}-db-password" --quiet && note "deleted: db password"
 fi
+if exists gc secrets describe "${NAME}-db_ca"; then
+  gc secrets delete "${NAME}-db_ca" --quiet && note "deleted: db server CA"
+fi
 
 step "Service account"
 if exists gc iam service-accounts describe "${NAME}-app@${PROJECT}.iam.gserviceaccount.com"; then

@@ -38,6 +38,10 @@ SERVICE="$NAME"
 SCHEDULER_JOB="${NAME}-workflow"
 REPO=cvos
 DB_PASSWORD_SECRET="cvos-${ENVIRONMENT}-db-password"
+DB_CA_SECRET="${NAME}-db_ca"
+# Cloud Run mounts a secret as a file here, so the container can verify the
+# database's certificate instead of being told not to bother.
+DB_CA_PATH="/etc/ssl/cloudsql/server-ca.pem"
 export PUBLIC_URL="https://${DOMAIN}"
 MEDIA_BACKSTOP_DAYS="${MEDIA_BACKSTOP_DAYS:-400}"
 
@@ -194,6 +198,33 @@ DB_IP=$(gc sql instances describe "$DB_INSTANCE" --format='value(ipAddresses[0].
 [[ -n "$DB_IP" ]] || die "The database has no private address."
 note "private address: $DB_IP"
 
+# Cloud SQL signs its server certificate with a per-instance CA that nothing
+# else has a reason to trust, and node-postgres 8.23 verifies the chain for
+# sslmode=require where libpq only encrypted. Without the CA in the container
+# the connection fails with UNABLE_TO_VERIFY_LEAF_SIGNATURE — so store it and
+# mount it, rather than switching verification off.
+DB_CA=$(gc sql instances describe "$DB_INSTANCE" --format='value(serverCaCert.cert)')
+[[ "$DB_CA" == *"BEGIN CERTIFICATE"* ]] || die "Could not read the server CA for $DB_INSTANCE."
+if ! exists gc secrets describe "$DB_CA_SECRET"; then
+  gc secrets create "$DB_CA_SECRET" --replication-policy=automatic >/dev/null
+fi
+# The CA is rotatable, so compare rather than assume: a stale copy fails exactly
+# the same way a missing one does.
+if [[ "$(gc secrets versions access latest --secret="$DB_CA_SECRET" 2>/dev/null || true)" == "$DB_CA" ]]; then
+  note "server CA already stored"
+else
+  printf '%s' "$DB_CA" | gc secrets versions add "$DB_CA_SECRET" --data-file=- >/dev/null
+  note "server CA stored in $DB_CA_SECRET"
+fi
+gc secrets add-iam-policy-binding "$DB_CA_SECRET" \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role=roles/secretmanager.secretAccessor >/dev/null 2>&1 || true
+
+# uselibpqcompat=true with verify-ca and a CA file: the chain is verified, the
+# hostname is not — correct here, because the certificate names the instance and
+# we connect to its private address.
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_IP}:5432/${DB_NAME}?uselibpqcompat=true&sslmode=verify-ca&sslrootcert=${DB_CA_PATH}"
+
 if exists gc sql databases describe "$DB_NAME" --instance="$DB_INSTANCE"; then
   note "exists: database $DB_NAME"
 else
@@ -271,6 +302,19 @@ for key in "${SECRET_KEYS[@]}"; do
     --member="serviceAccount:${SA_EMAIL}" \
     --role=roles/secretmanager.secretAccessor >/dev/null
 
+  # DATABASE_URL is the one secret that is recomputed rather than left alone: it
+  # encodes the address, the password and the TLS settings, and a stale value is
+  # the difference between a service that starts and one that does not.
+  if [[ "$key" == database_url ]]; then
+    if [[ "$(gc secrets versions access latest --secret="$secret" 2>/dev/null || true)" == "$DATABASE_URL" ]]; then
+      note "already correct: $key"
+    else
+      add_version "$secret" "$DATABASE_URL"
+      note "composed: $key (verify-ca against the instance CA)"
+    fi
+    continue
+  fi
+
   if [[ -n "$(gc secrets versions list "$secret" --filter='state=enabled' --format='value(name)' --limit=1)" ]]; then
     note "already set: $key"
     continue
@@ -278,9 +322,6 @@ for key in "${SECRET_KEYS[@]}"; do
   case "$key" in
     session_secret|data_encryption_key|cron_secret)
       add_version "$secret" "$(openssl rand -hex 32)"; note "generated: $key" ;;
-    database_url)
-      add_version "$secret" "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_IP}:5432/${DB_NAME}?sslmode=require"
-      note "composed: $key" ;;
     *)
       # An exported variable wins: `export ANTHROPIC_API_KEY=...` before running
       # this loads a real key instead of a blank placeholder.
@@ -338,6 +379,9 @@ for key in "${SECRET_KEYS[@]}"; do
   env_name=$(tr '[:lower:]' '[:upper:]' <<<"$key")
   SECRET_REFS+="${SECRET_REFS:+,}${env_name}=${NAME}-${key}:latest"
 done
+# A path rather than a variable name mounts the secret as a file, which is what
+# sslrootcert in DATABASE_URL points at.
+SECRET_REFS+=",${DB_CA_PATH}=${DB_CA_SECRET}:latest"
 
 # --allow-unauthenticated: the service answers citizens on the open internet and
 # telephony webhooks from providers holding no Google credentials. Every
