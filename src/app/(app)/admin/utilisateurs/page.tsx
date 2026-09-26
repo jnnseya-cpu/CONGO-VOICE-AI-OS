@@ -7,6 +7,7 @@ import { hasPermission } from "@server/core/rbac";
 import { getDb, schema } from "@server/db/client";
 import type { Role } from "@server/db/schema";
 import { PageHeader } from "@client/components/ui";
+import { identify } from "@shared/accounts";
 import { CreateUserForm, RoleFilter } from "@client/components/admin/UserAdmin";
 import { AccessNotice, LANGUAGE_FR, Panel, ROLE_FR, TableShell, Td, Th, dateFr, fmt, nowMs, since } from "@client/components/dashboard/Common";
 
@@ -69,6 +70,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               <>
                 <Th>Nom</Th>
                 <Th>Téléphone</Th>
+                <Th>Catégorie</Th>
                 <Th>Rôle</Th>
                 <Th>Langue</Th>
                 <Th>Province</Th>
@@ -80,10 +82,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           >
             {rows.map((u) => (
               <tr key={u.id} className="hover:bg-surface-2">
-                <Td className="font-medium text-ink">{u.name ?? (u.isAnonymous ? "Compte anonyme" : "—")}</Td>
+                <Td className="font-medium text-ink">{identify({ role: u.role, anonymous: u.isAnonymous, name: u.name }).displayName}</Td>
                 <Td className="font-mono text-[12px]">{u.phone ?? "—"}</Td>
+                <Td className="whitespace-nowrap">
+                  {/* What they are, which is what a supervisor scanning this
+                      needs; the role beside it says what they may do. */}
+                  <span className="tag tag-muted">{identify({ role: u.role, anonymous: u.isAnonymous }).category.label}</span>
+                </Td>
                 <Td>
-                  <span className="tag tag-case">{ROLE_FR[u.role] ?? u.role}</span>
+                  <span className="tag tag-case">{u.isAnonymous ? "Session anonyme" : (ROLE_FR[u.role] ?? u.role)}</span>
                 </Td>
                 <Td>{LANGUAGE_FR[u.languagePreference] ?? u.languagePreference}</Td>
                 <Td>{u.province ?? "—"}</Td>

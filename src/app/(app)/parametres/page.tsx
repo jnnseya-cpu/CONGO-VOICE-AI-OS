@@ -5,8 +5,12 @@ import { getSession } from "@server/core/auth";
 import { hasPermission } from "@server/core/rbac";
 import { getDb, schema } from "@server/db/client";
 import { PageHeader } from "@client/components/ui";
+import { AccountRequired } from "@client/components/AccountRequired";
 import { SettingsForm } from "@client/components/settings/SettingsForm";
 import { DataRights } from "@client/components/settings/DataRights";
+import { ProfileMedia } from "@client/components/settings/ProfileMedia";
+import { DeleteAccount } from "@client/components/settings/DeleteAccount";
+import { identify } from "@shared/accounts";
 import { LANGUAGE_FR, Panel, ROLE_FR, dateTimeFr, fmt } from "@client/components/dashboard/Common";
 import { IconShield } from "@client/components/icons";
 
@@ -24,6 +28,7 @@ const DATA_REQUEST_STATUS_FR: Record<string, string> = {
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect("/connexion?next=/parametres");
+  if (session.anonymous) return <AccountRequired next="/parametres" what="Vos paramètres, votre profil et vos droits sur vos données n'existent que pour un compte." />;
 
   const db = await getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, session.userId));
@@ -31,10 +36,26 @@ export default async function SettingsPage() {
   const requests = await db.select().from(schema.dataRequests).where(eq(schema.dataRequests.userId, session.userId)).orderBy(desc(schema.dataRequests.createdAt)).limit(5);
 
   const isAdmin = hasPermission(session.role, "dashboard:admin") || hasPermission(session.role, "admin:config") || hasPermission(session.role, "user:manage");
+  const who = identify({ role: session.role, anonymous: session.anonymous, name: user?.name });
+  // The last administrator cannot delete themselves; the form says so instead of
+  // failing after the PIN has been typed.
+  const otherAdmins =
+    session.role === "platform_admin"
+      ? (await db.select({ id: schema.users.id, status: schema.users.status }).from(schema.users).where(eq(schema.users.role, "platform_admin")))
+          .filter((a) => a.id !== session.userId && a.status === "active").length
+      : 1;
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-4">
       <PageHeader title="Paramètres" subtitle="Votre profil, votre langue, vos consentements et vos droits sur vos données." />
+
+      <ProfileMedia
+        name={who.displayName}
+        categoryLabel={who.category.label}
+        roleLabel={who.roleLabel}
+        avatarFileId={user?.avatarFileId ?? null}
+        coverFileId={user?.coverFileId ?? null}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
         <div className="space-y-4">
@@ -49,6 +70,8 @@ export default async function SettingsPage() {
               }}
             />
           </Panel>
+
+          <DeleteAccount isLastAdmin={otherAdmins === 0} />
 
           <Panel title="Vos droits sur vos données">
             <DataRights />
@@ -70,6 +93,11 @@ export default async function SettingsPage() {
         <div className="space-y-4">
           <Panel title="Votre compte">
             <ul className="divide-y divide-line text-[13px]">
+              <li className="flex items-center justify-between gap-3 px-5 py-2.5">
+                <span className="text-muted">Catégorie</span>
+                <span className="tag tag-muted">{who.category.label}</span>
+              </li>
+              <li className="px-5 pb-2 text-[12px] leading-snug text-muted">{who.category.description}</li>
               <li className="flex items-center justify-between gap-3 px-5 py-2.5">
                 <span className="text-muted">Rôle</span>
                 <span className="font-medium text-ink">{ROLE_FR[session.role] ?? session.role}</span>

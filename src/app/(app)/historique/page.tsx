@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { getSession } from "@server/core/auth";
 import { getDb, schema } from "@server/db/client";
 import { PageHeader, Badge, EmptyState } from "@client/components/ui";
+import { AccountRequired } from "@client/components/AccountRequired";
 
 export const metadata = { title: "Mon historique" };
 export const dynamic = "force-dynamic";
@@ -12,6 +13,14 @@ const TONE = { health: "health", agriculture: "agri", education: "edu", general:
 export default async function HistoryPage() {
   const session = await getSession();
   if (!session) return <div className="mx-auto max-w-[900px]"><PageHeader title="Mon historique" /><EmptyState title="Connectez-vous ou commencez une conversation pour voir votre historique." /></div>;
+  // Asking is free; keeping a record under a name is what needs an account.
+  if (session.anonymous)
+    return (
+      <AccountRequired
+        next="/historique"
+        what="L'historique conserve vos échanges sous votre nom, ce qu'une session anonyme ne fait pas."
+      />
+    );
   const db = await getDb();
   const rows = await db.select().from(schema.interactions).where(eq(schema.interactions.userId, session.userId)).orderBy(desc(schema.interactions.createdAt)).limit(50);
   return (
