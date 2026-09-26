@@ -53,6 +53,27 @@ const SERVES_CITIZENS: DeploymentStage[] = ["pilot", "prod"];
  * a restart. Each of these has a failure mode where everything looks fine and
  * nothing arrives, so each is checked and named.
  */
+/**
+ * The checks a deployment cannot resolve from inside itself.
+ *
+ * The distinction matters because it decides what a container probe may refuse
+ * to start on. A missing session secret or encryption key is a broken
+ * deployment: no request can be served correctly and no amount of operating the
+ * platform will fix it. Everything else in `readiness` — an escalation channel
+ * with no provider, a review board with no members, a clinical corpus nobody has
+ * signed — is a programme that is not ready yet, and every one of those is
+ * resolved *through* the running platform. Refusing to start on them is a
+ * deadlock: the board is appointed in the admin console, which needs the service
+ * that will not start until the board exists.
+ *
+ * Not starting is also not what protects a citizen. The clinical gate does, at
+ * the point of use: without a current sign-off the platform may escalate and
+ * refer, but it may not reassure. So a deployment carrying an unsigned corpus is
+ * safe and visibly incomplete, which is the honest state to be in while somebody
+ * signs it.
+ */
+export const DEPLOYMENT_CHECKS: readonly string[] = ["data_encryption_key", "session_secret", "public_origin"];
+
 export function readiness(): Readiness {
   // Read the environment as it is now rather than as it was at import time, so
   // this reports the running configuration and can be exercised in a test.

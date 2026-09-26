@@ -388,11 +388,21 @@ SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 #
 # Never zero instances where calls are answered: a cold start on an emergency
 # call is a citizen waiting.
-# --startup-probe on the platform's own health endpoint rather than Cloud Run's
-# default TCP check. A TCP check passes the moment the socket binds, which for a
-# Next.js server is before it can serve anything, so a container that boots and
-# then cannot reach its database reports healthy and fails on the first citizen.
-# 60 seconds of grace: the first request applies the migrations.
+# --startup-probe on /system/ready, not /system/health, and the difference is
+# the whole point. Health reports whether the PROGRAMME is ready to see
+# citizens: an escalation channel with a provider, a review board with its
+# quorum, a clinical corpus somebody has signed. Every one of those is arranged
+# through the running platform, so probing health deadlocks — the board is
+# appointed in the admin console, which needs the service that would not start
+# until the board existed. /system/ready asks only what a deployment can be
+# held to: the database answers and the secrets are present.
+#
+# It is still not Cloud Run's default TCP check, which passes the moment the
+# socket binds — before a Next.js server can serve anything — so a container
+# that boots and cannot reach its database would report healthy and fail on the
+# first citizen instead of failing the deploy.
+#
+# 60 seconds of grace, because the first request applies the migrations.
 if ! gc run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -407,7 +417,7 @@ if ! gc run deploy "$SERVICE" \
   --allow-unauthenticated \
   --env-vars-file="$ENV_FILE" \
   --set-secrets="$SECRET_REFS" \
-  --startup-probe="httpGet.path=/api/v1/system/health,initialDelaySeconds=10,timeoutSeconds=5,periodSeconds=10,failureThreshold=6" \
+  --startup-probe="httpGet.path=/api/v1/system/ready,initialDelaySeconds=10,timeoutSeconds=5,periodSeconds=10,failureThreshold=6" \
   --quiet
 then
   # A failed revision says "check the logs" and gives a console URL. Print them
