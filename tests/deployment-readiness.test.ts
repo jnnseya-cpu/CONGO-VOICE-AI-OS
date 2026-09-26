@@ -104,3 +104,36 @@ describe("configuring an escalation channel is what clears that check", () => {
     expect(readiness().checks.find((c) => c.id === "escalation_delivery")?.ok).toBe(false);
   });
 });
+
+describe("no container probe may point at the programme's readiness report", () => {
+  /**
+   * The liveness probe was on /system/health, which returns 503 until the review
+   * board has its quorum. Cloud Run killed the container every seventy seconds
+   * for as long as that was true, and a citizen saw an internal error from a
+   * platform that was working. A probe on health is never correct, wherever it
+   * is configured, so both places that configure one are checked here.
+   */
+  const files = ["Dockerfile", "scripts/go-live.sh"] as const;
+
+  for (const file of files) {
+    it(`${file} probes /system/ready, not /system/health`, async () => {
+      const { readFileSync } = await import("node:fs");
+      const text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+      const probeLines = text
+        .split("\n")
+        .filter((l) => /HEALTHCHECK|startup-probe|liveness-probe|readiness-probe/.test(l) || /httpGet\.path/.test(l));
+      expect(probeLines.length, `${file} configures no probe`).toBeGreaterThan(0);
+      for (const line of probeLines) {
+        expect(line, `${file}: ${line.trim()}`).not.toContain("/api/v1/system/health");
+      }
+    });
+  }
+
+  it("go-live.sh states a liveness probe rather than letting one be inferred", async () => {
+    const { readFileSync } = await import("node:fs");
+    const text = readFileSync(new URL("../scripts/go-live.sh", import.meta.url), "utf8");
+    // Unset, Cloud Run derives one from the image's HEALTHCHECK.
+    expect(text).toContain("--liveness-probe=");
+    expect(text).toContain("--startup-probe=");
+  });
+});

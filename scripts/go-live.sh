@@ -402,7 +402,15 @@ SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 # that boots and cannot reach its database would report healthy and fail on the
 # first citizen instead of failing the deploy.
 #
-# 60 seconds of grace, because the first request applies the migrations.
+# The liveness probe is stated for the same reason, and it matters more: left
+# unset, Cloud Run derives one from the image's HEALTHCHECK, and a liveness
+# probe on /system/health shuts down a container that is working perfectly —
+# every seventy seconds, for as long as the review board has no members. Which
+# is what it did: the instance started, served, was killed, and restarted, and a
+# citizen saw "Erreur interne" from a platform that was not broken.
+#
+# 60 seconds of grace on startup, because the first request applies the
+# migrations.
 if ! gc run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -418,6 +426,7 @@ if ! gc run deploy "$SERVICE" \
   --env-vars-file="$ENV_FILE" \
   --set-secrets="$SECRET_REFS" \
   --startup-probe="httpGet.path=/api/v1/system/ready,initialDelaySeconds=10,timeoutSeconds=5,periodSeconds=10,failureThreshold=6" \
+  --liveness-probe="httpGet.path=/api/v1/system/ready,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" \
   --quiet
 then
   # A failed revision says "check the logs" and gives a console URL. Print them

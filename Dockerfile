@@ -38,6 +38,13 @@ COPY --from=build --chown=appuser:appuser /app/drizzle ./drizzle
 COPY --from=build --chown=appuser:appuser /app/content ./content
 USER appuser
 EXPOSE 8080
+# /system/ready, never /system/health. Health reports whether the PROGRAMME is
+# ready to see citizens — an escalation channel with a provider, a review board
+# with its quorum, a signed clinical corpus — and returns 503 until all three
+# are arranged, which is done by operating the platform. A liveness probe on it
+# therefore shuts down a container that is working perfectly, over and over,
+# because the board has not been appointed yet. /system/ready answers the
+# question a probe is entitled to ask: can this container serve a request.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/v1/system/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/v1/system/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "server.js"]
