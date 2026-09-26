@@ -7,7 +7,7 @@ import { beginEnrolment, mfaRequiredFor, stepUpStatus } from "@server/core/mfa";
 import { readPhone } from "@server/core/phone";
 
 /** Current MFA state for the signed-in user. */
-export const GET = handle({ auth: true }, async ({ db, user }) => {
+export const GET = handle({ auth: true, registered: true }, async ({ db, user }) => {
   const [u] = await db.select({ mfaEnabled: schema.users.mfaEnabled }).from(schema.users).where(eq(schema.users.id, user.userId));
   if (!u) throw notFound();
   return { enabled: u.mfaEnabled, required: mfaRequiredFor(user.role), stepUp: await stepUpStatus(user.userId, user.role) };
@@ -17,7 +17,7 @@ export const GET = handle({ auth: true }, async ({ db, user }) => {
  * Start TOTP enrolment (RFC 6238). Returns the shared secret and the otpauth:// URI once;
  * enrolment only completes when a valid code is posted to /auth/mfa/verify.
  */
-export const POST = handle({ auth: true }, async ({ db, user, ip }) => {
+export const POST = handle({ auth: true, registered: true }, async ({ db, user, ip }) => {
   const [u] = await db.select({ phone: schema.users.phone, name: schema.users.name }).from(schema.users).where(eq(schema.users.id, user.userId));
   if (!u) throw notFound();
   // The label shown inside the authenticator app. Decrypted here and nowhere else.

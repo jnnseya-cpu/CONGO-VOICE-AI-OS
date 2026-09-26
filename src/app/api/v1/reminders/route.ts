@@ -15,7 +15,7 @@ import {
 } from "@server/core/scheduler";
 
 /** A citizen's reminder subscriptions and what is coming next. */
-export const GET = handle({ auth: true }, async ({ db, user }) => {
+export const GET = handle({ auth: true, registered: true }, async ({ db, user }) => {
   const consented = await hasReminderConsent(user.userId);
   const upcoming = await upcomingReminders(user.userId);
   const [latestConsent] = await db
@@ -48,7 +48,7 @@ const Body = z.object({
  * Opt in to a reminder programme. Consent (purpose "reminders") must already be granted
  * through /api/v1/consents: this endpoint never grants it implicitly.
  */
-export const POST = handle({ auth: true }, async ({ db, user, json, ip }) => {
+export const POST = handle({ auth: true, registered: true }, async ({ db, user, json, ip }) => {
   const body = await json(Body);
   if (!(await hasReminderConsent(user.userId))) {
     throw badRequest("Consentement « rappels » requis : accordez-le d'abord via /api/v1/consents.");
@@ -82,7 +82,7 @@ export const POST = handle({ auth: true }, async ({ db, user, json, ip }) => {
 });
 
 /** Stop all reminders (STOP keyword, IVR menu, or the citizen's own screen). */
-export const DELETE = handle({ auth: true }, async ({ user, ip }) => {
+export const DELETE = handle({ auth: true, registered: true }, async ({ user, ip }) => {
   const cancelled = await cancelReminders(user.userId);
   await audit({ action: "reminder.unsubscribed", actorUserId: user.userId, actorRole: user.role, entityType: "schedule", after: { cancelled: cancelled.length }, purpose: "reminders", ip });
   return { cancelled: cancelled.length };

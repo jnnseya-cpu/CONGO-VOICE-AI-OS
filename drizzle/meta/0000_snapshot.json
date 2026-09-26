@@ -1,5 +1,5 @@
 {
-  "id": "cfeda236-db99-4158-a2b6-9180a76a1b03",
+  "id": "86b291a4-dc2f-4111-8f8d-4e70af806164",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -7373,6 +7373,18 @@
           "notNull": true,
           "default": true
         },
+        "avatar_file_id": {
+          "name": "avatar_file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_file_id": {
+          "name": "cover_file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "pseudo_id": {
           "name": "pseudo_id",
           "type": "varchar(64)",
@@ -7561,7 +7573,9 @@
         "audio",
         "image",
         "video",
-        "document"
+        "document",
+        "avatar",
+        "cover"
       ]
     },
     "public.interaction_status": {

@@ -80,7 +80,7 @@ export const notificationStatusEnum = pgEnum("notification_status", [
   "read",
 ]);
 
-export const fileKindEnum = pgEnum("file_kind", ["audio", "image", "video", "document"]);
+export const fileKindEnum = pgEnum("file_kind", ["audio", "image", "video", "document", "avatar", "cover"]);
 
 /* ── Review boards (AI-10, AI-11, PRD §15.4) ─────────────────────────────── */
 
@@ -160,6 +160,16 @@ export const users = pgTable(
     /** Territories a worker covers; used for case routing. */
     territories: jsonb("territories").$type<string[]>().default([]).notNull(),
     onDuty: boolean("on_duty").default(true).notNull(),
+    /**
+     * Profile and cover images.
+     *
+     * They point at `files` rather than holding a URL, so a photograph of a
+     * citizen is governed by the same rules as a recording of one: encrypted at
+     * rest, covered by the retention sweep, erased by a tombstone, and never
+     * served except to someone entitled to see it.
+     */
+    avatarFileId: uuid("avatar_file_id"),
+    coverFileId: uuid("cover_file_id"),
     /** Pseudonymous identifier used in analytics instead of the user id. */
     pseudoId: varchar("pseudo_id", { length: 64 }).unique(),
     ageBand: varchar("age_band", { length: 16 }),

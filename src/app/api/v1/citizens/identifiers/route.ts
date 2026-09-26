@@ -11,7 +11,7 @@ import { hashIdentifier, toE164 } from "@server/channels/session";
  * the number is the proof, because on a shared or recycled handset the word of
  * whoever is holding it is not.
  */
-export const GET = handle({ auth: true }, async ({ user }) => ({ claims: await openClaims(user.userId) }));
+export const GET = handle({ auth: true, registered: true }, async ({ user }) => ({ claims: await openClaims(user.userId) }));
 
 const Request = z.object({
   kind: z.enum(["msisdn", "whatsapp", "pwa_account", "ivr_caller"]),
@@ -20,7 +20,7 @@ const Request = z.object({
   deliveredBy: z.enum(["voice", "sms"]).default("voice"),
 });
 
-export const POST = handle({ auth: true, limit: "auth" }, async ({ user, json, ip }) => {
+export const POST = handle({ auth: true, registered: true, limit: "auth" }, async ({ user, json, ip }) => {
   const body = await json(Request);
   const valueHash = hashIdentifier(body.kind, body.value);
   // A web account cannot receive a spoken code; only phone-like identifiers can.
@@ -53,7 +53,7 @@ export const POST = handle({ auth: true, limit: "auth" }, async ({ user, json, i
 
 const Confirm = z.object({ claimId: z.string().uuid(), code: z.string().min(4).max(8) });
 
-export const PUT = handle({ auth: true, limit: "auth" }, async ({ user, json, ip }) => {
+export const PUT = handle({ auth: true, registered: true, limit: "auth" }, async ({ user, json, ip }) => {
   const body = await json(Confirm);
   const result = await confirmIdentifierClaim({ claimId: body.claimId, code: body.code, actorUserId: user.userId, ip });
   if (result.outcome === "linked") return { linked: true };

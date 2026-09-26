@@ -8,7 +8,7 @@ const AGE_BANDS = ["6-8", "9-11", "12-14", "15-18", "adult"] as const;
 const LEVEL_VALUES = LEVELS as unknown as [string, ...string[]];
 
 /** The learner profile (FR-ED-01). Read your own profile and the confirmation questions. */
-export const GET = handle({ auth: true }, async ({ user }) => {
+export const GET = handle({ auth: true, registered: true }, async ({ user }) => {
   const profile = await getLearnerProfile(user.userId);
   return {
     profile,
@@ -33,7 +33,7 @@ const Body = z.object({
 });
 
 /** Explicit confirmation of the profile — the only place a learner profile is written. */
-export const PUT = handle({ auth: true }, async ({ user, json, ip }) => {
+export const PUT = handle({ auth: true, registered: true }, async ({ user, json, ip }) => {
   const body = await json(Body);
   const before = await getLearnerProfile(user.userId);
   const profile = await confirmLearnerProfile(user.userId, {

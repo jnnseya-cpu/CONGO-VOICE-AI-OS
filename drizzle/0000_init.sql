@@ -1,7 +1,7 @@
 CREATE TYPE "public"."board_seat" AS ENUM('physician', 'community_health_expert', 'agronomist', 'pedagogue', 'safeguarding_lead');--> statement-breakpoint
 CREATE TYPE "public"."case_status" AS ENUM('open', 'open_emergency', 'assigned', 'acknowledged', 'in_progress', 'needs_follow_up', 'reassigned', 'escalated', 'escalated_up', 'resolved', 'closed', 'cancelled', 'duplicate');--> statement-breakpoint
 CREATE TYPE "public"."channel_type" AS ENUM('pwa', 'ivr', 'whatsapp', 'ussd', 'sms', 'assisted', 'android');--> statement-breakpoint
-CREATE TYPE "public"."file_kind" AS ENUM('audio', 'image', 'video', 'document');--> statement-breakpoint
+CREATE TYPE "public"."file_kind" AS ENUM('audio', 'image', 'video', 'document', 'avatar', 'cover');--> statement-breakpoint
 CREATE TYPE "public"."interaction_status" AS ENUM('received', 'processing', 'completed', 'failed', 'abandoned');--> statement-breakpoint
 CREATE TYPE "public"."language_code" AS ENUM('fr', 'ln', 'kg', 'sw', 'lua');--> statement-breakpoint
 CREATE TYPE "public"."lifecycle_status" AS ENUM('draft', 'review', 'approved', 'canary', 'active', 'retired');--> statement-breakpoint
@@ -992,6 +992,8 @@ CREATE TABLE "users" (
 	"organisation_id" uuid,
 	"territories" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"on_duty" boolean DEFAULT true NOT NULL,
+	"avatar_file_id" uuid,
+	"cover_file_id" uuid,
 	"pseudo_id" varchar(64),
 	"age_band" varchar(16),
 	"sex" varchar(16),

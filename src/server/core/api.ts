@@ -30,6 +30,20 @@ export interface HandleOptions {
   permission?: Permission;
   /** Require a session but no specific permission. */
   auth?: boolean;
+  /**
+   * Require an account somebody signed up for, not an anonymous session.
+   *
+   * The voice console creates an anonymous session so a citizen on a borrowed
+   * phone can ask about a sick child without registering, and that must stay
+   * true — asking is free. What an anonymous session must not reach is anything
+   * that persists under a name or belongs to somebody else: conversation
+   * history, saved cases, dashboards, reports, profile media, settings.
+   *
+   * Without this the two are indistinguishable to a route: both have a session,
+   * both pass `auth: true`, and an anonymous visitor could read a history that
+   * happens to share their session id.
+   */
+  registered?: boolean;
   /** Rate-limit class: AI routes are more expensive, sign-in routes far stricter. */
   limit?: "default" | "ai" | "auth" | "none";
 }
@@ -68,7 +82,10 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
 
     try {
       db = await getDb();
-      if ((opts.auth || opts.permission) && !session) throw unauthorized();
+      if ((opts.auth || opts.permission || opts.registered) && !session) throw unauthorized();
+      if (opts.registered && session?.anonymous) {
+        throw forbidden("Créez un compte pour accéder à cette partie du service. Poser une question reste libre et gratuit.");
+      }
       if (opts.permission && session && !hasPermission(session.role, opts.permission)) throw forbidden();
 
       const limitClass = opts.limit ?? "default";

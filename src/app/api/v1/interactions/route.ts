@@ -75,7 +75,7 @@ export const POST = handle({ permission: "interaction:create", limit: "ai" }, as
   return result;
 });
 
-export const GET = handle({ permission: "interaction:read_own" }, async ({ req, db, user }) => {
+export const GET = handle({ permission: "interaction:read_own", registered: true }, async ({ req, db, user }) => {
   const { limit, offset } = paging(req);
   const moduleFilter = req.nextUrl.searchParams.get("module") as ModuleType | null;
   const all = hasPermission(user.role, "interaction:read_all") && req.nextUrl.searchParams.get("scope") === "all";
