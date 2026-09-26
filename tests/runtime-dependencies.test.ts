@@ -114,3 +114,39 @@ describe("the storage driver the deployment selects actually loads", () => {
     expect(typeof mod.Storage).toBe("function");
   });
 });
+
+describe("the storage client survives the standalone build", () => {
+  /**
+   * Adding the package to package.json was not enough, and the deployment said
+   * so: "Cannot find package '@google-cloud/storage'" kept arriving from inside
+   * the container after the dependency existed. The import was written as a
+   * const holding the name plus a webpackIgnore comment — deliberately, to keep
+   * an optional dependency out of the bundle — and the effect is that Next's
+   * file tracer cannot see it, so the package is never copied into
+   * .next/standalone and the image ships without it.
+   *
+   * Three things have to hold together. Any one of them alone fails.
+   */
+  const config = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
+  const storage = readFileSync(new URL("../src/server/core/storage.ts", import.meta.url), "utf8");
+
+  it("imports it by a literal specifier, which is what the tracer follows", () => {
+    expect(storage).toContain('import("@google-cloud/storage")');
+  });
+
+  it("does not hide that import from the bundler", () => {
+    // webpackIgnore is what made it invisible to tracing.
+    const importLine = storage.split("\n").find((l) => l.includes('import("@google-cloud/storage")')) ?? "";
+    expect(importLine).not.toContain("webpackIgnore");
+  });
+
+  it("marks it external, so it stays a real package rather than being bundled", () => {
+    const external = /serverExternalPackages:\s*\[([^\]]*)\]/.exec(config)?.[1] ?? "";
+    expect(external).toContain("@google-cloud/storage");
+  });
+
+  it("names it in the traced files, because it loads parts of itself by runtime string", () => {
+    // No static analysis can follow those, so the directory is included whole.
+    expect(config).toContain("node_modules/@google-cloud/storage/**");
+  });
+});

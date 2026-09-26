@@ -52,9 +52,17 @@ class GcsStorage implements StorageDriver {
     if (!this.bucketPromise) {
       const name = env.storage.gcsBucket;
       if (!name) throw new Error("GCS_BUCKET is required when STORAGE_DRIVER=gcs");
-      // Optional dependency: installed only in cloud deployments.
-      const moduleName = "@google-cloud/storage";
-      this.bucketPromise = import(/* webpackIgnore: true */ moduleName).then((m) => new m.Storage().bucket(name));
+      // A literal specifier, and no webpackIgnore. Both matter.
+      //
+      // This was written as a const holding the name plus webpackIgnore, to keep
+      // an optional dependency out of the bundle. The effect in a standalone
+      // build is that Next's file tracer cannot see the import at all, so the
+      // package is never copied into the image — and the deployment failed at
+      // runtime with "Cannot find package '@google-cloud/storage'" on every
+      // voice turn, long after it was added to package.json. A literal
+      // specifier is what the tracer follows; serverExternalPackages in
+      // next.config.ts is what keeps it out of the bundle instead.
+      this.bucketPromise = import("@google-cloud/storage").then((m) => new m.Storage().bucket(name));
     }
     return this.bucketPromise;
   }

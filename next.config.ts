@@ -38,7 +38,13 @@ const csp = [
 
 const nextConfig: NextConfig = {
   // Embedded PostgreSQL (WASM) and the pg driver must not be bundled by webpack/turbopack.
-  serverExternalPackages: ["@electric-sql/pglite", "pg", "pdfkit", "exceljs"],
+  // @google-cloud/storage joins them: it resolves parts of itself at runtime and
+  // does not survive bundling. Listed here it stays a real package on disk —
+  // and, crucially, one the file tracer still follows into the standalone
+  // output. The previous arrangement (webpackIgnore plus an indirect specifier)
+  // hid it from the tracer, so it was absent from the image and every voice turn
+  // failed with "Cannot find package".
+  serverExternalPackages: ["@electric-sql/pglite", "pg", "pdfkit", "exceljs", "@google-cloud/storage"],
   agentRules: false,
   poweredByHeader: false,
   // Self-contained server bundle, so the container copies one directory.
@@ -51,6 +57,17 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingExcludes: {
     "*": ["data/**", ".test-data/**", "screenshots-blog/**"],
+  },
+  /**
+   * Belt and braces for the storage client. The tracer follows the literal
+   * import in core/storage.ts, but that package loads further pieces of itself
+   * by runtime string, which no static analysis can follow. Naming the whole
+   * directory guarantees the image carries it: a recording that cannot be
+   * written is a gap in a citizen's record, and finding out at runtime costs a
+   * deployment.
+   */
+  outputFileTracingIncludes: {
+    "*": ["node_modules/@google-cloud/storage/**"],
   },
   headers: async () => [
     {
