@@ -345,7 +345,12 @@ done
 #
 # Never zero instances where calls are answered: a cold start on an emergency
 # call is a citizen waiting.
-gc run deploy "$SERVICE" \
+# --startup-probe on the platform's own health endpoint rather than Cloud Run's
+# default TCP check. A TCP check passes the moment the socket binds, which for a
+# Next.js server is before it can serve anything, so a container that boots and
+# then cannot reach its database reports healthy and fails on the first citizen.
+# 60 seconds of grace: the first request applies the migrations.
+if ! gc run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
   --service-account="$SA_EMAIL" \
@@ -359,7 +364,22 @@ gc run deploy "$SERVICE" \
   --allow-unauthenticated \
   --env-vars-file="$ENV_FILE" \
   --set-secrets="$SECRET_REFS" \
+  --startup-probe="httpGet.path=/api/v1/system/health,initialDelaySeconds=10,timeoutSeconds=5,periodSeconds=10,failureThreshold=6" \
   --quiet
+then
+  # A failed revision says "check the logs" and gives a console URL. Print them
+  # here instead: the reason is usually one line, and a round trip to a browser
+  # to read it is a round trip that did not have to happen.
+  printf '\n'
+  note "The revision did not start. Its own output follows."
+  printf '\n'
+  gc logging read \
+    "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE}\" AND severity>=DEFAULT" \
+    --freshness=15m --limit=60 --order=asc \
+    --format='value(timestamp.date("%H:%M:%S"),severity,textPayload,jsonPayload.message,jsonPayload.error)' \
+    | sed 's/^/   /' || note "(could not read the logs; see the console URL above)"
+  die "The container failed to start. The lines above are its reason."
+fi
 SERVICE_URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
 note "answering at $SERVICE_URL"
 
