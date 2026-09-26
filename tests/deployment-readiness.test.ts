@@ -24,22 +24,27 @@ beforeEach(() => {
   for (const k of KEYS) saved[k] = process.env[k];
 });
 afterEach(() => {
-  for (const k of KEYS) {
-    if (saved[k] === undefined) delete process.env[k];
-    else process.env[k] = saved[k];
-  }
+  for (const k of KEYS) setEnv(k, saved[k]);
 });
+
+/**
+ * Written through an indexed setter rather than `process.env.NODE_ENV = ...`:
+ * the typings mark that property read-only, and vitest does not typecheck, so a
+ * direct assignment passes here and fails `npm run typecheck`.
+ */
+function setEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
 
 /** A pilot deployment with its secrets in place and nothing operated yet. */
 function freshPilot() {
-  process.env.NODE_ENV = "production";
-  process.env.DEPLOYMENT_STAGE = "pilot";
-  process.env.SESSION_SECRET = "a".repeat(64);
-  process.env.DATA_ENCRYPTION_KEY = "b".repeat(64);
-  process.env.NEXT_PUBLIC_SITE_URL = "https://congovoicecd.com";
-  delete process.env.SMS_PROVIDER;
-  delete process.env.WHATSAPP_PROVIDER;
-  delete process.env.VOICE_PROVIDER;
+  setEnv("NODE_ENV", "production");
+  setEnv("DEPLOYMENT_STAGE", "pilot");
+  setEnv("SESSION_SECRET", "a".repeat(64));
+  setEnv("DATA_ENCRYPTION_KEY", "b".repeat(64));
+  setEnv("NEXT_PUBLIC_SITE_URL", "https://congovoicecd.com");
+  for (const p of ["SMS_PROVIDER", "WHATSAPP_PROVIDER", "VOICE_PROVIDER"]) setEnv(p, undefined);
 }
 
 const deploymentFailures = () =>
@@ -73,15 +78,15 @@ describe("a genuinely broken deployment is still refused", () => {
   ] as const) {
     it(`fails when ${variable} is missing in production`, () => {
       freshPilot();
-      delete process.env[variable];
+      setEnv(variable, undefined);
       expect(deploymentFailures()).toContain(id);
     });
   }
 
   it("reports every missing secret at once rather than one at a time", () => {
     freshPilot();
-    delete process.env.SESSION_SECRET;
-    delete process.env.DATA_ENCRYPTION_KEY;
+    setEnv("SESSION_SECRET", undefined);
+    setEnv("DATA_ENCRYPTION_KEY", undefined);
     expect(deploymentFailures()).toEqual(
       expect.arrayContaining(["session_secret", "data_encryption_key"]),
     );
@@ -92,7 +97,7 @@ describe("configuring an escalation channel is what clears that check", () => {
   it("passes once any one of the three providers is real", () => {
     for (const provider of ["SMS_PROVIDER", "WHATSAPP_PROVIDER", "VOICE_PROVIDER"] as const) {
       freshPilot();
-      process.env[provider] = "twilio";
+      setEnv(provider, "twilio");
       const check = readiness().checks.find((c) => c.id === "escalation_delivery");
       expect(check?.ok, provider).toBe(true);
     }
@@ -100,7 +105,7 @@ describe("configuring an escalation channel is what clears that check", () => {
 
   it("a log-only provider does not count as reaching anyone", () => {
     freshPilot();
-    process.env.SMS_PROVIDER = "log";
+    setEnv("SMS_PROVIDER", "log");
     expect(readiness().checks.find((c) => c.id === "escalation_delivery")?.ok).toBe(false);
   });
 });

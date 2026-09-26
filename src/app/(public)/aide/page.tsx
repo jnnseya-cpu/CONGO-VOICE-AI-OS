@@ -191,7 +191,7 @@ const FAQ: FaqItem[] = [
   {
     section: "donnees",
     q: "Comment demander la suppression de mes données ?",
-    a: "Écrivez à donnees@congovoicecd.com, ou demandez-le à un relais communautaire ou à un agent qui ouvrira la demande pour vous. Le programme répond dans les trente jours. La suppression efface les enregistrements et les photos, vide les textes qui vous concernent, et remplace votre identité par un identifiant sans retour possible. Deux choses subsistent : le journal d'audit, qui est la preuve de ce que le programme a fait et ne contient aucun texte personnel, et les statistiques anonymes déjà agrégées.",
+    a: `Écrivez à ${SITE.contact.dataProtection}, ou demandez-le à un relais communautaire ou à un agent qui ouvrira la demande pour vous. Le programme répond dans les trente jours. La suppression efface les enregistrements et les photos, vide les textes qui vous concernent, et remplace votre identité par un identifiant sans retour possible. Deux choses subsistent : le journal d'audit, qui est la preuve de ce que le programme a fait et ne contient aucun texte personnel, et les statistiques anonymes déjà agrégées.`,
   },
   {
     section: "donnees",
@@ -256,7 +256,7 @@ const FAQ: FaqItem[] = [
   {
     section: "problemes",
     q: "Je pense que le service m'a donné un mauvais conseil. À qui le dire ?",
-    a: "Écrivez à securite@congovoicecd.com, ou dites-le à l'agent de santé, à l'agent agricole ou à l'enseignant qui vous rappelle. Les signalements de sécurité sont traités en priorité. Un agent de santé peut relever le niveau de gravité décidé par le système en indiquant un motif, qui est enregistré ; le système, lui, ne peut jamais abaisser une gravité décidée par les règles.",
+    a: `Écrivez à ${SITE.contact.safety}, ou dites-le à l'agent de santé, à l'agent agricole ou à l'enseignant qui vous rappelle. Les signalements de sécurité sont traités en priorité. Un agent de santé peut relever le niveau de gravité décidé par le système en indiquant un motif, qui est enregistré ; le système, lui, ne peut jamais abaisser une gravité décidée par les règles.`,
   },
   {
     section: "problemes",

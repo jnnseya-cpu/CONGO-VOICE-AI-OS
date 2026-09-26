@@ -26,21 +26,30 @@ export const SITE = {
     sms: { label: "SMS", value: "Numéro court SMS", pending: true, note: "Réponses et rappels par message" },
     web: { label: "Application web", value: "congovoicecd.com", pending: false, note: "Fonctionne hors ligne une fois ouverte" },
   },
-  contact: {
-    general: "contact@congovoicecd.com",
-    dataProtection: "donnees@congovoicecd.com",
-    press: "presse@congovoicecd.com",
-    partnerships: "partenaires@congovoicecd.com",
-    safety: "securite@congovoicecd.com",
-  },
   /**
-   * The domain and the e-mail routes below are the programme's planned addresses. They are
-   * activated with the hosting and registrar setup; until NEXT_PUBLIC_SITE_URL is configured
-   * for a live deployment they are shown as being activated rather than as reachable today.
+   * One address, because one mailbox exists.
+   *
+   * This was five — donnees@, presse@, partenaires@, securite@ — which read
+   * well and none of which had an inbox. An address on a published page is a
+   * promise that someone reads it, and the help page used two of them to tell
+   * citizens how to exercise a data right and how to report a safety problem.
+   * Mail to either bounced. A citizen who asks for their recordings to be
+   * deleted and hears nothing has been failed by the programme, not
+   * inconvenienced by a typo.
+   *
+   * Give a route its own address when the mailbox is created, not before.
+   * NEXT_PUBLIC_CONTACT_EMAIL overrides it for a deployment that has others.
    */
+  contact: {
+    general: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "contact@congovoicecd.com",
+    get dataProtection() { return this.general; },
+    get press() { return this.general; },
+    get partnerships() { return this.general; },
+    get safety() { return this.general; },
+  },
   contactsActive: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
   contactsNote:
-    "Les adresses du programme sont en cours d'activation avec l'hébergement. En attendant, passez par votre relais communautaire, votre agent agricole ou votre enseignant référent.",
+    "Une seule adresse reçoit le courrier du programme. Vous pouvez aussi passer par votre relais communautaire, votre agent agricole ou votre enseignant référent.",
   /** Derived from the shared language list so the public site and the product cannot disagree. */
   languages: LANGUAGES,
 } as const;
