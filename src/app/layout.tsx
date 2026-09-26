@@ -9,6 +9,11 @@ import { getSession } from "@server/core/auth";
 import { SITE } from "@shared/site";
 
 export const metadata: Metadata = {
+  // iOS does not read display:standalone from the manifest. Without this, "Add
+  // to Home Screen" opens the site inside Safari's chrome — an address bar and a
+  // toolbar eating the screen, which is the usual reason an installed PWA looks
+  // like a web page rather than an app.
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Congo Voice" },
   metadataBase: new URL(SITE.url),
   title: { default: `${SITE.name} — ${SITE.shortDescription}`, template: `%s · ${SITE.name}` },
   description: SITE.description,
@@ -39,7 +44,19 @@ export const metadata: Metadata = {
   formatDetection: { telephone: true, address: false, email: false },
 };
 
-export const viewport: Viewport = { themeColor: "#0b1220", width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = {
+  themeColor: "#0b1220",
+  width: "device-width",
+  initialScale: 1,
+  // Hands the whole screen to the page, cutouts included. globals.css then pays
+  // that back with safe-area padding, so nothing lands under a notch.
+  viewportFit: "cover",
+  // A citizen reading a health answer must be able to enlarge the text. Locking
+  // the scale is the usual way a mobile layout is "fixed", and it makes the
+  // platform unusable for anyone who needs larger type.
+  maximumScale: 5,
+  userScalable: true,
+};
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const store = await cookies();

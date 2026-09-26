@@ -5,6 +5,7 @@ import { getDb, schema } from "@server/db/client";
 import { ensureKnowledgeLoaded } from "@server/ai/knowledge";
 import { HEALTH_PROTOCOLS } from "@server/ai/protocols/definitions";
 import { PageHeader } from "@client/components/ui";
+import { ClinicalBody } from "@client/components/ClinicalBody";
 import { LANGUAGE_FR, MODULE_FR, ModuleBadge, Panel, TableShell, Td, Th, dateFr, fmt } from "@client/components/dashboard/Common";
 import { IconBook, IconLeaf, IconShield } from "@client/components/icons";
 
@@ -26,13 +27,6 @@ const STATUS_FR: Record<string, string> = {
   active: "Actif",
   retired: "Retiré",
 };
-
-function paragraphs(body: string): string[] {
-  return body
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
 
 export default async function ResourcesPage() {
   const session = await getSession();
@@ -104,13 +98,9 @@ export default async function ResourcesPage() {
                       {d.reviewDate ? ` · à revoir le ${dateFr(d.reviewDate)}` : ""}
                     </span>
                   </summary>
-                  <div className="mt-3 space-y-2 border-l-2 border-line pl-4">
-                    {paragraphs(d.body).map((p, i) => (
-                      <p key={i} className="text-[13.5px] leading-relaxed text-ink-2">
-                        {p}
-                      </p>
-                    ))}
-                    {d.source && <p className="text-[12px] text-muted">Source : {d.source}</p>}
+                  <div className="mt-3 border-l-2 border-line pl-4">
+                    <ClinicalBody body={d.body} />
+                    {d.source && <p className="mt-2 text-[12px] text-muted">Source : {d.source}</p>}
                   </div>
                 </details>
               ))}
@@ -221,13 +211,9 @@ export default async function ResourcesPage() {
                     <span className="tag tag-muted">{s.level}</span>
                   </span>
                 </summary>
-                <div className="mt-3 space-y-2 border-l-2 border-line pl-4">
-                  {paragraphs(s.body).map((p, i) => (
-                    <p key={i} className="text-[13.5px] leading-relaxed text-ink-2">
-                      {p}
-                    </p>
-                  ))}
-                  <p className="text-[12px] text-muted">Licence : {s.licence}</p>
+                <div className="mt-3 border-l-2 border-line pl-4">
+                  <ClinicalBody body={s.body} />
+                  <p className="mt-2 text-[12px] text-muted">Licence : {s.licence}</p>
                 </div>
               </details>
             ))}

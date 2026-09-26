@@ -74,9 +74,29 @@
   --shadow-card: var(--shadow);
 }
 
+/*
+ * Installed as an app, the page owns the whole screen — including the parts
+ * behind a notch, a rounded corner and a home indicator. viewport-fit=cover is
+ * what hands those over; without the insets below, the header sits under the
+ * notch and the voice button sits under the home bar, where a thumb swipes the
+ * app away instead of pressing it.
+ *
+ * env() is zero on a device with no cutout and in a browser tab, so this costs
+ * nothing where it is not needed.
+ */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
 html {
   color-scheme: light;
   -webkit-text-size-adjust: 100%;
+  /* dvh, not vh: mobile vh is the viewport with the browser chrome hidden, so a
+   * full-height layout jumps by the height of the address bar as it retracts. */
+  min-height: 100dvh;
 }
 body {
   background: var(--bg);
@@ -86,6 +106,29 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.005em;
+  min-height: 100dvh;
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  /* The background continues under the inset rather than showing a white band
+   * where the status bar was, which is what makes an installed app look like a
+   * web page in a frame. */
+  background-clip: border-box;
+  /* A citizen scrolling to the end of an answer must not drag the page and
+   * trigger a browser pull-to-refresh, losing what they were reading. */
+  overscroll-behavior-y: contain;
+}
+
+/*
+ * Anything pinned to an edge has to carry the inset itself: body padding moves
+ * the flow, not a fixed element. Add this to a fixed header or bottom bar.
+ */
+.safe-fixed-bottom {
+  padding-bottom: calc(var(--safe-bottom) + 0.5rem);
+}
+.safe-fixed-top {
+  padding-top: calc(var(--safe-top) + 0.5rem);
 }
 h1, h2, h3, h4 {
   letter-spacing: -0.02em;

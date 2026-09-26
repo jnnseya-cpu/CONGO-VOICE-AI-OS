@@ -49,6 +49,7 @@ IMAGE_PATH="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/app"
 # Env var name → secret name. The application reads the former; Secret Manager
 # holds the latter. Cloud Run refuses to start if any of these has no version.
 SECRET_KEYS=(session_secret data_encryption_key database_url cron_secret
+             bootstrap_token
              anthropic_api_key gemini_api_key openai_api_key)
 
 step() { printf '\n\033[1m── %s\033[0m\n' "$*"; }
@@ -320,7 +321,7 @@ for key in "${SECRET_KEYS[@]}"; do
     continue
   fi
   case "$key" in
-    session_secret|data_encryption_key|cron_secret)
+    session_secret|data_encryption_key|cron_secret|bootstrap_token)
       add_version "$secret" "$(openssl rand -hex 32)"; note "generated: $key" ;;
     *)
       # An exported variable wins: `export ANTHROPIC_API_KEY=...` before running
