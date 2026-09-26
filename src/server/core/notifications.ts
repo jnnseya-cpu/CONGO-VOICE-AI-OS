@@ -27,9 +27,16 @@ import { safeLog, maskPhone } from "./redact";
 import { NOTIFICATION_TEMPLATES } from "@server/db/reference/notification-templates";
 import type { LanguageCode, Role } from "@server/db/schema";
 
-export type NotificationChannel = "in_app" | "sms" | "whatsapp" | "email";
+export type NotificationChannel = "in_app" | "sms" | "whatsapp" | "voice" | "email";
 /** Physical delivery channels: the enum above plus the outbound IVR fallback. */
-export type DeliveryChannel = NotificationChannel | "voice";
+/**
+ * Voice used to be deliverable but not storable: it was in this union and not in
+ * the database's channel enum, so a spoken call-back could be attempted and
+ * never recorded as the channel it went out on. On a platform whose premise is
+ * that a citizen may not read, that is the channel whose delivery record matters
+ * most. They are now the same set.
+ */
+export type DeliveryChannel = NotificationChannel;
 
 export type NotificationType =
   | "escalation"

@@ -70,6 +70,11 @@ export const notificationChannelEnum = pgEnum("notification_channel", [
   "in_app",
   "sms",
   "whatsapp",
+  // A spoken call-back. On a platform whose premise is that a citizen may not
+  // read, a catalogue of notices with no voice channel would be describing a
+  // different product: the people most likely to need an escalation followed up
+  // are the least likely to read the SMS about it.
+  "voice",
   "email",
 ]);
 

@@ -1,5 +1,5 @@
 {
-  "id": "86b291a4-dc2f-4111-8f8d-4e70af806164",
+  "id": "9ecb08bd-f870-435a-85dd-62a69d6c0ea9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -7629,6 +7629,7 @@
         "in_app",
         "sms",
         "whatsapp",
+        "voice",
         "email"
       ]
     },

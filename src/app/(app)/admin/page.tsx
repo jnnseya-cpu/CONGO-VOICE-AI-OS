@@ -46,6 +46,9 @@ export default async function AdminPage() {
             <Link href="/admin/utilisateurs" className="btn btn-ghost">
               Utilisateurs
             </Link>
+            <Link href="/admin/communications" className="btn btn-ghost">
+              Communications
+            </Link>
             <Link href="/admin/audit" className="btn btn-primary">
               Journal d&apos;audit
             </Link>

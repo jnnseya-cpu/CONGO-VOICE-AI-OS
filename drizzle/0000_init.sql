@@ -6,7 +6,7 @@ CREATE TYPE "public"."interaction_status" AS ENUM('received', 'processing', 'com
 CREATE TYPE "public"."language_code" AS ENUM('fr', 'ln', 'kg', 'sw', 'lua');--> statement-breakpoint
 CREATE TYPE "public"."lifecycle_status" AS ENUM('draft', 'review', 'approved', 'canary', 'active', 'retired');--> statement-breakpoint
 CREATE TYPE "public"."module_type" AS ENUM('health', 'agriculture', 'education', 'general');--> statement-breakpoint
-CREATE TYPE "public"."notification_channel" AS ENUM('in_app', 'sms', 'whatsapp', 'email');--> statement-breakpoint
+CREATE TYPE "public"."notification_channel" AS ENUM('in_app', 'sms', 'whatsapp', 'voice', 'email');--> statement-breakpoint
 CREATE TYPE "public"."notification_status" AS ENUM('queued', 'sent', 'failed', 'read');--> statement-breakpoint
 CREATE TYPE "public"."review_artefact_kind" AS ENUM('protocol_version', 'emergency_script', 'kb_document', 'system_prompt');--> statement-breakpoint
 CREATE TYPE "public"."review_decision" AS ENUM('approve', 'reject', 'request_changes');--> statement-breakpoint
