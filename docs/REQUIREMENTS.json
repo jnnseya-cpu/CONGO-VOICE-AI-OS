@@ -699,7 +699,7 @@
    "section": "Channels (product requirements §4)",
    "requirement": "Next.js 14 App Router PWA, installable, offline shell cached, IndexedDB queue for outgoing voice notes/photos when offline, background sync on reconnect.",
    "status": "Built",
-   "evidence": "public/sw.js · public/manifest.webmanifest",
+   "evidence": "src/app/sw.js/sw-source.js · public/manifest.webmanifest",
    "note": ""
   },
   {

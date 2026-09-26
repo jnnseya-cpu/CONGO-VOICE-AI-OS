@@ -155,7 +155,7 @@ docs/LAUNCH_READINESS.md, with docs/SECURITY.md for the security posture.
 | FR-CH-20 | USSD offers a 2-level menu: module → 5 most common questions per module → SMS answer in the user's language… | Built | src/server/channels/menus.ts · src/app/api/hooks/ussd |  |
 | FR-CH-21 | USSD sessions ≤ 180 s (gateway limit); state persisted so the citizen can dial again. | Built | src/server/channels/session.ts (state) |  |
 | FR-CH-22 | SMS is the delivery channel for reminders (vaccination, planting, revision) and follow-ups; each includes a… | Built | src/server/core/scheduler.ts · src/server/channels/sms.ts |  |
-| FR-CH-30 | Next.js 14 App Router PWA, installable, offline shell cached, IndexedDB queue for outgoing voice notes/phot… | Built | public/sw.js · public/manifest.webmanifest |  |
+| FR-CH-30 | Next.js 14 App Router PWA, installable, offline shell cached, IndexedDB queue for outgoing voice notes/phot… | Built | src/app/sw.js/sw-source.js · public/manifest.webmanifest |  |
 | FR-CH-31 | Push-to-talk UI with a single large button; text remains secondary; every screen reachable in ≤ 2 taps. | Built | src/client/components/voice/VoiceConsole.tsx |  |
 | FR-CH-32 | Worker PWA (CHW/Extension/Teacher) shares the same shell with role-gated routes. | Built | src/app/(app)/ |  |
 | FR-CH-40 | citizen_id is a platform UUID; phone number, WhatsApp ID and PWA account are identifiers linked to it. Merg… | Built | src/server/channels/session.ts · src/server/core/identifiers.ts · tests/identity.test.ts | One citizen across IVR, SMS, USSD and WhatsApp, and a spoken one-time code with a ten-minute life and three attempts before an identifier is added. |
