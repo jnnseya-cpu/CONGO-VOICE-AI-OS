@@ -5,6 +5,7 @@ import { getSession } from "@server/core/auth";
 import { hasPermission } from "@server/core/rbac";
 import { getDb, schema } from "@server/db/client";
 import { commandStats, importantAlerts, adminStats } from "@server/ai/agents/reporting";
+import { escalationTrend, interactionTrend, operatingBrief, severityMix } from "@server/ai/os/brief";
 import { PageHeader } from "@client/components/ui";
 import {
   AccessNotice,
@@ -27,6 +28,8 @@ import {
   since,
   todayLabelFr,
 } from "@client/components/dashboard/Common";
+import { OperatingBrief } from "@client/components/dashboard/OperatingBrief";
+import { Trend } from "@client/components/dashboard/Trend";
 import { IconAlert, IconBriefcase, IconChart, IconFlame, IconGraduation, IconLeaf, IconHeart, IconMic, IconUsers } from "@client/components/icons";
 
 export const metadata = { title: "Tableau de bord" };
@@ -122,11 +125,17 @@ export default async function DashboardPage() {
   }
 
   const canSeeCost = hasPermission(session.role, "dashboard:admin");
-  const [stats, data, alerts, admin] = await Promise.all([
+  const [stats, data, alerts, admin, brief, useTrend, caseTrend, severity] = await Promise.all([
     commandStats().catch(() => null),
     govData(),
     importantAlerts(8).catch(() => []),
     canSeeCost ? adminStats().catch(() => null) : Promise.resolve(null),
+    // A brief that fails must not take the dashboard with it: the numbers below
+    // remain useful even when a check cannot run.
+    operatingBrief().catch(() => null),
+    interactionTrend().catch(() => null),
+    escalationTrend().catch(() => null),
+    severityMix().catch(() => []),
   ]);
   const now = nowMs();
 
@@ -156,6 +165,10 @@ export default async function DashboardPage() {
           </>
         }
       />
+
+      {/* First on the page, because it is the reason to open the page: the
+          numbers below say what happened, this says what to do about it. */}
+      {brief && <OperatingBrief brief={brief} />}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Citoyens actifs aujourd'hui" value={fmt(data.activeDay)} hint={`${fmt(data.activeWeek)} sur 7 jours · ${fmt(data.activeMonth)} sur 30 jours`} icon={<IconUsers size={16} />} tone="brand" />
@@ -204,6 +217,21 @@ export default async function DashboardPage() {
               <ShareBar rows={languageRows} />
             </Panel>
           </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Échanges par jour" hint="Quatorze derniers jours. Une journée sans activité est tracée comme zéro, pas omise.">
+          {useTrend ? <Trend points={useTrend.points} caption="Échanges par jour" tone="brand" /> : null}
+        </Panel>
+        <Panel title="Cas ouverts par jour" hint="La mesure qui décide si les effectifs de garde suffisent.">
+          {caseTrend ? <Trend points={caseTrend.points} caption="Cas ouverts par jour" tone="danger" /> : null}
+        </Panel>
+      </div>
+
+      {severity.length > 0 && (
+        <Panel title="Répartition par gravité" hint="Trente derniers jours. La part d'urgences dit si le service atteint les bonnes personnes.">
+          <BarList rows={severity} tone="health" />
+        </Panel>
+      )}
+
 
           <Panel title="Classement des provinces" hint="Interactions sur 30 jours." action={<Link href="#cartes" className="link">Voir le tableau complet</Link>}>
             <BarList rows={provinceBars} tone="agri" />

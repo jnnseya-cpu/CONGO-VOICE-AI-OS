@@ -71,12 +71,31 @@ else
 fi
 
 step "Backend service"
+# --timeout is the whole reason a voice turn failed with "Failed to fetch".
+#
+# A backend service defaults to thirty seconds. One spoken question is an audio
+# upload, a transcription, a language decision, an answer and a speech synthesis
+# — routinely more than thirty seconds, and much more on the first request to a
+# cold instance. The load balancer closed the connection mid-request and the
+# browser reported a network failure, which looks like the citizen's signal
+# rather than our configuration.
+#
+# 300s matches Cloud Run's own request timeout, so the platform decides when a
+# turn has taken too long, not the hop in front of it.
+BACKEND_TIMEOUT="${BACKEND_TIMEOUT:-300}"
 if exists gc compute backend-services describe "$BACKEND" --global; then
-  note "exists: $BACKEND"
+  current=$(gc compute backend-services describe "$BACKEND" --global --format='value(timeoutSec)')
+  if [[ "$current" == "$BACKEND_TIMEOUT" ]]; then
+    note "exists: $BACKEND (délai ${current}s)"
+  else
+    gc compute backend-services update "$BACKEND" --global --timeout="$BACKEND_TIMEOUT" >/dev/null
+    note "exists: $BACKEND — délai porté de ${current}s à ${BACKEND_TIMEOUT}s"
+  fi
 else
   gc compute backend-services create "$BACKEND" \
-    --global --load-balancing-scheme=EXTERNAL_MANAGED >/dev/null
-  note "created: $BACKEND"
+    --global --load-balancing-scheme=EXTERNAL_MANAGED \
+    --timeout="$BACKEND_TIMEOUT" >/dev/null
+  note "created: $BACKEND (délai ${BACKEND_TIMEOUT}s)"
 fi
 if gc compute backend-services describe "$BACKEND" --global \
      --format='value(backends[].group)' | grep -q "$NEG"; then

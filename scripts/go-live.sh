@@ -383,6 +383,11 @@ done
 # The certificate authority the application verifies the database against.
 SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 
+# --timeout=300 is stated rather than defaulted, and the load balancer in front
+# of this is set to match. A spoken turn is an upload, a transcription, an
+# answer and a speech synthesis; the platform must be the thing that decides it
+# has taken too long, not a hop in front of it closing the connection.
+#
 # --allow-unauthenticated: the service answers citizens on the open internet and
 # telephony webhooks from providers holding no Google credentials. Every
 # /api/v1 route still enforces its own session and permission check in handle().
@@ -421,6 +426,7 @@ if ! gc run deploy "$SERVICE" \
   --vpc-egress=private-ranges-only \
   --port=8080 \
   --cpu=1 --memory=1Gi \
+  --timeout=300 \
   --min-instances="${MIN_INSTANCES:-1}" \
   --max-instances="${MAX_INSTANCES:-10}" \
   --allow-unauthenticated \
