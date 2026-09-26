@@ -23,7 +23,7 @@ set -euo pipefail
 PROJECT="${PROJECT:-congo-voice}"
 REGION="${REGION:-africa-south1}"
 DOMAIN="${DOMAIN:-congovoicecd.com}"
-ENVIRONMENT="${ENVIRONMENT:-pilot}"
+export ENVIRONMENT="${ENVIRONMENT:-pilot}"
 
 NAME="congovoice-${ENVIRONMENT}"
 NETWORK="${NAME}-net"
@@ -32,17 +32,17 @@ DB_INSTANCE="${NAME}-pg"
 DB_NAME=cvos
 DB_USER=cvos_app
 DB_TIER="${DB_TIER:-db-custom-2-7680}"
-MEDIA_BUCKET="${NAME}-media"
+export MEDIA_BUCKET="${NAME}-media"
 SERVICE_ACCOUNT_ID="${NAME}-app"
 SERVICE="$NAME"
 SCHEDULER_JOB="${NAME}-workflow"
 REPO=cvos
 DB_PASSWORD_SECRET="cvos-${ENVIRONMENT}-db-password"
-PUBLIC_URL="https://${DOMAIN}"
+export PUBLIC_URL="https://${DOMAIN}"
 MEDIA_BACKSTOP_DAYS="${MEDIA_BACKSTOP_DAYS:-400}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SA_EMAIL="${SERVICE_ACCOUNT_ID}@${PROJECT}.iam.gserviceaccount.com"
+export SA_EMAIL="${SERVICE_ACCOUNT_ID}@${PROJECT}.iam.gserviceaccount.com"
 IMAGE_PATH="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/app"
 
 # Env var name → secret name. The application reads the former; Secret Manager
@@ -297,26 +297,41 @@ done
 # ── 8. The service ───────────────────────────────────────────────────────────
 
 step "Cloud Run service"
-# ^@^ as the delimiter because DATA_RESIDENCY is itself a comma-separated list,
-# and the default delimiter would split it into two broken variables.
-ENV_VARS="^@^NODE_ENV=production"
-ENV_VARS+="@STORAGE_DRIVER=gcs"
-ENV_VARS+="@GCS_BUCKET=${MEDIA_BUCKET}"
-ENV_VARS+="@TRUSTED_PROXY_HOPS=1"
-ENV_VARS+="@NEXT_PUBLIC_SITE_URL=${PUBLIC_URL}"
-# Not a label: pilot and prod are the stages at which the platform assumes a
-# real citizen is on the other end. An escalation must be able to reach a
-# person, clinical content must carry a review-board sign-off, and a log-only
-# notification provider fails loudly instead of pretending it sent something.
-ENV_VARS+="@DEPLOYMENT_STAGE=${ENVIRONMENT}"
-# Declared, never inferred from the region: the platform refuses to guess a
-# jurisdiction from a region name. See docs/DATA_RESIDENCY.md.
-ENV_VARS+="@DATA_RESIDENCY=${DATA_RESIDENCY:-ZA,US}"
-ENV_VARS+="@DEPLOYMENT_JURISDICTION=${DEPLOYMENT_JURISDICTION:-ZA}"
-# So the maintenance endpoint can tell the scheduler's own identity token from
-# anybody else's. Without these it refuses every scheduled run.
-ENV_VARS+="@CRON_OIDC_AUDIENCE=${PUBLIC_URL}/api/v1/workflow/run"
-ENV_VARS+="@CRON_SERVICE_ACCOUNT=${SA_EMAIL}"
+# Environment variables go in a file, not on the command line.
+#
+# --set-env-vars parses its own syntax, so any value containing the delimiter
+# breaks it — and there is no safe delimiter here: CRON_SERVICE_ACCOUNT is an
+# email address (@), DATA_RESIDENCY is a comma-separated list (,), and the URLs
+# contain : and /. A file has no delimiter to collide with.
+ENV_FILE="$(mktemp)"
+trap 'rm -f "$ENV_FILE"' EXIT
+python3 - "$ENV_FILE" <<'PYENV'
+import json, os, sys
+# JSON is a subset of YAML, which is what --env-vars-file accepts, and json.dump
+# escapes every value correctly by construction.
+env = {
+    "NODE_ENV": "production",
+    "STORAGE_DRIVER": "gcs",
+    "GCS_BUCKET": os.environ["MEDIA_BUCKET"],
+    "TRUSTED_PROXY_HOPS": "1",
+    "NEXT_PUBLIC_SITE_URL": os.environ["PUBLIC_URL"],
+    # Not a label: pilot and prod are the stages at which the platform assumes a
+    # real citizen is on the other end. An escalation must be able to reach a
+    # person, clinical content must carry a review-board sign-off, and a log-only
+    # notification provider fails loudly instead of pretending it sent something.
+    "DEPLOYMENT_STAGE": os.environ["ENVIRONMENT"],
+    # Declared, never inferred from the region: the platform refuses to guess a
+    # jurisdiction from a region name. See docs/DATA_RESIDENCY.md.
+    "DATA_RESIDENCY": os.environ.get("DATA_RESIDENCY") or "ZA,US",
+    "DEPLOYMENT_JURISDICTION": os.environ.get("DEPLOYMENT_JURISDICTION") or "ZA",
+    # So the maintenance endpoint can tell the scheduler's own identity token
+    # from anybody else's. Without these it refuses every scheduled run.
+    "CRON_OIDC_AUDIENCE": os.environ["PUBLIC_URL"] + "/api/v1/workflow/run",
+    "CRON_SERVICE_ACCOUNT": os.environ["SA_EMAIL"],
+}
+json.dump(env, open(sys.argv[1], "w"), indent=2)
+PYENV
+note "$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))), "environment variables")' "$ENV_FILE")"
 
 SECRET_REFS=""
 for key in "${SECRET_KEYS[@]}"; do
@@ -327,6 +342,9 @@ done
 # --allow-unauthenticated: the service answers citizens on the open internet and
 # telephony webhooks from providers holding no Google credentials. Every
 # /api/v1 route still enforces its own session and permission check in handle().
+#
+# Never zero instances where calls are answered: a cold start on an emergency
+# call is a citizen waiting.
 gc run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -339,14 +357,11 @@ gc run deploy "$SERVICE" \
   --min-instances="${MIN_INSTANCES:-1}" \
   --max-instances="${MAX_INSTANCES:-10}" \
   --allow-unauthenticated \
-  --set-env-vars="$ENV_VARS" \
+  --env-vars-file="$ENV_FILE" \
   --set-secrets="$SECRET_REFS" \
   --quiet
 SERVICE_URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
 note "answering at $SERVICE_URL"
-
-# Never zero instances where calls are answered: a cold start on an emergency
-# call is a citizen waiting.
 
 step "Scheduled work"
 SCHED_OK=yes
