@@ -416,10 +416,16 @@ then
   # to read it is a round trip that did not have to happen.
   printf '\n'
   note "The revision did not start. Its own output follows."
+  # Scoped to THIS revision, not to a time window. A --freshness window wide
+  # enough to catch a slow boot is also wide enough to show the previous
+  # failure's lines, which reads as though the fix did nothing.
+  FAILED_REVISION=$(gc run revisions list --service="$SERVICE" --region="$REGION" \
+    --sort-by='~createTime' --limit=1 --format='value(name)' 2>/dev/null || true)
+  note "revision: ${FAILED_REVISION:-unknown}"
   printf '\n'
   gc logging read \
-    "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE}\" AND severity>=DEFAULT" \
-    --freshness=15m --limit=60 --order=asc \
+    "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE}\"${FAILED_REVISION:+ AND resource.labels.revision_name=\"$FAILED_REVISION\"} AND severity>=DEFAULT" \
+    --freshness=20m --limit=60 --order=asc \
     --format='value(timestamp.date("%H:%M:%S"),severity,textPayload,jsonPayload.message,jsonPayload.error)' \
     | sed 's/^/   /' || note "(could not read the logs; see the console URL above)"
   die "The container failed to start. The lines above are its reason."

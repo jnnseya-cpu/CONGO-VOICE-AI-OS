@@ -27,7 +27,8 @@
     "residency:docx": "node scripts/residency-docx.mjs",
     "rehearsal": "node scripts/pilot-rehearsal.mjs",
     "go-live": "bash scripts/go-live.sh",
-    "teardown": "bash scripts/teardown.sh"
+    "teardown": "bash scripts/teardown.sh",
+    "set-ai-keys": "bash scripts/set-ai-keys.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
