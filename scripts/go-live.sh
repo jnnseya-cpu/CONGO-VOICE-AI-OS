@@ -239,21 +239,55 @@ done
 
 # ── 8. The service ───────────────────────────────────────────────────────────
 
-step "The service, its scheduler job and the domain mapping"
-terraform apply -input=false -auto-approve -var-file="$TFVARS"
+step "The service and its scheduler job"
+terraform apply -input=false -auto-approve -var-file="$TFVARS" \
+  -target=google_cloud_run_v2_service.app \
+  -target=google_cloud_run_v2_service_iam_member.public \
+  -target=google_cloud_scheduler_job.workflow
+SERVICE_URL=$(terraform output -raw service_url)
+note "the platform answers at $SERVICE_URL"
+
+# ── 9. The domain, which is allowed to fail ──────────────────────────────────
+#
+# Cloud Run domain mappings are not offered in every region, and a region that
+# does not offer them refuses the mapping rather than the service. Attempting it
+# last, and separately, means an unsupported region costs a warning instead of
+# the whole run — the platform is already up and answering by this point.
+
+step "The domain mapping for $DOMAIN"
+DOMAIN_OK=yes
+if ! terraform apply -input=false -auto-approve -var-file="$TFVARS"; then
+  DOMAIN_OK=no
+  note "The mapping did not apply. Everything else is up."
+fi
 
 step "Done"
-SERVICE_URL=$(terraform output -raw service_url)
 printf '\n'
 note "The platform answers at: $SERVICE_URL"
 printf '\n'
-note "DNS records to add at your registrar for $DOMAIN:"
-terraform output -json dns_records_to_create | python3 -c \
-  "import json,sys; [print('     ' + r) for r in json.load(sys.stdin)]"
-printf '\n'
-note "Then, once the records resolve and the certificate is issued:"
-note "  curl -sI https://$DOMAIN | head -3"
-note "  npm run preflight -- https://$DOMAIN"
+if [[ "$DOMAIN_OK" == yes ]]; then
+  note "DNS records to add at your registrar for $DOMAIN:"
+  terraform output -json dns_records_to_create 2>/dev/null | python3 -c \
+    "import json,sys; [print('     ' + r) for r in json.load(sys.stdin)]" \
+    || note "     (re-run: terraform output dns_records_to_create)"
+  printf '\n'
+  note "Then, once the records resolve and the certificate is issued:"
+  note "  curl -sI https://$DOMAIN | head -3"
+  note "  npm run preflight -- https://$DOMAIN"
+else
+  note "$DOMAIN is NOT mapped yet. The service is reachable on its run.app URL,"
+  note "which is enough to test the platform but not to launch on: the telephony"
+  note "provider signs each webhook over the full URL it called, and the image"
+  note "was built believing it lives at https://$DOMAIN."
+  printf '\n'
+  note "Two ways forward — see docs/GO_LIVE.md §4:"
+  note "  a) Put a global external Application Load Balancer in front of the"
+  note "     service with a Google-managed certificate for $DOMAIN. This works"
+  note "     in every region and is the usual answer for a .cd domain."
+  note "  b) Deploy in a region that offers domain mappings, accepting the"
+  note "     latency and the change to the residency posture in"
+  note "     docs/DATA_RESIDENCY.md. Do not do this silently."
+fi
 printf '\n'
 note "Do NOT run 'npm run seed' against this database — it is synthetic"
 note "demonstration data. Create the real accounts in /admin/utilisateurs."

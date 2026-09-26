@@ -344,6 +344,19 @@ terraform apply -var-file=environments/pilot.tfvars
 
 This is the step that is skipped, and the failure is quiet.
 
+**Cloud Run domain mappings are not offered in every region.** If the mapping
+step fails, that is what happened — the service itself is fine and answering on
+its `run.app` URL. The script attempts the mapping last and on its own so an
+unsupported region costs a warning rather than the whole run. Two ways forward:
+
+| Option | When |
+|---|---|
+| A global external Application Load Balancer in front of the service, with a Google-managed certificate for the domain | Works in every region. The usual answer for a `.cd` domain, and the one to take for the pilot. |
+| Redeploy in a region that offers mappings | Only with the latency and the residency change written down. `docs/DATA_RESIDENCY.md` records the jurisdiction the pilot declared; changing the region changes it, and `DATA_RESIDENCY` in the tfvars must change with it or the residency guard will refuse providers it should allow. |
+
+Whichever you choose, `NEXT_PUBLIC_SITE_URL` must end up matching the origin
+citizens actually reach. The image has it baked in, so a change means a rebuild.
+
 `NEXT_PUBLIC_SITE_URL` is what canonical links, the sitemap, social images and
 the telephony callback URLs are built from. The telephony provider signs each
 webhook over **the full URL it called**. A service reachable on one origin while
