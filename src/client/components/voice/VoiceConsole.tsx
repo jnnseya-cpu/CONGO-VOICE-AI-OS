@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { InteractionResult, LanguageCode, ModuleType } from "@shared/types";
 import { LANGUAGES } from "@shared/types";
+import { EMERGENCY_INSTRUCTIONS, FACILITY_UNKNOWN_NOTE, detectRoutingDangerSigns } from "@shared/emergency";
 import { useLanguage } from "../shell/LanguageProvider";
 import { IconImage, IconMic, IconSpinner, IconStop, IconThumbDown, IconThumbUp, IconVolume, IconX } from "../icons";
 import { AnswerPanel } from "./AnswerPanel";
@@ -14,6 +15,61 @@ interface Turn {
   images: number;
   result: InteractionResult | null;
   error?: string;
+  /**
+   * The reviewed emergency instruction, produced on the handset because the
+   * request could not be completed. Rendered as guidance, never as an error.
+   */
+  offlineEmergency?: string;
+}
+
+/**
+ * What the citizen is told when the request does not complete.
+ *
+ * It used to be `e.message`, so a caregiver in Kinshasa was shown the string
+ * "Failed to fetch" — a browser's internal wording, in English, to somebody who
+ * came here specifically to be spoken to in their own language. A citizen is
+ * never shown a technical message.
+ */
+const NETWORK_MESSAGE: Record<LanguageCode, string> = {
+  fr: "La connexion n'a pas abouti. Votre message est conservé sur cet appareil : appuyez de nouveau sur Envoyer quand le réseau revient.",
+  ln: "Réseau ekoki te. Message na yo ebombami na telefone: fina Envoyer lisusu tango réseau ezongi.",
+  kg: "Réseau me sala ve. Nsangu na nge me bumbana na telefone: fina Envoyer diaka ntangu réseau me vutuka.",
+  sw: "Mtandao haukufanikiwa. Ujumbe wako umehifadhiwa kwenye simu: bonyeza Envoyer tena mtandao utakaporudi.",
+  lua: "Lutanda kaluvua lwenza to. Mukenji webe udi mulame mu telefone: ofina Envoyer kabidi padi lutanda lupingana.",
+};
+
+/** Subscribes React to the browser's own online/offline events. */
+function subscribeToConnection(onChange: () => void): () => void {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
+
+/** How long the handset waits before deciding the request will not arrive. */
+const REQUEST_TIMEOUT_MS = 45_000;
+
+/**
+ * One attempt at sending a turn, with a deadline.
+ *
+ * Module scope on purpose: nothing here reads component state, and keeping the
+ * abort controller out of the component body leaves the render path exactly as
+ * it was. Without the deadline the spinner turns forever on a connection that
+ * has already gone, which is what a citizen on a failing mast actually sees.
+ */
+async function postInteraction(form: FormData): Promise<InteractionResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/v1/interactions", { method: "POST", body: form, signal: controller.signal });
+    const json = (await res.json()) as InteractionResult | { error: { message: string } };
+    if (!res.ok || "error" in json) throw new Error("error" in json ? json.error.message : "Erreur");
+    return json;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const BCP47: Record<LanguageCode, string> = { fr: "fr-FR", ln: "fr-FR", kg: "fr-FR", sw: "sw-KE", lua: "fr-FR" };
@@ -30,8 +86,35 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
-  const [online, setOnline] = useState(true);
+  /**
+   * Whether the handset believes it has a connection.
+   *
+   * useSyncExternalStore rather than an effect that calls setState: the browser
+   * already owns this value, React only needs to subscribe to it. The server
+   * snapshot is `true` so the markup rendered on the server matches the first
+   * client render and nothing flashes an offline banner during hydration.
+   */
+  const online = useSyncExternalStore(subscribeToConnection, () => navigator.onLine, () => true);
   const [speaking, setSpeaking] = useState<string | null>(null);
+  /**
+   * Identifies a turn in this session's list.
+   *
+   * Was Date.now(), which reads the clock inside the component body and makes
+   * two turns submitted in the same millisecond collide. A counter is stable,
+   * ordered, and does not depend on anything outside React.
+   */
+  const turnSeq = useRef(0);
+  /**
+   * The recorder's callbacks outlive the render that created them.
+   *
+   * `rec.onstop` and the duration timer are installed once and then fire much
+   * later, so they cannot close over `submit` and `stopRecording` directly —
+   * those are declared further down and would be read before they exist. Holding
+   * the current version in a ref, assigned from an effect, keeps the callbacks
+   * pointing at the latest one without reaching forward during render.
+   */
+  const submitRef = useRef<(opts: { audio?: Blob; question?: string }) => void>(() => undefined);
+  const stopRecordingRef = useRef<() => void>(() => undefined);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
@@ -47,21 +130,25 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
     fetch("/api/v1/auth/me").then(async (r) => {
       if (r.status === 401) await fetch("/api/v1/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anonymous: true, language: lang, consent: true }) });
     }).catch(() => undefined);
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    setOnline(navigator.onLine);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
     try {
       const draft = localStorage.getItem(draftKey);
+      /**
+       * Restoring an unsent draft is the one state update that genuinely
+       * belongs in an effect. localStorage does not exist while the server
+       * renders, so the value cannot be read during render or in a lazy
+       * initialiser without producing markup that disagrees with the client's.
+       * The alternative the rule suggests — deriving it during render — is not
+       * available here.
+       *
+       * It runs once, on mount, for a citizen who typed something and lost their
+       * connection before sending it. Losing that text is the failure this
+       * guards against, and it is the failure the screenshots are about.
+       */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (draft) setText(draft);
     } catch {
       /* ignore */
     }
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -99,14 +186,14 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
       rec.onstop = () => {
         stream.getTracks().forEach((tr) => tr.stop());
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-        if (blob.size > 0) void submit({ audio: blob });
+        if (blob.size > 0) submitRef.current({ audio: blob });
       };
       rec.start(250);
       recorderRef.current = rec;
       setRecording(true);
       setSeconds(0);
       timerRef.current = window.setInterval(() => setSeconds((s) => {
-        if (s + 1 >= MAX_SECONDS) stopRecording();
+        if (s + 1 >= MAX_SECONDS) stopRecordingRef.current();
         return s + 1;
       }), 1000);
       // level meter
@@ -128,7 +215,8 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
     } catch {
       setMicError(t("micDenied"));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The dependency list is now complete: submit and stopRecording are reached
+    // through refs, so this no longer needs an exhaustive-deps exception.
   }, [t]);
 
   const stopRecording = useCallback(() => {
@@ -144,7 +232,7 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
   async function submit(opts: { audio?: Blob; question?: string }) {
     const question = (opts.question ?? text).trim();
     if (!opts.audio && !question && images.length === 0) return;
-    const id = `${Date.now()}`;
+    const id = `t${(turnSeq.current += 1)}`;
     const turn: Turn = { id, question: question || (opts.audio ? "🎤" : ""), hasAudio: !!opts.audio, images: images.length, result: null };
     setTurns((tt) => [...tt, turn]);
     setBusy(true);
@@ -155,9 +243,16 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
     if (opts.audio) form.append("audio", opts.audio, "voice.webm");
     for (const img of images) form.append("images", img, img.name);
     try {
-      const res = await fetch("/api/v1/interactions", { method: "POST", body: form });
-      const json = (await res.json()) as InteractionResult | { error: { message: string } };
-      if (!res.ok || "error" in json) throw new Error("error" in json ? json.error.message : "Erreur");
+      let json: InteractionResult;
+      try {
+        json = await postInteraction(form);
+      } catch {
+        // One retry. A cold start, a lost cell and a handover between masts all
+        // look identical from here, and a second attempt rescues most of them.
+        setStage(t("processing"));
+        await new Promise((r) => setTimeout(r, 1200));
+        json = await postInteraction(form);
+      }
       setTurns((tt) => tt.map((x) => (x.id === id ? { ...x, result: json } : x)));
       setText("");
       setImages([]);
@@ -167,13 +262,37 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
         /* ignore */
       }
       speak(json.responseText, json.language, json.audioUrl, id);
-    } catch (e) {
-      setTurns((tt) => tt.map((x) => (x.id === id ? { ...x, error: e instanceof Error ? e.message : "Erreur" } : x)));
+    } catch {
+      /**
+       * The request did not complete. If what the citizen wrote carries a danger
+       * sign, the handset answers it.
+       *
+       * The phrases and the instruction are both constants shipped with the
+       * page, so this works with the radio off. It is the whole reason the
+       * emergency core was moved to @shared: the likeliest moment for a
+       * connection to fail here is also the likeliest moment for it to matter,
+       * and "réessayez dans quelques instants" is not an answer to give someone
+       * whose child has stopped drinking.
+       *
+       * The draft is deliberately not cleared, so Envoyer resends it when the
+       * network returns and the case is opened for a human then.
+       */
+      const danger = question ? detectRoutingDangerSigns(question) : [];
+      const emergency = danger.length > 0 ? `${EMERGENCY_INSTRUCTIONS[lang]} ${FACILITY_UNKNOWN_NOTE[lang]}`.trim() : undefined;
+      setTurns((tt) =>
+        tt.map((x) => (x.id === id ? { ...x, error: NETWORK_MESSAGE[lang] ?? NETWORK_MESSAGE.fr, offlineEmergency: emergency } : x)),
+      );
+      if (emergency) speak(emergency, lang, null, id);
     } finally {
       setBusy(false);
       setStage(null);
     }
   }
+
+  useEffect(() => {
+    submitRef.current = (opts) => void submit(opts);
+    stopRecordingRef.current = stopRecording;
+  });
 
   function speak(textToSpeak: string, language: LanguageCode, audioUrl: string | null, id: string) {
     stopSpeaking();
@@ -226,7 +345,27 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
             {turn.result ? (
               <AnswerPanel result={turn.result} speaking={speaking === turn.id} onSpeak={() => speak(turn.result!.responseText, turn.result!.language, turn.result!.audioUrl, turn.id)} onStop={stopSpeaking} onFollowUp={(q) => setText(q)} onFeedback={(b) => feedback(turn.result!.interactionId, b)} />
             ) : turn.error ? (
-              <div className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">{turn.error}</div>
+              <div className="space-y-2">
+                {/*
+                  When the handset recognised a danger sign, the instruction comes
+                  first and the connection problem second. Someone whose child has
+                  stopped drinking needs to be told to leave now; that the network
+                  failed is a detail they can read afterwards.
+                */}
+                {turn.offlineEmergency ? (
+                  <div className="rounded-xl border-2 border-danger bg-danger-soft px-4 py-3">
+                    <p className="text-sm font-semibold text-danger">{turn.offlineEmergency}</p>
+                    <button
+                      type="button"
+                      onClick={() => speak(turn.offlineEmergency!, lang, null, turn.id)}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-danger underline"
+                    >
+                      <IconVolume size={14} /> {t("listen")}
+                    </button>
+                  </div>
+                ) : null}
+                <div className="rounded-xl bg-surface-muted px-4 py-3 text-sm text-muted">{turn.error}</div>
+              </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted">
                 <IconSpinner size={16} /> {stage}
