@@ -297,7 +297,13 @@ describe("channel session API", () => {
   });
 
   it("uploads a photo in resumable chunks and verifies the checksum", async () => {
-    const data = Buffer.from(Array.from({ length: 2048 }, (_, i) => i % 251));
+    // A real JPEG header, then filler. The declared type is now verified against
+    // the assembled bytes, so a fixture of arbitrary numbers was testing a
+    // resumable upload that no camera would ever produce.
+    const data = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]),
+      Buffer.from(Array.from({ length: 2048 - 11 }, (_, i) => i % 251)),
+    ]);
     const sha256 = createHash("sha256").update(data).digest("hex");
 
     const init = (await (

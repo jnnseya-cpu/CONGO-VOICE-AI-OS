@@ -39,6 +39,15 @@ import { languageMode, type LanguageStatus } from "../language/gates";
 
 export interface InteractionInput {
   user: { userId: string; role: Role; language: LanguageCode; province?: string | null } | null;
+  /**
+   * The request's trace identifier, stored on the interaction.
+   *
+   * The column existed and nothing wrote it, so a citizen saying "it failed this
+   * afternoon" could not be connected to the request that failed. The API wrapper
+   * adopts Cloud Run's own trace header where present, so this is the same string
+   * Cloud Logging indexes.
+   */
+  traceId?: string | null;
   moduleHint?: ModuleType | null;
   text?: string | null;
   audio?: { data: Buffer; mimeType: string } | null;
@@ -119,6 +128,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       audioFileId,
       attachmentIds: (input.images ?? []).map((i) => i.fileId),
       originalInput: input.text ?? null,
+      traceId: input.traceId ?? null,
       status: "processing",
     })
     .returning();

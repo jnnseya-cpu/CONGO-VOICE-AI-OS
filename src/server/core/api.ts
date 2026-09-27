@@ -6,6 +6,7 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { ApiError, badRequest, forbidden, tooMany, unauthorized, isMalformedInput } from "./errors";
 import { sessionFromRequest, type Session } from "./auth";
@@ -22,6 +23,16 @@ export interface ApiContext<P = Record<string, string>> {
   db: Database;
   params: P;
   ip: string | null;
+  /**
+   * One identifier per request, for correlating a citizen's report with a log.
+   *
+   * Three tables carried a trace_id column and nothing ever wrote one, so an
+   * operator holding "it failed at about four o'clock" had no way to reach the
+   * request that failed. Cloud Run already stamps X-Cloud-Trace-Context on every
+   * inbound request, which is the identifier Cloud Logging indexes, so that one is
+   * adopted where present rather than inventing a second scheme beside it.
+   */
+  traceId: string;
   json<T>(schema: ZodType<T>): Promise<T>;
 }
 
@@ -75,6 +86,7 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
   return async (req: NextRequest, route?: RouteParams): Promise<Response> => {
     const started = Date.now();
     const ip = clientIp(req);
+    const traceId = requestTraceId(req);
     const session = sessionFromRequest(req);
     let status = 200;
     let errorMessage: string | undefined;
@@ -139,6 +151,7 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
         db,
         params,
         ip,
+        traceId,
         async json<T>(zschema: ZodType<T>): Promise<T> {
           const declared = Number(req.headers.get("content-length") ?? 0);
           if (Number.isFinite(declared) && declared > env.maxJsonBodyBytes) {
@@ -169,7 +182,7 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
       const apiErr = toApiError(err);
       status = apiErr.status;
       errorMessage = apiErr.message;
-      if (status >= 500) console.error(`[api] ${req.method} ${req.nextUrl.pathname}`, err);
+      if (status >= 500) console.error(`[api] ${req.method} ${req.nextUrl.pathname} trace=${traceId}`, err);
       return NextResponse.json(
         { error: { code: apiErr.code, message: apiErr.message, details: apiErr.details ?? undefined } },
         { status },
@@ -196,6 +209,21 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
 
 function flattenZod(e: ZodError) {
   return e.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
+}
+
+/**
+ * The identifier for this request.
+ *
+ * Cloud Run's own header wins, so an application record and a Cloud Logging entry
+ * name the same request. `x-request-id` is honoured next for proxies that set it,
+ * and only then is one generated.
+ */
+export function requestTraceId(req: NextRequest): string {
+  const cloud = req.headers.get("x-cloud-trace-context");
+  if (cloud) return cloud.split("/")[0].slice(0, 64);
+  const given = req.headers.get("x-request-id");
+  if (given) return given.slice(0, 64);
+  return randomUUID();
 }
 
 export function toApiError(err: unknown): ApiError {

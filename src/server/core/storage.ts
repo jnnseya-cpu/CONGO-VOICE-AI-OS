@@ -137,8 +137,49 @@ export function isAllowedMime(mime: string): boolean {
   return mime in EXT;
 }
 
+/**
+ * Leading bytes that a declared type must actually begin with.
+ *
+ * The MIME type arrives from the client and nothing checked it, so a file could
+ * be stored as "image/jpeg" while containing anything at all. The allowlist above
+ * is what keeps that from being serious — HTML and SVG are not in it, so there is
+ * no stored-cross-site-scripting path — and the download route sets
+ * X-Content-Type-Options: nosniff and requires ownership. What remains is a PDF:
+ * it is allowlisted, it renders inline in a viewer, and the person most likely to
+ * open an attachment is a health worker looking at a case.
+ *
+ * Images and PDFs are checked here because their signatures are stable and
+ * universal. Audio and video deliberately are not: this is a voice-first service
+ * for people who may not be able to type, the recordings arrive from Android
+ * WebViews and old iOS builds whose container quirks cannot be tested from here,
+ * and rejecting a caregiver's voice note over a signature check would be a worse
+ * defect than the one being fixed. That gap is recorded rather than closed.
+ */
+const MAGIC: Record<string, Array<{ offset: number; bytes: number[] }>> = {
+  "image/jpeg": [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }],
+  "image/png": [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }],
+  // RIFF....WEBP
+  "image/webp": [
+    { offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] },
+    { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
+  ],
+  // %PDF-
+  "application/pdf": [{ offset: 0, bytes: [0x25, 0x50, 0x44, 0x46, 0x2d] }],
+};
+
+/** True when the bytes are consistent with the declared type, or unchecked. */
+export function contentMatchesMime(data: Buffer, mime: string): boolean {
+  const checks = MAGIC[mime];
+  if (!checks) return true; // audio and video: see the note above
+  return checks.every(({ offset, bytes }) =>
+    data.length >= offset + bytes.length && bytes.every((b, i) => data[offset + i] === b),
+  );
+}
+
 export async function storeUpload(data: Buffer, mimeType: string, prefix: string): Promise<StoredFile> {
   if (data.length > env.storage.maxUploadBytes) throw new Error("File too large");
+  if (data.length === 0) throw new Error("Empty file");
+  if (!contentMatchesMime(data, mimeType)) throw new Error("File contents do not match the declared type");
   const ext = EXT[mimeType] ?? "bin";
   const sha256 = createHash("sha256").update(data).digest("hex");
   const day = new Date().toISOString().slice(0, 10);

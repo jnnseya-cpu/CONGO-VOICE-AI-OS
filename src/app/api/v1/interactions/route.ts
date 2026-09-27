@@ -21,7 +21,7 @@ const Json = z.object({
  * Create and process an interaction. Accepts JSON (text) or multipart/form-data with
  * `audio` (voice note), `images[]` (photos/videos) and text fields.
  */
-export const POST = handle({ permission: "interaction:create", limit: "ai" }, async ({ req, db, user, json }) => {
+export const POST = handle({ permission: "interaction:create", limit: "ai" }, async ({ req, db, user, json, traceId }) => {
   const contentType = req.headers.get("content-type") ?? "";
   let text: string | undefined;
   let moduleHint: ModuleType | undefined;
@@ -71,6 +71,7 @@ export const POST = handle({ permission: "interaction:create", limit: "ai" }, as
     images: images.filter((i) => i.data.length > 0 || true),
     province: province ?? null,
     wantsAudio,
+    traceId,
   });
   return result;
 });
