@@ -8,6 +8,7 @@ import type { LanguageCode } from "@server/db/schema";
 import { detectAgriUrgentTerms, detectEmergencyTerms } from "../safety";
 import { detectSafeguarding } from "../safety";
 import { deterministicAnswers, extractEntities, selectProtocolId } from "../protocols/extraction";
+import { LANG_MARKERS, detectLanguageOffline } from "../language/detect";
 import { getProtocol } from "../protocols/definitions";
 import type {
   LlmJsonRequest,
@@ -20,37 +21,6 @@ import type {
   TranscribeResult,
   TtsProvider,
 } from "../types";
-
-const LANG_MARKERS: Record<LanguageCode, string[]> = {
-  ln: ["mbote", "nazali", "malali", "mwana na ngai", "ngai", "boni", "nalingi", "fièvre te", "bilanga", "koyekola", "mokolo", "moto", "azali", "ya ngai", "nakoki"],
-  sw: ["habari", "nina", "homa", "mtoto", "shamba", "mimi", "ninahitaji", "msaada", "mgonjwa", "ninaomba", "wangu", "sasa", "kuhusu", "nataka"],
-  kg: ["mono", "kele", "nkento", "mbote na nge", "beto", "kiadi", "bilanga", "nzo", "kimbeefo", "nge"],
-  lua: ["ndi", "muana wanyi", "meme", "tshia", "bualu", "mukaji", "disanka", "tshidimu", "wanyi"],
-  fr: ["je", "mon", "ma", "enfant", "fièvre", "champ", "manioc", "maïs", "école", "devoir", "bonjour", "comment"],
-};
-
-interface LanguageReadingOffline {
-  language: LanguageCode;
-  confidence: number;
-  mixed: LanguageCode[];
-  /** FR-LG-01: the runner-up, so a near-tie is confirmed rather than guessed. */
-  alternative: { language: LanguageCode; confidence: number } | null;
-}
-
-function detectLanguage(text: string): LanguageReadingOffline {
-  const t = ` ${text.toLowerCase()} `;
-  const scores = (Object.keys(LANG_MARKERS) as LanguageCode[]).map((lang) => ({
-    lang,
-    score: LANG_MARKERS[lang].filter((m) => t.includes(` ${m} `) || t.includes(` ${m}`)).length,
-  }));
-  scores.sort((a, b) => b.score - a.score);
-  const best = scores[0];
-  const confidenceOf = (score: number) => Math.min(0.95, 0.5 + score * 0.12);
-  if (!best || best.score === 0) return { language: "fr", confidence: 0.4, mixed: [], alternative: null };
-  const runnerUp = scores[1] && scores[1].score > 0 ? { language: scores[1].lang, confidence: confidenceOf(scores[1].score) } : null;
-  const mixed = scores.slice(1).filter((s) => s.score > 0).map((s) => s.lang);
-  return { language: best.lang, confidence: confidenceOf(best.score), mixed, alternative: runnerUp };
-}
 
 /**
  * Splits a message into runs of one language each (FR-LG-03). Code-switching is
@@ -114,7 +84,27 @@ function detectUncertainElements(text: string, languageConfidence: number) {
 
 function detectModule(text: string): "health" | "agriculture" | "education" | "general" {
   const t = text.toLowerCase();
-  const health = ["fièvre", "malade", "enfant", "grossesse", "enceinte", "diarrh", "vomi", "paludisme", "malaria", "vaccin", "toux", "douleur", "homa", "mgonjwa", "mtoto", "malali", "mwana", "kimbeefo", "kabeela", "médicament", "clinique", "sang"];
+  /**
+   * Offline routing recall.
+   *
+   * The platform has to be usable with no API keys at all, and this list is the
+   * whole router in that mode. It did not contain "bébé", "respire" or "téter",
+   * so "Mon bébé ne respire pas bien et il ne peut plus téter" scored zero and
+   * came back as a general enquiry. The deterministic danger-sign override now
+   * catches that particular message whatever the router says, but an ordinary
+   * offline health question — a baby who will not feed, a burn, a woman in
+   * labour — should reach the health module on its own.
+   */
+  const health = [
+    "fièvre", "malade", "enfant", "grossesse", "enceinte", "diarrh", "vomi", "paludisme", "malaria", "vaccin",
+    "toux", "douleur", "médicament", "clinique", "sang",
+    "bébé", "bebe", "nourrisson", "nouveau-né", "nouveau ne", "respire", "respirer", "téter", "teter",
+    "allaite", "allaitement", "saigne", "saignement", "brûlure", "brulure", "convuls", "accouch",
+    "hôpital", "hopital", "centre de santé", "dispensaire", "soigner", "infirmier", "médecin", "medecin",
+    // The platform languages.
+    "homa", "mgonjwa", "mtoto", "malali", "mwana", "muana", "kimbeefo", "kabeela",
+    "afya", "bukolame", "bukolele", "monganga", "munganga", "mganga", "lopitalo", "lupitalu", "lupitadi",
+  ];
   const agri = ["champ", "manioc", "maïs", "plante", "feuille", "récolte", "semence", "engrais", "chèvre", "poule", "vache", "bétail", "insecte", "chenille", "sol", "pluie", "marché", "prix", "shamba", "bilanga", "mahindi", "mihogo", "mbuma"];
   const edu = ["école", "devoir", "fraction", "mathématique", "maths", "lecture", "leçon", "examen", "exercice", "élève", "apprendre", "koyekola", "shule", "somo", "kalasi", "kelasi", "diviser", "multiplier", "conjug"];
   const s = (list: string[]) => list.filter((k) => t.includes(k)).length;
@@ -195,7 +185,7 @@ export class MockProvider implements LlmProvider, SttProvider, TtsProvider {
   }
 
   private language(text: string) {
-    const d = detectLanguage(text);
+    const d = detectLanguageOffline(text);
     const moduleType = detectModule(text);
     return {
       language: d.language,

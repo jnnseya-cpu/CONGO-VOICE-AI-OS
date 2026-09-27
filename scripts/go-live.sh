@@ -426,6 +426,24 @@ SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 #
 # 60 seconds of grace on startup, because the first request applies the
 # migrations.
+#
+# --concurrency is set rather than left at the Cloud Run default of 80, because
+# the default was measured to be wrong for this service. A load test of the
+# interaction endpoint on one CPU held p95 inside budget to about ten concurrent
+# turns (p50 92 ms and p95 114 ms at one, p95 1.5 s at ten) and then collapsed:
+# p95 7.7 s at twenty-five, with throughput flat at roughly twelve turns a
+# second. At the default, Cloud Run would pack eighty of those onto a single
+# instance and only then scale out, so the queue forms inside the container where
+# no autoscaler can see it.
+#
+# Sixteen is also close to the database pool: src/server/db/client.ts opens a
+# pool of ten per instance, and eighty in-flight turns contending for ten
+# connections is a second queue behind the first. Ten instances at sixteen is a
+# hundred and sixty concurrent turns, which is above the pilot's expected peak,
+# and a hundred connections, which is well inside what the instance allows.
+#
+# --cpu-boost shortens the cold start, which on a voice turn is the difference a
+# caller actually notices.
 if ! gc run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -435,6 +453,8 @@ if ! gc run deploy "$SERVICE" \
   --vpc-egress=private-ranges-only \
   --port=8080 \
   --cpu=1 --memory=1Gi \
+  --cpu-boost \
+  --concurrency="${CONCURRENCY:-16}" \
   --timeout="${REQUEST_TIMEOUT:-3600}" \
   --min-instances="${MIN_INSTANCES:-1}" \
   --max-instances="${MAX_INSTANCES:-10}" \

@@ -388,6 +388,18 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
     "saigne beaucoup", "saignement abondant", "hémorragie", "hemorragie", "perd du sang", "beaucoup de sang", "sang qui coule",
     "saigne énormément", "saigne sans arrêt", "n'arrête pas de saigner",
     "makila mingi", "makila ebimi mingi",
+    /*
+     * Conjugated forms, taken from this platform's own approved emergency
+     * script. EMERGENCY_EN_ROUTE tells a caregiver in Lingala "Soki makila
+     * ezali kobima, fina makasi na mpota" — so that is how the platform itself
+     * says "blood is coming out" — yet the list only matched "makila mingi",
+     * two words that a speaker separates with a verb. The consequence was not
+     * theoretical: "Makila ezali kobima mingi epai ya mwasi na ngai, azali
+     * kobota" — heavy bleeding in a woman in labour — was scored severity 1,
+     * monitor at home. Each phrase below appears verbatim in the reviewed
+     * script for its language.
+     */
+    "makila ezali kobima", "menga ke basika", "mashi apatuka",
     "damu nyingi", "anavuja damu",
     "menga mingi",
     "mashi a bungi",
@@ -428,6 +440,115 @@ export const DANGER_SIGN_KEYWORDS: Record<string, string[]> = {
     "mubidi wa mashika bikole", "mubidi wa luya bikole",
   ],
 };
+
+
+/* ==========================================================================================
+ * ROUTING-GRADE DANGER SIGNS
+ *
+ * The triage engine only ever sees a message that has already been routed to
+ * health, and that routing was the Language Agent's decision. So the
+ * deterministic red-flag rules — the ones CLAUDE.md says must be code and never
+ * model judgement — sat behind a model's opinion. "Mon bébé ne respire pas bien
+ * et il ne peut plus téter" was scored risk=low and answered with the generic
+ * menu, because the router put it in `general` and the rules never got to look
+ * at it. Offline, with no model to route at all, that is the normal case, which
+ * makes it an NFR-A-01 failure in the one scenario that matters most.
+ *
+ * These phrases choose the module themselves, whatever any model said.
+ *
+ * The list is deliberately narrower than DANGER_SIGN_KEYWORDS. That list is
+ * tuned for recall once a message is already about health, and it contains words
+ * that carry a different meaning elsewhere: "crise" (alimentaire), "brûlant"
+ * (soleil), "tout jaune" (a maize field), "somnolent" (a pupil), "ne répond pas"
+ * (to a message), "tirage" (a print run). Routing on those would open cases
+ * nobody asked for, which is the fabricated-alert failure this platform was
+ * explicitly told not to produce. Precision is the requirement here; recall is
+ * the requirement once inside the protocol.
+ * ========================================================================================== */
+
+/**
+ * Triage phrases that are not precise enough to choose a module on their own.
+ * Each one stays in DANGER_SIGN_KEYWORDS and is still honoured by the protocol
+ * engine; it simply cannot be the reason a message becomes a health case.
+ */
+const AMBIGUOUS_FOR_ROUTING: ReadonlySet<string> = new Set([
+  // Ordinary French senses: a food crisis, a burning sun, a yellowing field,
+  // an unanswered message, a print run, a confused pupil.
+  "crise", "crises", "tremble", "confus", "confuse", "délire", "il délire", "elle délire",
+  "tirage", "brûlant", "brulant", "glace comme", "tout jaune", "toute jaune",
+  "ne repond", "ne répond", "paleur", "pâleur",
+  // Sleep descriptions, which a teacher uses about a drowsy pupil.
+  "somnolent", "très endormi", "dort tout le temps", "reste endormi", "toujours endormi",
+  "alali makasi", "usingizi mzito",
+  // "does not answer" in the platform languages: said of a phone as often as a child.
+  "azali koyanola te", "ke vutula ve", "kena wandamuna", "hajibu",
+  // Trembling and lost colour, which describe fear, cold and cloth as readily as a child.
+  "anatetemeka", "rangi imeisha",
+]);
+
+/**
+ * Emergencies that are not danger-sign options but must still route.
+ * Written out in full rather than as stems, because routing matches on whole
+ * words — see containsPhrase.
+ */
+const ROUTING_EXTRAS: readonly string[] = [
+  "morsure de serpent",
+  "mordu par un serpent",
+  "nyoka aswi",
+  "nyoka ameuma",
+  "empoisonné",
+  "empoisonnée",
+  "empoisonnement",
+  "a été empoisonné",
+];
+
+/** The phrases that may decide the module on their own, folded once. */
+export const ROUTING_DANGER_PHRASES: readonly string[] = Array.from(
+  new Set([
+    ...Object.values(DANGER_SIGN_KEYWORDS).flat().filter((k) => !AMBIGUOUS_FOR_ROUTING.has(k)),
+    ...ROUTING_EXTRAS,
+  ]),
+);
+
+const ROUTING_DANGER_FOLDED: readonly string[] = folded([...ROUTING_DANGER_PHRASES]);
+
+/**
+ * Whole-word containment.
+ *
+ * Routing matches on word boundaries; triage does not. That difference is the
+ * point, and it cost a test to learn: "Les feuilles de mon manioc jaunissent" —
+ * a photograph of a yellowing cassava leaf — contains "jaunisse", the word for
+ * jaundice, and a plain substring match sent a farmer's crop question into
+ * paediatric triage.
+ *
+ * Inside the health module a loose match is the safer error: "ses yeux
+ * jaunissent" should reach the jaundice sign, and DANGER_SIGN_KEYWORDS is tuned
+ * for that. Choosing the module is the opposite problem, where a loose match
+ * opens a clinical case nobody asked for. So this is used here and deliberately
+ * not in detectDangerSigns.
+ */
+function containsPhrase(haystack: string, needle: string): boolean {
+  if (!needle) return false;
+  const letter = (c: string | undefined) => c !== undefined && /[\p{L}\p{N}]/u.test(c);
+  for (let from = 0; ; ) {
+    const at = haystack.indexOf(needle, from);
+    if (at === -1) return false;
+    if (!letter(haystack[at - 1]) && !letter(haystack[at + needle.length])) return true;
+    from = at + 1;
+  }
+}
+
+/**
+ * Danger-sign phrases in a message, precise enough to route it to health.
+ *
+ * Returns the phrases matched rather than a boolean, so the override can be
+ * audited: an operator reviewing a case must be able to see which words made the
+ * platform overrule its own router.
+ */
+export function detectRoutingDangerSigns(text: string): string[] {
+  const t = normaliseForMatching(text);
+  return ROUTING_DANGER_PHRASES.filter((_, i) => containsPhrase(t, ROUTING_DANGER_FOLDED[i]));
+}
 
 const DANGER_SIGN_FOLDED: Array<[string, string[]]> = Object.entries(DANGER_SIGN_KEYWORDS).map(([value, keys]) => [value, folded(keys)]);
 

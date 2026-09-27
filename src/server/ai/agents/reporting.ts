@@ -4,6 +4,7 @@
  * previous 7 so institutions see what is changing, not just totals.
  */
 import "server-only";
+import { ttlMemo } from "@server/core/memo";
 import { and, count, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import type { ModuleType } from "@server/db/schema";
@@ -80,6 +81,80 @@ export async function recentActivity(limit = 8, module?: ModuleType) {
     .limit(limit);
   return rows;
 }
+
+/**
+ * The activity feed as a visitor with no account may see it.
+ *
+ * The home page rendered `recentActivity()` unconditionally and built each row's
+ * title from the interaction's `understanding`, so an anonymous request to the
+ * site's front page returned, verbatim:
+ *
+ *   "Cas escaladé : Mon enfant de 3 ans a de la fièvre depuis deux jours et il
+ *    ne veut…"
+ *
+ * A caregiver's description of their sick child, published to anyone who loaded
+ * the page, on a platform whose whole proposition is that people can say
+ * something private to it. Health data is special-category data in every regime
+ * this programme will be judged under, and the only thing that stopped it being
+ * worse is that the feed was capped at five rows.
+ *
+ * What a visitor legitimately gains from this feed is the knowledge that the
+ * service is alive and being used, which needs a category, a channel, a province
+ * and a time — and none of the citizen's words. That is what this returns.
+ */
+const PUBLIC_MODULE_LABEL: Record<string, string> = {
+  health: "Consultation santé",
+  agriculture: "Question agricole",
+  education: "Session d'apprentissage",
+  general: "Demande d'information",
+};
+
+export interface PublicActivityRow {
+  id: string;
+  module: ModuleType;
+  channel: string;
+  title: string;
+  province: string | null;
+  escalated: boolean;
+  createdAt: Date;
+}
+
+/** Category, channel, province and time. Never the citizen's own words. */
+export function publicActivityRow(a: {
+  id: string;
+  module: ModuleType;
+  channel: string;
+  province: string | null;
+  escalated: boolean;
+  createdAt: Date;
+}): PublicActivityRow {
+  const label = PUBLIC_MODULE_LABEL[a.module] ?? "Demande d'information";
+  return {
+    id: a.id,
+    module: a.module,
+    channel: a.channel,
+    // "orientée vers un agent" rather than naming the case: that a referral
+    // happened is a fact about the service, not about the person.
+    title: a.escalated ? `${label} — orientée vers un agent` : label,
+    province: a.province,
+    escalated: a.escalated,
+    createdAt: a.createdAt,
+  };
+}
+
+/**
+ * Everything the public home page needs, recomputed at most once a minute.
+ *
+ * See src/server/core/memo.ts: this page was running database aggregates for
+ * every anonymous visitor and saturating one instance at 28 requests a second.
+ */
+export const publicHomeSnapshot = ttlMemo(async () => {
+  const [stats, activity] = await Promise.all([
+    commandStats().catch(() => null),
+    recentActivity(5).catch(() => []),
+  ]);
+  return { stats, rows: activity.map(publicActivityRow) };
+}, 60_000);
 
 /** Institution-facing alerts derived from data: clusters, critical cases, overdue follow-ups. */
 export async function importantAlerts(limit = 6) {

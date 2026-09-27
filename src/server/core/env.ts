@@ -101,6 +101,24 @@ export const env = {
     windowSeconds: num("RATE_LIMIT_WINDOW_SECONDS", 60),
     maxRequests: num("RATE_LIMIT_MAX_REQUESTS", 120),
     maxAiRequests: num("RATE_LIMIT_MAX_AI_REQUESTS", 30),
+    /**
+     * Per-address ceiling on requests that spend money at a provider.
+     *
+     * The per-account ceiling alone is not a budget. A citizen session needs no
+     * account — that is the point of a voice-first service — so anonymous
+     * sign-in hands out a fresh account, and with it a fresh AI bucket, ten
+     * times a minute per address. The accounts persist, so an hour of that is
+     * six hundred live buckets of thirty calls a minute from one address, all
+     * billed to a government-funded programme with no payment barrier anywhere
+     * in front of it.
+     *
+     * Set well above the per-account figure on purpose: a health centre, a
+     * school or a cybercafé reaches this platform through one NAT address, and a
+     * ceiling tight enough to stop an attacker outright would cut off the
+     * building. This bounds the bill and is logged when it bites, so an operator
+     * can tell a busy clinic from an attack instead of guessing.
+     */
+    maxAiRequestsPerIp: num("RATE_LIMIT_MAX_AI_REQUESTS_PER_IP", 120),
     /** Sign-in and enrolment: deliberately far below the general ceiling. */
     maxAuthRequests: num("RATE_LIMIT_MAX_AUTH_REQUESTS", 10),
   },

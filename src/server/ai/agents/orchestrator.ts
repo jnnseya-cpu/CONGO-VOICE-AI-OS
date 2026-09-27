@@ -28,8 +28,10 @@ import { scoreRisk } from "./risk";
 import { openCase, shouldAutoCreateCase } from "./workflow";
 import { isDegradedMode } from "@server/core/metering";
 import { getProfileContext, rememberLanguage } from "./personalisation";
+import { emitEvent } from "@server/core/events";
 import { recordSample, retrieveLearningContext } from "./learning";
-import { BOUNDARY_RESPONSES, CLAIM_FALLBACK, checkOutboundClaims, dedupeSentences, detectBoundaryTopics, EMERGENCY_MESSAGES, withDisclaimer } from "../safety";
+import { BOUNDARY_RESPONSES, CLAIM_FALLBACK, checkOutboundClaims, dedupeSentences, detectBoundaryTopics, detectRoutingDangerSigns, EMERGENCY_INSTRUCTIONS, EMERGENCY_MESSAGES, FACILITY_UNKNOWN_NOTE, withDisclaimer } from "../safety";
+import { detectLanguageOffline } from "../language/detect";
 import { confidenceVector, planClarification, type ConfidenceVector } from "../language/confidence";
 import { toSpokenText } from "../language/voice";
 import { scriptText } from "../language/scripts";
@@ -140,6 +142,16 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     await save({ errorMessage: `recording_not_stored: ${storageFailure}`.slice(0, 500) }).catch(() => undefined);
   }
 
+  /**
+   * The citizen's own words, readable from the failure handler.
+   *
+   * The transcript itself is scoped to the try, and the deterministic emergency
+   * fallback below needs it: without it, a pipeline that fell over after speech
+   * recognition had already succeeded would have nothing to check for danger
+   * signs and would answer "try again later".
+   */
+  let transcriptForFallback = (input.text ?? "").trim();
+
   try {
     // 2. Speech to text.
     let transcript = (input.text ?? "").trim();
@@ -151,6 +163,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
         transcript = transcript ? `${stt.text.trim()}\n${transcript}` : stt.text.trim();
         sttLanguage = stt.language ?? null;
         sttConfidence = stt.confidence ?? null;
+        transcriptForFallback = transcript;
       }
       await save({ transcript, status: "processing" });
     }
@@ -173,7 +186,37 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     const lang = await analyseLanguage(transcript || "(image seulement)", { preferredLanguage: input.user?.language, moduleHint: input.moduleHint, learning }, interactionId);
     const language: LanguageCode = lang.language;
     const languageConfidence = sttLanguage && sttLanguage === language && sttConfidence ? Math.max(lang.confidence, sttConfidence) : lang.confidence;
-    const service: ModuleType = input.moduleHint && input.moduleHint !== "general" ? input.moduleHint : lang.module;
+    const requestedService: ModuleType = input.moduleHint && input.moduleHint !== "general" ? input.moduleHint : lang.module;
+    /**
+     * A danger sign chooses the module, not the model (FR-HE-03, NFR-A-01).
+     *
+     * The deterministic triage engine only runs on a message already routed to
+     * health, so until now every red-flag rule sat behind the Language Agent's
+     * opinion of what the message was about. "Mon bébé ne respire pas bien et il
+     * ne peut plus téter" came back risk=low with the generic menu, because the
+     * router said "general" and the rules never saw it. Offline there is no
+     * router at all, so that was the ordinary case for the most critical message
+     * the platform can receive.
+     *
+     * The phrases that trigger this are deliberately narrow — see
+     * ROUTING_DANGER_PHRASES — because the failure mode on the other side is an
+     * emergency case opened for a food crisis or a yellowing field.
+     */
+    const routingDangerSigns = detectRoutingDangerSigns(transcript);
+    const service: ModuleType = routingDangerSigns.length > 0 ? "health" : requestedService;
+    if (service !== requestedService) {
+      // Recorded so the rate at which the router is overruled is visible: a
+      // rising number is the model getting worse at something safety-critical.
+      await emitEvent({
+        type: "ai.routing.overridden",
+        aggregateType: "interaction",
+        aggregateId: interactionId,
+        module: service,
+        classification: "internal",
+        actor: { type: "ai" },
+        payload: { rule: "FR-HE-03", from: requestedService, to: service, phrases: routingDangerSigns.slice(0, 8) },
+      });
+    }
 
     // FR-LG-09: three separate readings, not one number. A confident translation
     // of a badly-heard sentence must not pass as a confident turn.
@@ -593,7 +636,93 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     console.error("[orchestrator]", err);
     await save({ status: "failed", errorMessage: message.slice(0, 500), latencyMs: Date.now() - started });
     await audit({ action: "interaction.failed", actorUserId: userId, entityType: "interaction", entityId: interactionId, systemEvent: "pipeline_error", after: { message: message.slice(0, 200) } });
-    const language = input.user?.language ?? "fr";
+
+    /**
+     * NFR-A-01: a danger sign is answered even when nothing else works.
+     *
+     * With every provider unreachable, this used to return "Le service est
+     * momentanément indisponible, réessayez dans quelques instants" to a
+     * caregiver who had just written that their baby was not breathing and could
+     * no longer feed. No script, no case, nobody alerted — the message was
+     * stored and the caller was asked to come back later. The IVR path already
+     * short-circuits on danger keywords before any model call; the web path,
+     * which is the one most people use, did not.
+     *
+     * Nothing here needs a provider. The danger phrases are constants, the
+     * language reading is a marker count, the instruction is reviewed text in
+     * five languages, and the case is a database row. A provider outage is
+     * precisely when this matters: it is also when a network is bad enough that
+     * someone may not get a second chance to ask.
+     */
+    const dangerSigns = detectRoutingDangerSigns(transcriptForFallback);
+    const language: LanguageCode =
+      input.user?.language ?? (transcriptForFallback ? detectLanguageOffline(transcriptForFallback).language : "fr");
+
+    if (dangerSigns.length > 0) {
+      const scripted = `${EMERGENCY_INSTRUCTIONS[language]} ${FACILITY_UNKNOWN_NOTE[language]}`.trim();
+      let fallbackCaseId: string | null = null;
+      try {
+        const c = await openCase({
+          module: "health",
+          userId,
+          interactionId,
+          title: "Signe de danger signalé pendant une panne des services d'IA",
+          severity: "critical",
+          province: input.province ?? input.user?.province ?? null,
+          notes:
+            "Ouvert par la voie de repli déterministe : les fournisseurs d'IA étaient indisponibles. " +
+            `Signes détectés : ${dangerSigns.slice(0, 8).join(", ")}. Le message d'origine est conservé sur l'interaction.`,
+          escalate: true,
+          escalationReason: "Signe de danger détecté hors ligne (NFR-A-01)",
+        });
+        fallbackCaseId = c.id;
+        await save({ caseId: c.id });
+      } catch (caseErr) {
+        // The instruction still goes out. A caregiver being told to leave now
+        // does not depend on the case row, and losing both would be worse.
+        console.error("[orchestrator] fallback case could not be opened", caseErr);
+      }
+      await audit({
+        action: "interaction.emergency_fallback",
+        actorUserId: userId,
+        entityType: "interaction",
+        entityId: interactionId,
+        systemEvent: "provider_outage",
+        after: { phrases: dangerSigns.slice(0, 8), language, caseId: fallbackCaseId },
+      });
+      const answer: FinalAnswer = {
+        asking: transcriptForFallback.slice(0, 500),
+        understanding: "Signe de danger détecté sans l'aide d'un modèle : les services d'IA étaient indisponibles.",
+        risk: { level: "critical", score: 1, flags: ["signe_de_danger", "repli_hors_ligne", ...dangerSigns.slice(0, 5)] },
+        action: scripted,
+        escalation: { required: true, to: ROLE_LABEL.health, reason: "Signe de danger détecté hors ligne (NFR-A-01)" },
+        confidence: { score: 0, low: true },
+        summary: `[santé] signe de danger — repli hors ligne, escaladé${fallbackCaseId ? "" : " (dossier non créé)"}`,
+      };
+      return {
+        interactionId,
+        // The turn did what it existed to do, so it is not reported as a failure
+        // to the citizen; the interaction row keeps status=failed and the reason.
+        status: "completed",
+        module: "health",
+        language,
+        languageConfidence: 0,
+        transcript: transcriptForFallback,
+        intent: "health_danger_sign_offline",
+        answer,
+        answerLocalised: answer,
+        responseText: scripted,
+        spokenText: toSpokenText(scripted, language),
+        followUpQuestions: [],
+        clarificationReasons: [],
+        confidenceDimensions: { transcription: null, language: 0, translation: 0, overall: 0 },
+        caseId: fallbackCaseId,
+        audioUrl: null,
+        audioAvailable: false,
+        latencyMs: Date.now() - started,
+      };
+    }
+
     return failedOutput(interactionId, language, "Le service est momentanément indisponible. Votre message a été enregistré ; réessayez dans quelques instants.", started);
   }
 }

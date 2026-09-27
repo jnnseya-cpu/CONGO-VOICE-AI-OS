@@ -146,6 +146,53 @@ export async function tombstoneUser(userId: string, actor: { userId: string; rol
     inArray(schema.languageCorpus.interactionId, interactions.length ? interactions.map((i) => i.id) : [randomUUID()]),
   );
 
+  /*
+   * 4b. Everywhere else the person's own words were kept.
+   *
+   * This section exists because the endpoint told the citizen, in French, that
+   * "le texte de vos échanges" had been erased, and eight tables said otherwise.
+   * Making a false statement to a data subject about erasure is worse than the
+   * omission it covers, so each one is named here rather than left to be found:
+   *
+   *  - autosave_drafts.payload — the half-typed question, saved as they typed it
+   *  - feedback.comment — free text, written by the person about the service
+   *  - sessions.channel_ref — the caller or WhatsApp id, which identifies them
+   *  - sessions.state — the resumable channel conversation, mid-answer
+   *  - idempotency_keys.response_body — a cached API response, which for an
+   *    interaction contains the transcript and the answer in full
+   *  - sync_events.payload — turns captured offline on a device
+   *  - case_events note/from/to — the case timeline, written about them
+   *  - follow_ups.outcome_text — what a worker recorded them saying afterwards
+   *  - api_request_logs.ip — an address is personal data on its own
+   *
+   * The analytical skeleton stays in each case: a draft row without a payload, a
+   * rating without a comment, a session without its state, a timeline entry
+   * without its note. What the programme did remains countable; what the person
+   * said does not remain readable.
+   */
+  const caseIds = cases.map((c) => c.id);
+  const noCases = caseIds.length === 0;
+
+  await db.delete(schema.autosaveDrafts).where(eq(schema.autosaveDrafts.userId, userId));
+  await db.update(schema.feedback).set({ comment: null }).where(eq(schema.feedback.userId, userId));
+  await db
+    .update(schema.sessions)
+    .set({ channelRef: null, state: {}, proxy: null, consentSnapshot: {} })
+    .where(eq(schema.sessions.userId, userId));
+  // A replay cache, so deletion is the correct treatment rather than blanking.
+  await db.delete(schema.idempotencyKeys).where(eq(schema.idempotencyKeys.userId, userId));
+  await db.update(schema.syncEvents).set({ payload: {} }).where(eq(schema.syncEvents.userId, userId));
+  if (!noCases) {
+    await db
+      .update(schema.caseEvents)
+      .set({ note: null, fromValue: null, toValue: null })
+      .where(inArray(schema.caseEvents.caseId, caseIds));
+    await db.update(schema.followUps).set({ outcomeText: null }).where(inArray(schema.followUps.caseId, caseIds));
+  }
+  await db.update(schema.followUps).set({ outcomeText: null }).where(eq(schema.followUps.userId, userId));
+  // The request log keeps method, path, status and duration; the address goes.
+  await db.update(schema.apiRequestLogs).set({ ip: null }).where(eq(schema.apiRequestLogs.userId, userId));
+
   // 5. The account itself becomes a tombstone.
   await db
     .update(schema.users)

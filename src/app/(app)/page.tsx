@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getSession } from "@server/core/auth";
 import { hasPermission } from "@server/core/rbac";
-import { commandStats, importantAlerts, insightOfTheDay, recentActivity } from "@server/ai/agents/reporting";
+import { commandStats, importantAlerts, insightOfTheDay, publicHomeSnapshot, recentActivity } from "@server/ai/agents/reporting";
 import { Hero } from "@client/components/home/Hero";
 import { ModuleCards } from "@client/components/home/ModuleCards";
 import { LiveActivity } from "@client/components/home/LiveActivity";
@@ -38,12 +38,29 @@ export default async function HomePage() {
   const now = serverNow();
   const photo = fs.existsSync(path.join(process.cwd(), "public", "hero", "congo-river.jpg"));
 
-  const [stats, activity, alerts, insight] = await Promise.all([
-    commandStats().catch(() => null),
-    recentActivity(5).catch(() => []),
-    institutional ? importantAlerts(4).catch(() => []) : Promise.resolve([]),
-    institutional ? insightOfTheDay().catch(() => null) : Promise.resolve(null),
-  ]);
+  /**
+   * Two different pages, on purpose.
+   *
+   * A worker with case:read is looking at their queue and needs the real text.
+   * Everyone else — including every anonymous visitor and every crawler — gets a
+   * de-identified snapshot, recomputed once a minute rather than per request.
+   *
+   * This split is the fix for two findings at once. The feed used to carry the
+   * citizen's own words to anybody who loaded the page: an anonymous request
+   * returned "Cas escaladé : Mon enfant de 3 ans a de la fièvre depuis deux jours
+   * et il ne veut…". And the page ran database aggregates for every one of those
+   * requests, which held one instance to 28 a second with p95 at 3.8s under fifty
+   * concurrent readers.
+   */
+  const snapshot = institutional ? null : await publicHomeSnapshot();
+  const [stats, activity, alerts, insight] = institutional
+    ? await Promise.all([
+        commandStats().catch(() => null),
+        recentActivity(5).catch(() => []),
+        importantAlerts(4).catch(() => []),
+        insightOfTheDay().catch(() => null),
+      ])
+    : [snapshot!.stats, [] as Awaited<ReturnType<typeof recentActivity>>, [] as Awaited<ReturnType<typeof importantAlerts>>, null];
 
   const live = {
     activeUsersToday: stats?.activeUsersToday ?? { value: 0, deltaPct: null },
@@ -56,16 +73,27 @@ export default async function HomePage() {
     agriculture: { today: stats?.modules.agriculture.today ?? 0, alerts: stats?.modules.agriculture.alerts ?? 0 },
     education: { today: stats?.modules.education.today ?? 0, topics: stats?.modules.education.topics ?? 0 },
   };
-  const items: ActivityItem[] = activity.map((a) => ({
-    id: a.id,
-    module: a.module,
-    channel: a.channel,
-    title: activityTitle(a),
-    who: a.escalated ? "un agent de santé" : WHO[a.module] ?? "un citoyen",
-    province: a.province,
-    escalated: a.escalated,
-    createdAt: a.createdAt.toISOString(),
-  }));
+  const items: ActivityItem[] = institutional
+    ? activity.map((a) => ({
+        id: a.id,
+        module: a.module,
+        channel: a.channel,
+        title: activityTitle(a),
+        who: a.escalated ? "un agent de santé" : WHO[a.module] ?? "un citoyen",
+        province: a.province,
+        escalated: a.escalated,
+        createdAt: a.createdAt.toISOString(),
+      }))
+    : (snapshot!.rows.map((a) => ({
+        id: a.id,
+        module: a.module,
+        channel: a.channel,
+        title: a.title,
+        who: WHO[a.module] ?? "un citoyen",
+        province: a.province,
+        escalated: a.escalated,
+        createdAt: a.createdAt.toISOString(),
+      })));
 
   return (
     <div className="mx-auto max-w-[1320px]">

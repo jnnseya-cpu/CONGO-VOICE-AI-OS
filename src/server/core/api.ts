@@ -7,7 +7,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { eq } from "drizzle-orm";
-import { ApiError, badRequest, forbidden, tooMany, unauthorized } from "./errors";
+import { ApiError, badRequest, forbidden, tooMany, unauthorized, isMalformedInput } from "./errors";
 import { sessionFromRequest, type Session } from "./auth";
 import { hasPermission, type Permission } from "./rbac";
 import { checkSharedRateLimit } from "./rate-limit";
@@ -97,6 +97,24 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
           limitClass === "ai" ? env.rateLimit.maxAiRequests : limitClass === "auth" ? env.rateLimit.maxAuthRequests : env.rateLimit.maxRequests;
         const rl = await checkSharedRateLimit(db, `${limitClass}:${identity}`, max, env.rateLimit.windowSeconds);
         if (!rl.allowed) throw tooMany();
+
+        /**
+         * Provider spend is additionally capped per address.
+         *
+         * Keying only on the account leaves the ceiling defeatable by asking for
+         * another account, which anonymous sign-in grants freely and by design.
+         * See RATE_LIMIT_MAX_AI_REQUESTS_PER_IP for why the figure is set well
+         * above the per-account one.
+         */
+        if (limitClass === "ai" && ip) {
+          const perIp = await checkSharedRateLimit(db, `ai-ip:${ip}`, env.rateLimit.maxAiRequestsPerIp, env.rateLimit.windowSeconds);
+          if (!perIp.allowed) {
+            // Named in the logs: a shared clinic address hitting this looks
+            // identical to an attack unless the refusal says which ceiling bit.
+            console.warn(`[rate-limit] per-address AI ceiling reached for ${ip}`);
+            throw tooMany();
+          }
+        }
       }
 
       // A session is a signed token, so the only way to withdraw one is to check
@@ -183,6 +201,8 @@ function flattenZod(e: ZodError) {
 export function toApiError(err: unknown): ApiError {
   if (err instanceof ApiError) return err;
   if (err instanceof ZodError) return badRequest("Validation échouée", flattenZod(err));
+  // A malformed identifier is a bad request, not a server fault. See isMalformedInput.
+  if (isMalformedInput(err)) return badRequest("Identifiant invalide");
   const message = env.isProd ? "Erreur interne" : err instanceof Error ? err.message : String(err);
   return new ApiError(500, message, "internal_error");
 }
