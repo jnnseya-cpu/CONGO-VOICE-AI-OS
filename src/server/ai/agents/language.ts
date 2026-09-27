@@ -1,6 +1,7 @@
 import "server-only";
 import type { LanguageCode, ModuleType } from "@server/db/schema";
 import { activeGlossary, applyGlossary, type GlossaryApplication } from "../language/glossary";
+import { fullyReviewed, joinSegments, renderReviewed, segmentScripted } from "../language/scripted";
 import { aiGateway } from "../gateway";
 import { LanguageAnalysis, Localisation } from "../schemas";
 import { LANGUAGE_AGENT_SYSTEM, LOCALISATION_SYSTEM, localisationUser, messageEnvelope } from "../prompts";
@@ -54,13 +55,44 @@ export async function localiseWithGlossary(
   const empty: GlossaryApplication = { text: textFr, corrected: [], missing: [], versions: [] };
   if (target === "fr" || !textFr.trim()) return { text: textFr, glossary: empty };
 
-  const fragment = opts.learning ? learningPromptFragment(opts.learning, target) : "";
-  const r = await aiGateway().generateJson(
-    { system: LOCALISATION_SYSTEM, user: (fragment ? fragment + "\n" : "") + localisationUser(textFr, target), schema: Localisation, schemaName: "localisation", maxTokens: 1500 },
-    { interactionId: opts.interactionId },
-  );
+  /**
+   * Reviewed text is substituted, never translated (FR-LG-04, FR-HE-12).
+   *
+   * An emergency answer is reviewed text from end to end, so it renders without
+   * a model call at all — which is why it is now correct in all five languages
+   * with no API key configured, where before it came back in French.
+   */
+  const segments = segmentScripted(textFr);
+  if (fullyReviewed(segments)) {
+    const text = joinSegments(segments.map((s) => renderReviewed(s as Extract<typeof s, { kind: "reviewed" }>, target)));
+    return { text, glossary: { ...empty, text } };
+  }
 
+  const fragment = opts.learning ? learningPromptFragment(opts.learning, target) : "";
   const terms = await activeGlossary(opts.module ?? "general").catch(() => []);
-  const glossary = applyGlossary(textFr, r.output.text, target, terms);
-  return { text: glossary.text, glossary };
+  const corrected: GlossaryApplication["corrected"] = [];
+  const missing = new Set<string>();
+  const versions = new Set<string>();
+  const rendered: string[] = [];
+
+  for (const segment of segments) {
+    if (segment.kind === "reviewed") {
+      rendered.push(renderReviewed(segment, target));
+      continue;
+    }
+    const r = await aiGateway().generateJson(
+      { system: LOCALISATION_SYSTEM, user: (fragment ? fragment + "\n" : "") + localisationUser(segment.fr, target), schema: Localisation, schemaName: "localisation", maxTokens: 1500 },
+      { interactionId: opts.interactionId },
+    );
+    // The glossary is enforced on what the model wrote, and only on that:
+    // "correcting" reviewed wording would defeat the review.
+    const applied = applyGlossary(segment.fr, r.output.text, target, terms);
+    rendered.push(applied.text);
+    corrected.push(...applied.corrected);
+    for (const m of applied.missing) missing.add(m);
+    for (const v of applied.versions) versions.add(v);
+  }
+
+  const text = joinSegments(rendered);
+  return { text, glossary: { text, corrected, missing: [...missing], versions: [...versions] } };
 }

@@ -737,7 +737,14 @@ export async function runTurn(input: RunTurnInput): Promise<TurnResult> {
      */
     const alert = deliverScript("emergency_alert", language);
     const instructions = deliverScript("emergency_instructions", language);
-    const message = toSpokenText(`${alert.text} ${instructions.text}`, language);
+    /**
+     * The instruction script opens with the alert line — that is how it is
+     * defined, so that the referral is stated exactly once wherever the script
+     * is used. Concatenating the two, as this did, said it twice in a row down
+     * a phone line. The recorded alert is still what gets played first, when a
+     * recording exists.
+     */
+    const message = toSpokenText(instructions.text, language);
     const scriptAudioUrl = alert.audioUrl;
     // The full pipeline still runs — the CHW alert and the case must be created.
     const background = runInteraction(interactionInput)

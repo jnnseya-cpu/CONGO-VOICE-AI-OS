@@ -274,7 +274,24 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     const clarification = emergency ? { questions: [], routeToHuman: false, reasons: [] } : planClarification(lang);
     if (!emergency && clarification.questions.length > 0) {
       actionFr += ` ${clarification.questions[0]}`;
-    } else if (risk.lowConfidence) {
+    } else if (!emergency && risk.lowConfidence && risk.confidenceBand !== "caution") {
+      /**
+       * The `!emergency` guard is the point of this branch, not an optimisation.
+       *
+       * Without it a live turn ended: "...allez au centre de santé le plus proche
+       * maintenant, sans attendre. [...] Je ne suis pas certain d'avoir bien
+       * compris : pouvez-vous préciser ?" — the platform telling a caregiver to
+       * leave immediately and then, in the same breath, that it may have
+       * misunderstood. Whichever half they believe, one of them cost them time.
+       * The danger-sign rules that produced the instruction are deterministic and
+       * do not depend on the confidence score, so there is nothing to hedge.
+       *
+       * The `caution` exclusion removes a second doubling seen in the same
+       * test run: the caution band below appends its own "I am not sure I
+       * understood" and offers a person, so both fired and the citizen heard
+       * the platform doubt itself twice in consecutive sentences. The caution
+       * wording is the better of the two — it offers a human — so it wins.
+       */
       actionFr += " Je ne suis pas certain d'avoir bien compris : pouvez-vous préciser ?";
     }
     if (health) actionFr = withDisclaimer(actionFr, "fr");

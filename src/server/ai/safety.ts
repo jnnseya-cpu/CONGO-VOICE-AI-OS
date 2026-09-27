@@ -582,15 +582,39 @@ export const SAFEGUARDING_NOTIFICATION_BODY =
   "Un dossier relevant du dispositif de protection a été ouvert. Les informations sont accessibles uniquement dans l'espace protégé, aux personnes habilitées.";
 
 /**
- * Scripted emergency instructions read to the citizen while they set off (FR-HE-12).
- * Fixed text, never model-generated.
+ * En-route care spoken after the referral instruction (FR-HE-12).
+ *
+ * The referral itself lives once, in EMERGENCY_MESSAGES, and this constant
+ * carries only what follows it. They were one string until a live test showed a
+ * caregiver being told to leave for the health centre four times in a single
+ * answer: the orchestrator said it, this script said it again, the protocol
+ * outcome said it a third time and the model's explanation a fourth. Read aloud
+ * over a bad line that is not repetition for emphasis, it is forty seconds in
+ * which nothing new is said while a child is not drinking. Splitting the script
+ * at the referral sentence is what makes "say it once" structural rather than a
+ * thing each caller has to remember.
+ *
+ * Fixed text, never model-generated, never model-translated.
+ */
+export const EMERGENCY_EN_ROUTE: Record<LanguageCode, string> = {
+  fr: "Ne restez pas à la maison et faites-vous accompagner. Pendant le trajet : allongez la personne sur le côté si elle est somnolente ou si elle vomit, ne lui donnez rien à boire ni à manger si elle ne réagit pas bien, gardez-la au chaud et desserrez ses vêtements. En cas de saignement, appuyez fort sur la plaie avec un linge propre sans jamais le retirer. Emportez le carnet de santé et les médicaments déjà pris.",
+  ln: "Kotikala na ndako te mpe sala ete moto mosusu akende na yo. Na nzela : lalisa moto na mopanzi soki alali makasi to azali kosanza, kopesa ye eloko ya komela to ya kolia te soki azali koyanola malamu te, batela ye moto mpe fungola bilamba na ye. Soki makila ezali kobima, fina makasi na mpota na elamba ya peto mpe kolongola yango te. Kamata carnet ya santé mpe bakisi oyo asili komela.",
+  kg: "Kubikala na nzo ve mpi sala nde muntu ya nkaka kwenda ti nge. Na nzila : lalisa muntu na lweka kana yandi ke lala ngolo to ke luka, kupesa yandi kima ya kunwa to ya kudia ve kana yandi ke vutula mbote ve, bumba yandi mwini mpi kangula bilele na yandi. Kana menga ke basika, fina ngolo na mputa ti dilele ya bunkete mpi kukatula yo ve. Baka mukanda ya bukolele ti bankisi yina yandi me nwa.",
+  sw: "Usibaki nyumbani na nenda na mtu wa kukusaidia. Njiani: mlaze mtu kwa ubavu ikiwa ana usingizi mzito au anatapika, usimpe chochote cha kunywa au kula kama hajibu vizuri, mwekeni joto na mlegeze nguo. Kama kuna damu, bonyeza kwa nguvu jeraha kwa kitambaa safi bila kukiondoa. Chukua kadi ya afya na dawa alizotumia.",
+  lua: "Kushala ku nzubu to ne yaya ne muntu mukuabu. Mu njila: lalika muntu ku luseke bikala ulala bikole anyi udi ulua, kumupesha tshintu tshia kunua anyi tshia kudia to bikala kayi wandamuna bimpe, mulame ne luya ne mutuluile bilamba. Bikala mashi apatuka, kuata mputa ne bukole ne tshilamba tshimpe kabiyi kutshiumbula. Angata mukanda wa bukolame ne manga akadiye munue.",
+};
+
+/**
+ * The full scripted emergency answer: the referral sentence once, then the
+ * en-route care. Derived rather than written out, so the two halves cannot
+ * drift into saying the same thing twice again.
  */
 export const EMERGENCY_INSTRUCTIONS: Record<LanguageCode, string> = {
-  fr: "Partez maintenant vers le centre de santé le plus proche, ne restez pas à la maison. Faites-vous accompagner. Pendant le trajet : allongez la personne sur le côté si elle est somnolente ou si elle vomit, ne lui donnez rien à boire ni à manger si elle ne réagit pas bien, gardez-la au chaud et desserrez ses vêtements. En cas de saignement, appuyez fort sur la plaie avec un linge propre sans jamais le retirer. Emportez le carnet de santé et les médicaments déjà pris.",
-  ln: "Kende sikoyo na centre de santé ya pene, kotikala na ndako te. Sala ete moto mosusu akende na yo. Na nzela : lalisa moto na mopanzi soki alali makasi to azali kosanza, kopesa ye eloko ya komela to ya kolia te soki azali koyanola malamu te, batela ye moto mpe fungola bilamba na ye. Soki makila ezali kobima, fina makasi na mpota na elamba ya peto mpe kolongola yango te. Kamata carnet ya santé mpe bakisi oyo asili komela.",
-  kg: "Kwenda ntangu yayi na centre de santé ya pene-pene, kubikala na nzo ve. Sala nde muntu ya nkaka kwenda ti nge. Na nzila : lalisa muntu na lweka kana yandi ke lala ngolo to ke luka, kupesa yandi kima ya kunwa to ya kudia ve kana yandi ke vutula mbote ve, bumba yandi mwini mpi kangula bilele na yandi. Kana menga ke basika, fina ngolo na mputa ti dilele ya bunkete mpi kukatula yo ve. Baka mukanda ya bukolele ti bankisi yina yandi me nwa.",
-  sw: "Nenda sasa kituo cha afya kilicho karibu, usibaki nyumbani. Nenda na mtu wa kukusaidia. Njiani: mlaze mtu kwa ubavu ikiwa ana usingizi mzito au anatapika, usimpe chochote cha kunywa au kula kama hajibu vizuri, mwekeni joto na mlegeze nguo. Kama kuna damu, bonyeza kwa nguvu jeraha kwa kitambaa safi bila kukiondoa. Chukua kadi ya afya na dawa alizotumia.",
-  lua: "Ndaku mpindieu ku tshibambalu tshia bukolame tshia pabuipi, kushala ku nzubu to. Yaya ne muntu mukuabu. Mu njila: lalika muntu ku luseke bikala ulala bikole anyi udi ulua, kumupesha tshintu tshia kunua anyi tshia kudia to bikala kayi wandamuna bimpe, mulame ne luya ne mutuluile bilamba. Bikala mashi apatuka, kuata mputa ne bukole ne tshilamba tshimpe kabiyi kutshiumbula. Angata mukanda wa bukolame ne manga akadiye munue.",
+  fr: `${EMERGENCY_MESSAGES.fr} ${EMERGENCY_EN_ROUTE.fr}`,
+  ln: `${EMERGENCY_MESSAGES.ln} ${EMERGENCY_EN_ROUTE.ln}`,
+  kg: `${EMERGENCY_MESSAGES.kg} ${EMERGENCY_EN_ROUTE.kg}`,
+  sw: `${EMERGENCY_MESSAGES.sw} ${EMERGENCY_EN_ROUTE.sw}`,
+  lua: `${EMERGENCY_MESSAGES.lua} ${EMERGENCY_EN_ROUTE.lua}`,
 };
 
 /** Stated limitation when no facility is known for the caller's area (HEA-004). */

@@ -116,8 +116,12 @@ describe("channel session service", () => {
     // The reply must stand on its own with every AI provider down (NFR-A-01):
     // the alert, then what to do on the way, from fixed approved wording.
     expect(result.text.startsWith(EMERGENCY_MESSAGES.fr.replace(/\s+:/, " :"))).toBe(true);
-    expect(result.text).toContain("ne restez pas à la maison");
+    expect(result.text).toContain("Ne restez pas à la maison");
     expect(result.text).toContain("Emportez le carnet de santé");
+    // And it says the referral once. Composing the alert with a script that
+    // already opens with the alert made an IVR call repeat it immediately.
+    const alertLine = EMERGENCY_MESSAGES.fr.replace(/\s+:/, " :");
+    expect(result.text.split(alertLine).length - 1, "the referral line must appear exactly once").toBe(1);
     expect(result.background).toBeDefined();
 
     const settled = await settleTurn(result);

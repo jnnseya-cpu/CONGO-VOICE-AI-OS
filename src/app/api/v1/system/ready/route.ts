@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
-import { getDb } from "@server/db/client";
+import { getDb, schemaReport } from "@server/db/client";
 import { DEPLOYMENT_CHECKS, readiness } from "@server/core/status";
 
 /**
@@ -30,7 +30,26 @@ export async function GET() {
     if (failing.length > 0) {
       return NextResponse.json({ status: "not_ready", failing }, { status: 503 });
     }
-    return NextResponse.json({ status: "ready", time: new Date().toISOString() });
+    /**
+     * What the bootstrap had to settle on the way up.
+     *
+     * Additive convergence — a column or an enum value the deployed database was
+     * missing — is not a reason to refuse traffic, but an operator should not
+     * have to open a log viewer to find out it happened. Anything the bootstrap
+     * could not settle safely is named here too; the service still serves,
+     * because a database one constraint short is not a database that cannot
+     * answer, and hiding it would be worse than reporting it.
+     */
+    const schema = schemaReport();
+    const converged =
+      schema.columnsAdded.length > 0 || schema.statementsSkipped > 0 || schema.drift.some((d) => d.kind !== "extra_column")
+        ? {
+            statementsSkipped: schema.statementsSkipped,
+            columnsAdded: schema.columnsAdded,
+            unsettled: schema.drift.filter((d) => d.kind !== "extra_column"),
+          }
+        : undefined;
+    return NextResponse.json({ status: "ready", time: new Date().toISOString(), ...(converged ? { schema: converged } : {}) });
   } catch (err) {
     // The message can carry a connection string, so it stays in the logs.
     console.error("[ready]", err);

@@ -131,7 +131,9 @@ describe("health triage (offline provider)", () => {
 
   it("gives the emergency script in the citizen's language", async () => {
     const out = await assessHealth("Mtoto wangu ana degedege", { province: "Kinshasa", language: "sw" }, randomUUID());
-    expect(out.emergencyScript).toContain("Nenda sasa kituo cha afya");
+    // The reviewed Swahili referral line, which is now the opening of the script.
+    expect(out.emergencyScript).toContain("nenda kituo cha afya kilicho karibu sasa hivi");
+    expect(out.emergencyScript).toContain("Usibaki nyumbani");
   });
 
   it("returns null from the directory when the province is unknown", async () => {

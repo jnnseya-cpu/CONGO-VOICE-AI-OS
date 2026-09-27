@@ -6,15 +6,19 @@
  *                          or in memory when PGLITE_MEMORY=1 (tests).
  *
  * Migrations in ./drizzle are applied automatically on first use so the platform
- * boots from a clean checkout without any manual database step.
+ * boots from a clean checkout without any manual database step, and converge on
+ * a database that already exists rather than failing on it. See ./bootstrap.ts
+ * for why that distinction cost this deployment a day.
  */
 import "server-only";
 import path from "node:path";
 import fs from "node:fs";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
+import { sql } from "drizzle-orm";
 import * as schema from "./schema";
 import { env } from "@server/core/env";
+import { applySchema, EMPTY_REPORT, readSnapshot, schemaMatches, type Executor, type SchemaReport } from "./bootstrap";
 
 export type Database = NodePgDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
@@ -113,20 +117,18 @@ async function connect(): Promise<Database> {
   if (env.databaseUrl) {
     const { Pool } = await import("pg");
     const { drizzle } = await import("drizzle-orm/node-postgres");
-    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
     const pool = new Pool({
       connectionString: withoutTlsParams(env.databaseUrl),
       ssl: databaseTls(),
       max: 10,
     });
     const db = drizzle(pool, { schema });
-    await migrate(db, { migrationsFolder });
+    await bootstrap(db);
     return db;
   }
 
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
-  const { migrate } = await import("drizzle-orm/pglite/migrator");
   let client: InstanceType<typeof PGlite>;
   if (env.pgliteMemory || env.isTest) {
     client = new PGlite();
@@ -136,8 +138,60 @@ async function connect(): Promise<Database> {
     client = new PGlite(dir);
   }
   const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder });
+  await bootstrap(db);
   return db;
+}
+
+/**
+ * The statement seam the bootstrap runs through.
+ *
+ * Both drivers answer `execute` with something that carries `rows`; PGlite
+ * hands back the array directly in some versions, so both shapes are accepted
+ * rather than assumed.
+ */
+function executor(db: Database): Executor {
+  const run = async (statement: string) => {
+    await (db as { execute: (q: unknown) => Promise<unknown> }).execute(sql.raw(statement));
+  };
+  return {
+    run,
+    async rows<T extends Record<string, unknown>>(statement: string): Promise<T[]> {
+      const result = await (db as { execute: (q: unknown) => Promise<unknown> }).execute(sql.raw(statement));
+      if (Array.isArray(result)) return result as T[];
+      const rows = (result as { rows?: unknown }).rows;
+      return Array.isArray(rows) ? (rows as T[]) : [];
+    },
+  };
+}
+
+/**
+ * Last schema report, for the readiness probe.
+ *
+ * A database that is one column short of the schema is a fact an operator has
+ * to be able to read without opening a log viewer, so it is carried rather than
+ * logged and forgotten.
+ */
+let lastReport: SchemaReport = EMPTY_REPORT;
+
+export function schemaReport(): SchemaReport {
+  return lastReport;
+}
+
+async function bootstrap(db: Database): Promise<void> {
+  const { readMigrationFiles } = await import("drizzle-orm/migrator");
+  const migrations = readMigrationFiles({ migrationsFolder });
+  const report = await applySchema(executor(db), migrations, readSnapshot(migrationsFolder));
+  lastReport = report;
+  if (report.statementsSkipped > 0 || report.columnsAdded.length > 0) {
+    console.warn(
+      `[db] schema converged: ${report.statementsRun} statement(s) run, ${report.statementsSkipped} already present, ` +
+        `${report.columnsAdded.length} column(s) added`,
+      { columnsAdded: report.columnsAdded },
+    );
+  }
+  if (!schemaMatches(report)) {
+    console.error("[db] schema drift the bootstrap could not settle", report.drift.filter((d) => d.kind !== "extra_column"));
+  }
 }
 
 /** Returns the shared, migrated database handle. */

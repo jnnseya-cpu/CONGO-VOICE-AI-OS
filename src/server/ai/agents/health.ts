@@ -434,7 +434,35 @@ export async function assessHealth(textFr: string, ctx: HealthContext, interacti
       ? `Structure la plus proche connue : ${facility.name}${facility.healthZone ? ` (zone de santé de ${facility.healthZone})` : ""}${facility.phone ? `, téléphone ${facility.phone}` : ""}.`
       : FACILITY_UNKNOWN_NOTE[language];
     emergencyScript = `${EMERGENCY_INSTRUCTIONS[language]} ${destination}`.trim();
-    guidanceFr = `${EMERGENCY_INSTRUCTIONS.fr} ${facility ? destination : FACILITY_UNKNOWN_NOTE.fr} ${guidanceFr}`.trim();
+    /**
+     * At severity 4 the citizen hears the approved script and the destination,
+     * and nothing else.
+     *
+     * The explanation prose used to be appended to it. A live test of
+     * "Mon enfant de 3 ans a de la fièvre depuis deux jours et il ne veut pas
+     * boire" came back telling the caregiver to leave for a health centre four
+     * separate times: once from the orchestrator's danger-sign line, once from
+     * this script, once from the protocol's own severity-4 text and once from
+     * the model's restatement of it. None of the three extra sentences carried
+     * anything the script does not already say, and a fourth paraphrase read
+     * aloud over a bad line is half a minute in which a child who will not
+     * drink is still at home.
+     *
+     * The prose is not lost: it is recorded below for the clinician, and the
+     * summary the case carries is untouched. It simply is not read to someone
+     * who has already been told to leave now.
+     */
+    const withheld = guidanceFr;
+    guidanceFr = `${EMERGENCY_INSTRUCTIONS.fr} ${facility ? destination : FACILITY_UNKNOWN_NOTE.fr}`.trim();
+    await emitEvent({
+      type: "ai.emergency.prose_withheld",
+      aggregateType: "interaction",
+      aggregateId: interactionId,
+      module: "health",
+      classification: "internal",
+      actor: { type: "ai" },
+      payload: { rule: "FR-HE-12", protocolId: protocol.id, protocolVersion: protocol.version, withheld },
+    });
   }
 
   // 10. Safeguarding: restricted record, scripted reply, no detail in ordinary channels.
@@ -446,7 +474,17 @@ export async function assessHealth(textFr: string, ctx: HealthContext, interacti
       isChild: Boolean(modelFlag?.concernsChild) || entities.subject === "child_under_5" || entities.subject === "newborn",
       note: textFr,
     });
-    guidanceFr = `${SAFEGUARDING_RESPONSES.fr} ${guidanceFr}`.trim();
+    /**
+     * Ordinarily the safeguarding reply comes first: it is the answer to what
+     * the person actually risked telling us. At severity 4 it comes second,
+     * because a danger sign and a disclosure in the same message still means
+     * someone has to leave for a health centre now, and that instruction cannot
+     * wait behind a paragraph.
+     */
+    guidanceFr =
+      severityLevel === 4
+        ? `${guidanceFr} ${SAFEGUARDING_RESPONSES.fr}`.trim()
+        : `${SAFEGUARDING_RESPONSES.fr} ${guidanceFr}`.trim();
     // Nothing identifying or descriptive may travel through ordinary case notes or notifications.
     understanding = SAFEGUARDING_NOTIFICATION_BODY;
     explanationSummary = SAFEGUARDING_NOTIFICATION_BODY;
