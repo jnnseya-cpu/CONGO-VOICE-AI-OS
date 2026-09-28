@@ -14,7 +14,15 @@ export const SITE = {
     "Service public vocal qui permet à chaque citoyen congolais d'obtenir une orientation en santé, un conseil agricole et un appui scolaire en parlant dans sa langue — français, lingala, kikongo, kiswahili ou tshiluba — depuis n'importe quel téléphone, sans savoir lire ni écrire. Gratuit pour les citoyens.",
   tagline: "Your Voice. Our Intelligence. Stronger Congo.",
   taglineFr: "Votre voix. Notre intelligence. Un Congo plus fort.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://congovoicecd.com",
+  /**
+   * The canonical address, and the fallback when the origin is not configured.
+   *
+   * www, not the apex: the government entity that publishes, links and prints
+   * this address uses www, and an official link landing on a host nobody
+   * recognises is worse than a longer address. The apex redirects here — see
+   * src/middleware.ts — so both work, but only one is written down.
+   */
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.congovoicecd.com",
   operator: "Groupe Nseya Digital / JNN Global Ltd",
   country: "République Démocratique du Congo",
   status: "Pilote — préparation du déploiement national",

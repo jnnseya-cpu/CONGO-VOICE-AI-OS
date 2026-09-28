@@ -628,12 +628,42 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
      * digit over a bad line is the part the listener loses.
      */
     const spokenText = toSpokenText(actionLocal, language);
+    /**
+     * The answer is not lost because the recording of it could not be saved.
+     *
+     * Saving the spoken answer is on the path of every turn, including a typed
+     * one, so anything that throws here used to fail the whole interaction and
+     * the citizen was told "Le service est momentanément indisponible". That is
+     * exactly what happened in production: the image carried
+     * @google-cloud/storage without the packages it needs, the dynamic import
+     * threw "Cannot find module 'gcp-metadata'", and every question in all three
+     * modules failed while the home page and both probes stayed green.
+     *
+     * The text answer is the answer. Audio is how it is also delivered, and
+     * losing it degrades the turn rather than ending it — which matters most for
+     * someone who cannot read, because they still get the spoken answer their
+     * browser can read aloud from the text. The failure is recorded so that a
+     * silent platform is not mistaken for a working one.
+     */
     if (input.wantsAudio !== false) {
-      const speech = await aiGateway().synthesize({ text: spokenText, language }, { interactionId });
-      if (speech) {
-        const stored = await storeUpload(speech.audio, speech.mimeType, "tts");
-        const [f] = await db.insert(schema.files).values({ userId, interactionId, kind: "audio", storageKey: stored.key, mimeType: speech.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256 }).returning();
-        audioUrl = `/api/v1/files/${f.id}`;
+      try {
+        const speech = await aiGateway().synthesize({ text: spokenText, language }, { interactionId });
+        if (speech) {
+          const stored = await storeUpload(speech.audio, speech.mimeType, "tts");
+          const [f] = await db.insert(schema.files).values({ userId, interactionId, kind: "audio", storageKey: stored.key, mimeType: speech.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256 }).returning();
+          audioUrl = `/api/v1/files/${f.id}`;
+        }
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error("[orchestrator] the spoken answer could not be produced or stored:", reason);
+        await audit({
+          action: "interaction.audio_unavailable",
+          actorUserId: userId,
+          entityType: "interaction",
+          entityId: interactionId,
+          systemEvent: "tts_or_storage_failure",
+          after: { reason: reason.slice(0, 200) },
+        });
       }
     }
 

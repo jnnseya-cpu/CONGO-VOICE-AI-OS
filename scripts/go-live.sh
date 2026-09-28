@@ -46,13 +46,14 @@ DB_CA_SECRET="${NAME}-db_ca"
 # redirected to the one that is (see src/middleware.ts). It has to be chosen
 # rather than left open: the session cookie belongs to the host that issued it,
 # so two live spellings means signing in twice and being signed out by following
-# a link.
+# a link between them.
 #
-# The apex is the default because this service is told to people out loud — on
-# the radio, by a health worker, by a neighbour — and "congovoicecd.com" is what
-# somebody types after hearing it. Set SITE_HOST=www.congovoicecd.com to make www
-# canonical instead.
-SITE_HOST="${SITE_HOST:-$DOMAIN}"
+# www is canonical because the government entity that will publish, link and
+# print this address uses www, and an institutional link that lands on a host
+# nobody recognises is a worse problem than a longer address. Set
+# SITE_HOST=congovoicecd.com to make the apex canonical instead; the redirect
+# reverses and nothing else changes.
+SITE_HOST="${SITE_HOST:-www.$DOMAIN}"
 export PUBLIC_URL="https://${SITE_HOST}"
 MEDIA_BACKSTOP_DAYS="${MEDIA_BACKSTOP_DAYS:-400}"
 

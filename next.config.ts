@@ -1,4 +1,68 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { NextConfig } from "next";
+
+/**
+ * Every package a runtime-loaded dependency needs, not just the one named.
+ *
+ * "node_modules/@google-cloud/storage/**" was carried into the image and its
+ * fifty-seven dependencies were not, because serverExternalPackages tells the
+ * tracer to stop at that package and the glob named one directory. The result
+ * reached production and looked like this in the logs:
+ *
+ *   [orchestrator] Failed to load external module @google-cloud/storage:
+ *   Cannot find module 'gcp-metadata'
+ *
+ * Saving the spoken answer is on the path of every turn, so that was every
+ * question in all three modules failing — text, voice and photograph alike —
+ * and the citizen was told "Le service est momentanément indisponible". The
+ * container started, the probes passed and the home page served throughout.
+ *
+ * Walking the tree here rather than listing the names keeps it true when the
+ * package updates: a new dependency is carried the next time the image is
+ * built, and nobody has to remember.
+ */
+/**
+ * Packages Next must not bundle, because they load parts of themselves by
+ * runtime string. Declared once: the same list marks them external and pulls
+ * their dependency trees into the image, so the two cannot disagree.
+ */
+const EXTERNAL_PACKAGES = ["@electric-sql/pglite", "pg", "pdfkit", "exceljs", "@google-cloud/storage"];
+
+function runtimeClosure(entry: string, root = process.cwd()): string[] {
+  const found = new Set<string>();
+
+  const locate = (name: string, from: string): string | null => {
+    let dir = from;
+    for (;;) {
+      const candidate = join(dir, "node_modules", name);
+      if (existsSync(join(candidate, "package.json"))) return candidate;
+      const up = dirname(dir);
+      if (up === dir) break;
+      dir = up;
+    }
+    const hoisted = join(root, "node_modules", name);
+    return existsSync(join(hoisted, "package.json")) ? hoisted : null;
+  };
+
+  const walk = (name: string, from: string): void => {
+    if (found.has(name)) return;
+    const dir = locate(name, from);
+    if (!dir) return;
+    // @types/* are compile-time only and are never loaded by the container.
+    if (name.startsWith("@types/")) return;
+    found.add(name);
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
+      for (const dep of Object.keys(pkg.dependencies ?? {})) walk(dep, dir);
+    } catch {
+      /* a package without a readable manifest carries nothing further */
+    }
+  };
+
+  walk(entry, root);
+  return [...found].sort().map((name) => `node_modules/${name}/**`);
+}
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -44,7 +108,7 @@ const nextConfig: NextConfig = {
   // output. The previous arrangement (webpackIgnore plus an indirect specifier)
   // hid it from the tracer, so it was absent from the image and every voice turn
   // failed with "Cannot find package".
-  serverExternalPackages: ["@electric-sql/pglite", "pg", "pdfkit", "exceljs", "@google-cloud/storage"],
+  serverExternalPackages: EXTERNAL_PACKAGES,
   agentRules: false,
   poweredByHeader: false,
   // Self-contained server bundle, so the container copies one directory.
@@ -64,11 +128,14 @@ const nextConfig: NextConfig = {
    * by runtime string, which no static analysis can follow. Naming the whole
    * directory guarantees the image carries it: a recording that cannot be
    * written is a gap in a citizen's record, and finding out at runtime costs a
-   * deployment.
+   * deployment — and naming only that directory, as this did, cost one.
    */
   outputFileTracingIncludes: {
     "*": [
-      "node_modules/@google-cloud/storage/**",
+      // Every external package's whole tree, not just the package. pdfkit and
+      // exceljs were missing pieces too; report export would have failed the
+      // same way the moment somebody used it.
+      ...EXTERNAL_PACKAGES.flatMap((name) => runtimeClosure(name)),
       // The service worker's source is read at runtime by its route. A file the
       // tracer does not carry is a 500 on /sw.js, which takes offline support
       // with it — and this repository has already shipped one missing file that

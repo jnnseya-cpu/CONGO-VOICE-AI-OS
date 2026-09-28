@@ -235,7 +235,7 @@ Two things worth knowing before the ministry asks:
 
 ```bash
 # What a deployment would have to admit if asked:
-curl -s https://congovoicecd.com/api/v1/system/health | jq '.failing'
+curl -s https://www.congovoicecd.com/api/v1/system/health | jq '.failing'
 ```
 
 ## 1. Decide the four inputs
@@ -434,7 +434,7 @@ wait for the managed certificate. It is normally minutes and can be an hour.
 
 ```bash
 # Certificate issued and the domain answering?
-curl -sI https://congovoicecd.com | head -3
+curl -sI https://www.congovoicecd.com | head -3
 ```
 
 ## 5. Migrate and seed — carefully
@@ -488,7 +488,7 @@ Nothing health-related is assessed until this is done (AI-10).
    expert — recording each one's registration number:
 
 ```bash
-curl -X POST https://congovoicecd.com/api/v1/admin/review/members \
+curl -X POST https://www.congovoicecd.com/api/v1/admin/review/members \
   -H 'content-type: application/json' -H "authorization: Bearer $ADMIN_TOKEN" \
   -d '{"boardKey":"crb","userId":"<uuid>","seat":"physician","credential":"CNOM-…"}'
 ```
@@ -504,7 +504,7 @@ Steps 1–4 and the first citizen journeys can be rehearsed end to end:
 ```bash
 REHEARSAL_ADMIN=+243… REHEARSAL_PHYSICIANS=+243…,+243… \
 REHEARSAL_CHW=+243… REHEARSAL_WORKER=+243… \
-npm run rehearsal -- https://congovoicecd.com
+npm run rehearsal -- https://www.congovoicecd.com
 ```
 
 It signs in over HTTP as each person, seats the board, has the members sign
@@ -525,7 +525,7 @@ field, not a code change.
 Run this against the real origin before anyone is told the number.
 
 ```bash
-npm run preflight -- https://congovoicecd.com
+npm run preflight -- https://www.congovoicecd.com
 ```
 
 It checks, as an anonymous caller: the readiness probe, that the origin it
@@ -538,10 +538,10 @@ failure and prints what to fix.
 Then the three checks that need a browser:
 
 ```bash
-npm run rehearsal -- https://congovoicecd.com  # 28 checks: seated, signed, answering
-npm run smoke -- https://congovoicecd.com    # 37 behavioural checks
-npm run crawl -- https://congovoicecd.com    # every page, console errors, broken links
-npm run a11y  -- https://congovoicecd.com    # WCAG 2.2 A/AA, fails on one violation
+npm run rehearsal -- https://www.congovoicecd.com  # 28 checks: seated, signed, answering
+npm run smoke -- https://www.congovoicecd.com    # 37 behavioural checks
+npm run crawl -- https://www.congovoicecd.com    # every page, console errors, broken links
+npm run a11y  -- https://www.congovoicecd.com    # WCAG 2.2 A/AA, fails on one violation
 ```
 
 ## 9. Connect the channels
@@ -550,10 +550,10 @@ Only now, when the origin is right, point the providers at it:
 
 | Channel | Where it goes |
 |---|---|
-| Voice (IVR) | `https://congovoicecd.com/api/hooks/ivr/twilio` |
-| SMS | `https://congovoicecd.com/api/hooks/sms` and `/api/hooks/sms/dlr` |
-| WhatsApp | `https://congovoicecd.com/api/hooks/whatsapp` |
-| USSD | `https://congovoicecd.com/api/hooks/ussd` |
+| Voice (IVR) | `https://www.congovoicecd.com/api/hooks/ivr/twilio` |
+| SMS | `https://www.congovoicecd.com/api/hooks/sms` and `/api/hooks/sms/dlr` |
+| WhatsApp | `https://www.congovoicecd.com/api/hooks/whatsapp` |
+| USSD | `https://www.congovoicecd.com/api/hooks/ussd` |
 
 Set `TWILIO_AUTH_TOKEN` (and the equivalents) at the same time. Until it is set,
 signature validation is skipped so the platform still runs offline — which is
@@ -566,7 +566,7 @@ in `/historique` and the case in `/cas`.
 
 ```bash
 # One province, one module, 5% of traffic, held for seven days.
-curl -X POST https://congovoicecd.com/api/v1/admin/feature-flags \
+curl -X POST https://www.congovoicecd.com/api/v1/admin/feature-flags \
   -H 'content-type: application/json' -H "authorization: Bearer $ADMIN_TOKEN" \
   -d '{"key":"module.health","enabled":true,"modules":["health"],"provinces":["Kinshasa"],"startCanary":true}'
 ```

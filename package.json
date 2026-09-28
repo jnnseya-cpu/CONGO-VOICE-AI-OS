@@ -30,7 +30,9 @@
     "teardown": "bash scripts/teardown.sh",
     "set-ai-keys": "bash scripts/set-ai-keys.sh",
     "domain": "bash scripts/domain.sh",
-    "reset-pilot-data": "bash scripts/reset-pilot-data.sh"
+    "reset-pilot-data": "bash scripts/reset-pilot-data.sh",
+    "check:standalone": "node scripts/check-standalone.mjs",
+    "postbuild": "node scripts/check-standalone.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -74,7 +76,7 @@
     "typescript": "^5",
     "vitest": "^5.0.0"
   },
-  "description": "Plateforme nationale d'inclusion numérique vocale en santé, agriculture et éducation — République Démocratique du Congo.",
+  "description": "Plateforme nationale d'inclusion num\u00e9rique vocale en sant\u00e9, agriculture et \u00e9ducation \u2014 R\u00e9publique D\u00e9mocratique du Congo.",
   "engines": {
     "node": ">=22.12.0 <23",
     "npm": ">=10"

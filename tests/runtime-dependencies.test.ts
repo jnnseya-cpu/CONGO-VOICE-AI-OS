@@ -141,12 +141,29 @@ describe("the storage client survives the standalone build", () => {
   });
 
   it("marks it external, so it stays a real package rather than being bundled", () => {
-    const external = /serverExternalPackages:\s*\[([^\]]*)\]/.exec(config)?.[1] ?? "";
+    const external = /const EXTERNAL_PACKAGES = \[([^\]]*)\]/.exec(config)?.[1] ?? "";
     expect(external).toContain("@google-cloud/storage");
   });
 
-  it("names it in the traced files, because it loads parts of itself by runtime string", () => {
-    // No static analysis can follow those, so the directory is included whole.
-    expect(config).toContain("node_modules/@google-cloud/storage/**");
+  it("carries the whole dependency tree, not just the package", () => {
+    /*
+     * Naming the one directory is what put this in production:
+     *
+     *   [orchestrator] Failed to load external module @google-cloud/storage:
+     *   Cannot find module 'gcp-metadata'
+     *
+     * serverExternalPackages stops the tracer at the package, so its fifty-seven
+     * dependencies were left out of the image while the build, the probes and
+     * every test passed. The config now walks the tree instead of listing it.
+     */
+    expect(config).toContain("runtimeClosure");
+    expect(config).toMatch(/EXTERNAL_PACKAGES\.flatMap\(\(name\) => runtimeClosure\(name\)\)/);
+  });
+
+  it("is checked against the built image, which is where this defect is visible", () => {
+    // Every source-level gate passed while production was broken. The artefact
+    // check reads .next/standalone and runs on postbuild.
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { scripts?: Record<string, string> };
+    expect(pkg.scripts?.postbuild ?? "", "an unverified image must not be producible silently").toContain("check-standalone");
   });
 });
