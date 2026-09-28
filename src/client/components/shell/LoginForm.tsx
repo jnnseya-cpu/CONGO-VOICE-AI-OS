@@ -26,6 +26,7 @@ export function LoginForm({ next }: { next: string }) {
    * real kindness. This is the way out for the few accounts it is wrong for.
    */
   const [lettersInCode, setLettersInCode] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const [province, setProvince] = useState("Kinshasa");
   const [busy, setBusy] = useState<"login" | "anon" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +69,21 @@ export function LoginForm({ next }: { next: string }) {
           <span className="mb-1 block font-medium text-ink-2">{t("pin")}</span>
           <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" inputMode={lettersInCode ? "text" : "numeric"} autoComplete="current-password" className="h-11 w-full rounded-lg border border-line-strong px-3 outline-none focus:border-brand-2 focus:ring-4 focus:ring-brand-soft" />
         </label>
-        <button type="button" onClick={() => setLettersInCode((v) => !v)} className="text-[12.5px] text-brand underline underline-offset-2">
-          {lettersInCode ? t("codeDigitsOnly") : t("codeHasLetters")}
-        </button>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button type="button" onClick={() => setLettersInCode((v) => !v)} className="text-[12.5px] text-brand underline underline-offset-2">
+            {lettersInCode ? t("codeDigitsOnly") : t("codeHasLetters")}
+          </button>
+          {/*
+            There is no self-service reset, and saying so is better than
+            offering nothing. A code that can be reset by whoever is holding
+            the phone is not a code; the recovery is a human checking who you
+            are, which is what this explains.
+          */}
+          <button type="button" onClick={() => setShowForgot((v) => !v)} className="text-[12.5px] text-muted underline underline-offset-2">
+            {t("forgotCode")}
+          </button>
+        </div>
+        {showForgot && <p className="rounded-lg bg-surface-2 px-3 py-2 text-[12.5px] leading-relaxed text-ink-2">{t("forgotCodeHelp")}</p>}
         {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
         <button type="submit" disabled={busy !== null} className="btn btn-primary h-11 w-full">
           {busy === "login" ? <IconSpinner size={18} /> : null} {t("login")}
