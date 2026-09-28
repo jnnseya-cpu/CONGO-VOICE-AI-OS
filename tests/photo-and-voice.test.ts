@@ -45,11 +45,31 @@ describe("recognising a photograph from a phone", () => {
     expect(needsJpegConversion(JPEG, "image/jpeg")).toBe(false);
   });
 
-  it("leaves a normal photograph untouched", async () => {
-    const out = await normaliseImage(JPEG, "image/jpeg");
-    expect(out.converted).toBe(false);
+  it("re-encodes a normal photograph rather than passing it through", async () => {
+    /**
+     * This test used to assert the opposite — that a JPEG came out as the same
+     * object it went in as — and the assertion was changed deliberately.
+     *
+     * Passing a photograph through untouched also passes its EXIF through, and
+     * a phone stamps every picture with where it was taken. A photograph of a
+     * sick child, carrying the household's coordinates into this platform's
+     * storage for the retention period, is not something to hold because a
+     * camera put it there by default. Re-encoding drops it, along with bounding
+     * the size and applying the orientation the phone only recorded.
+     *
+     * The cost is one re-encode per photograph; tests/real-photograph.test.ts
+     * covers what it produces.
+     */
+    const sharp = (await import("sharp")).default;
+    const real = (await sharp({ create: { width: 640, height: 480, channels: 3, background: { r: 7, g: 7, b: 7 } } })
+      .jpeg()
+      .toBuffer()) as Buffer<ArrayBuffer>;
+
+    const out = await normaliseImage(real, "image/jpeg");
     expect(out.mimeType).toBe("image/jpeg");
-    expect(out.data).toBe(JPEG);
+    expect(out.converted).toBe(true);
+    expect(out.data[0]).toBe(0xff);
+    expect(out.data[1]).toBe(0xd8);
   });
 
   it("no longer refuses the camera's own format outright", () => {
