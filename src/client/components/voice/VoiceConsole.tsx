@@ -222,8 +222,33 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
-    } catch {
-      setMicError(t("micDenied"));
+    } catch (err) {
+      /**
+       * Why the microphone did not open, not merely that it did not.
+       *
+       * Every failure here used to become "Le micro n'est pas disponible",
+       * which is a dead end for the commonest cause by far: the person tapped
+       * Block on the browser's permission prompt, or tapped it once weeks ago.
+       * The microphone is then available and working, the site is simply not
+       * allowed to use it, and nothing on the page says how to undo that. On a
+       * service whose whole premise is speaking rather than typing, that is the
+       * difference between a citizen using it and a citizen deciding it does
+       * not work.
+       *
+       * It matters more than it looks: permission is granted per origin, so
+       * moving between the run.app URL and the domain asks again, and a second
+       * prompt is exactly where somebody taps the wrong button.
+       */
+      const name = err instanceof Error ? err.name : "";
+      setMicError(
+        name === "NotAllowedError" || name === "SecurityError"
+          ? t("micBlocked")
+          : name === "NotFoundError" || name === "OverconstrainedError"
+            ? t("micMissing")
+            : name === "NotReadableError" || name === "AbortError"
+              ? t("micBusy")
+              : t("micDenied"),
+      );
     }
     // The dependency list is now complete: submit and stopRecording are reached
     // through refs, so this no longer needs an exhaustive-deps exception.
@@ -307,13 +332,38 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
   function speak(textToSpeak: string, language: LanguageCode, audioUrl: string | null, id: string) {
     stopSpeaking();
     if (audioUrl) {
+      /**
+       * The recorded voice first, the phone's own voice if it does not come.
+       *
+       * The answer is now synthesised when this URL is requested rather than
+       * during the turn, which is what took several seconds off the wait. The
+       * consequence is that this request can fail where before the turn would
+       * simply have carried no audio — the provider may be unreachable, or the
+       * answer may have no spoken form — and it returns 204.
+       *
+       * Falling through to the browser's own speech matters more here than
+       * anywhere else in this interface. Somebody who cannot read has not been
+       * given a degraded answer when the audio fails; they have been given no
+       * answer. So a failure is not an end state: it is a switch to the voice
+       * already on the handset, which needs no network at all.
+       */
       const a = new Audio(audioUrl);
       audioRef.current = a;
       setSpeaking(id);
       a.onended = () => setSpeaking(null);
-      a.play().catch(() => setSpeaking(null));
+      const fallBackToDevice = () => {
+        if (audioRef.current !== a) return; // superseded by a newer turn
+        audioRef.current = null;
+        speakOnDevice(textToSpeak, language, id);
+      };
+      a.onerror = fallBackToDevice;
+      a.play().catch(fallBackToDevice);
       return;
     }
+    speakOnDevice(textToSpeak, language, id);
+  }
+  /** The voice built into the handset. Works with the radio off. */
+  function speakOnDevice(textToSpeak: string, language: LanguageCode, id: string) {
     if (typeof speechSynthesis === "undefined") return;
     const u = new SpeechSynthesisUtterance(textToSpeak);
     u.lang = BCP47[language];

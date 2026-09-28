@@ -88,6 +88,25 @@ const ROLE_LABEL: Record<ModuleType, string> = { health: "agent de santé commun
 
 export async function runInteraction(input: InteractionInput): Promise<InteractionOutput> {
   const started = Date.now();
+  /**
+   * Where the turn's time actually goes.
+   *
+   * A citizen's turn was measured at thirty-eight seconds and nobody could say
+   * which part of it was thirty of them — the only number recorded was the
+   * total. Guessing at that is how the wrong thing gets optimised, so each
+   * stage is timed and written to the interaction's modelRoute. It costs a
+   * subtraction per stage and it turns the next latency question into a query
+   * instead of an argument.
+   */
+  const stages: Record<string, number> = {};
+  const timed = async <T>(name: string, work: () => Promise<T>): Promise<T> => {
+    const at = Date.now();
+    try {
+      return await work();
+    } finally {
+      stages[name] = (stages[name] ?? 0) + (Date.now() - at);
+    }
+  };
   const db = await getDb();
   const userId = input.user?.userId ?? null;
   const province = input.province ?? input.user?.province ?? null;
@@ -171,6 +190,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     /** True when the transcript looped and its detail cannot be trusted. */
     let transcriptDegraded = false;
     if (input.audio) {
+      // Bound once so the timing closure below keeps the narrowing.
+      const recording = input.audio;
       /**
        * Speech recognition failing is not the turn failing.
        *
@@ -186,11 +207,12 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
        * here is turned into that, and the recording itself is kept on the
        * interaction so nothing the person said is lost.
        */
-      const stt = await aiGateway()
-        .transcribe({ audio: input.audio.data, mimeType: input.audio.mimeType, languageHint: input.user?.language ?? null }, { interactionId })
+      const stt = await timed("stt", () =>
+        aiGateway()
+        .transcribe({ audio: recording.data, mimeType: recording.mimeType, languageHint: input.user?.language ?? null }, { interactionId })
         .catch(async (err: unknown) => {
           const reason = err instanceof Error ? err.message : String(err);
-          console.error(`[orchestrator] speech recognition failed (${input.audio?.mimeType ?? "unknown format"}):`, reason);
+          console.error(`[orchestrator] speech recognition failed (${recording.mimeType}):`, reason);
           await save({ errorMessage: `stt_failed: ${reason}`.slice(0, 500) }).catch(() => undefined);
           await audit({
             action: "interaction.stt_failed",
@@ -198,10 +220,10 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
             entityType: "interaction",
             entityId: interactionId,
             systemEvent: "stt_failure",
-            after: { mimeType: input.audio?.mimeType ?? null, reason: reason.slice(0, 200) },
+            after: { mimeType: recording.mimeType, reason: reason.slice(0, 200) },
           });
           return { text: "", language: null, confidence: null };
-        });
+        }));
       /**
        * A transcript the model invented is not a message.
        *
@@ -255,7 +277,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
 
     // 3. Language analysis + service classification.
     const learning = await retrieveLearningContext(transcript || "", input.user?.language ?? null);
-    const lang = await analyseLanguage(transcript || "(image seulement)", { preferredLanguage: input.user?.language, moduleHint: input.moduleHint, learning }, interactionId);
+    const lang = await timed("language", () => analyseLanguage(transcript || "(image seulement)", { preferredLanguage: input.user?.language, moduleHint: input.moduleHint, learning }, interactionId));
     const language: LanguageCode = lang.language;
     const languageConfidence = sttLanguage && sttLanguage === language && sttConfidence ? Math.max(lang.confidence, sttConfidence) : lang.confidence;
     const requestedService: ModuleType = input.moduleHint && input.moduleHint !== "general" ? input.moduleHint : lang.module;
@@ -338,13 +360,15 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     let education: EducationAssessmentPlus | null = null;
     let general: GeneralAssessment | null = null;
     if (service === "health")
-      health = await assessHealth(
-        textFr,
-        { province, history: profile?.historyText, language, languageConfidence, transcriptionConfidence: sttConfidence },
-        interactionId,
+      health = await timed("module", () =>
+        assessHealth(
+          textFr,
+          { province, history: profile?.historyText, language, languageConfidence, transcriptionConfidence: sttConfidence },
+          interactionId,
+        ),
       );
-    else if (service === "agriculture") agriculture = await assessAgriculture(textFr, { province, history: profile?.historyText, userId }, images, interactionId);
-    else if (service === "education") education = await assessEducation(textFr, { province, history: profile?.historyText, userId, language }, interactionId);
+    else if (service === "agriculture") agriculture = await timed("module", () => assessAgriculture(textFr, { province, history: profile?.historyText, userId }, images, interactionId));
+    else if (service === "education") education = await timed("module", () => assessEducation(textFr, { province, history: profile?.historyText, userId, language }, interactionId));
     else {
       const r = await aiGateway().generateJson({ system: GENERAL_AGENT_SYSTEM, user: messageEnvelope(textFr, { province }), schema: GeneralSchema, schemaName: "general_assessment", maxTokens: 800 }, meta);
       general = r.output;
@@ -481,11 +505,11 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       confidence: { score: risk.confidence, low: risk.lowConfidence },
       summary: summaryFr,
     };
-    const [actionRendered, understandingLocal, followUpsLocal] = await Promise.all([
+    const [actionRendered, understandingLocal, followUpsLocal] = await timed("localise", () => Promise.all([
       localiseWithGlossary(answer.action, language, { interactionId, learning, module: service }),
       localise(answer.understanding, language, interactionId, learning, service),
       Promise.all(followUps.map((q) => localise(q, language, interactionId, learning, service))),
-    ]);
+    ]));
     const actionLocal = actionRendered.text;
     // A term the renderer dropped is worth seeing: it is how a glossary quietly
     // stops being enforced (FR-LG-05).
@@ -677,27 +701,26 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
      * browser can read aloud from the text. The failure is recorded so that a
      * silent platform is not mistaken for a working one.
      */
-    if (input.wantsAudio !== false) {
-      try {
-        const speech = await aiGateway().synthesize({ text: spokenText, language }, { interactionId });
-        if (speech) {
-          const stored = await storeUpload(speech.audio, speech.mimeType, "tts");
-          const [f] = await db.insert(schema.files).values({ userId, interactionId, kind: "audio", storageKey: stored.key, mimeType: speech.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256 }).returning();
-          audioUrl = `/api/v1/files/${f.id}`;
-        }
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        console.error("[orchestrator] the spoken answer could not be produced or stored:", reason);
-        await audit({
-          action: "interaction.audio_unavailable",
-          actorUserId: userId,
-          entityType: "interaction",
-          entityId: interactionId,
-          systemEvent: "tts_or_storage_failure",
-          after: { reason: reason.slice(0, 200) },
-        });
-      }
-    }
+    /**
+     * The spoken answer is produced when the page asks for it.
+     *
+     * Synthesis and the upload that follows used to run here, inside the turn,
+     * between the citizen's question and their answer. On a turn already
+     * measured at thirty-eight seconds those were several of them spent making
+     * audio nobody had yet pressed play on, with a person watching a spinner
+     * the whole time.
+     *
+     * Pointing at the route instead costs nothing here and nothing there: the
+     * page requests it the moment the answer arrives, so the audio still
+     * follows by about the interval it always did, while the words stop waiting
+     * behind it. The file row is still written, the first time anybody listens,
+     * so what was said to a citizen is recorded exactly as before.
+     *
+     * See src/app/api/v1/interactions/[id]/audio/route.ts, which also handles
+     * the provider being unreachable — in which case the page speaks the answer
+     * with the browser's own voice rather than going silent.
+     */
+    if (input.wantsAudio !== false) audioUrl = `/api/v1/interactions/${interactionId}/audio`;
 
     const latencyMs = Date.now() - started;
     await save({
@@ -709,6 +732,9 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
         languageMode: languageStatus.mode,
         languageGate: languageStatus.reason,
         ...(env.ai.enforceLanguageGates ? {} : { languageGatesEnforced: "false" }),
+        // Milliseconds per stage, so a slow turn can be attributed rather than
+        // guessed at. Audio is absent on purpose: it is no longer in the turn.
+        ...Object.fromEntries(Object.entries(stages).map(([k, v]) => [`ms_${k}`, String(v)])),
       },
     });
     await audit({ action: "interaction.completed", actorUserId: userId, actorRole: input.user?.role, entityType: "interaction", entityId: interactionId, after: { module: service, language, risk: risk.level, escalated: risk.escalationRequired, caseId }, aiSummary: summaryFr });
