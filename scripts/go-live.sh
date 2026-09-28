@@ -39,7 +39,21 @@ SCHEDULER_JOB="${NAME}-workflow"
 REPO=cvos
 DB_PASSWORD_SECRET="cvos-${ENVIRONMENT}-db-password"
 DB_CA_SECRET="${NAME}-db_ca"
-export PUBLIC_URL="https://${DOMAIN}"
+# Which spelling of the address is the real one.
+#
+# congovoicecd.com and www.congovoicecd.com are different hosts. The certificate
+# covers both and both reach the service, so whichever is not chosen here is
+# redirected to the one that is (see src/middleware.ts). It has to be chosen
+# rather than left open: the session cookie belongs to the host that issued it,
+# so two live spellings means signing in twice and being signed out by following
+# a link.
+#
+# The apex is the default because this service is told to people out loud — on
+# the radio, by a health worker, by a neighbour — and "congovoicecd.com" is what
+# somebody types after hearing it. Set SITE_HOST=www.congovoicecd.com to make www
+# canonical instead.
+SITE_HOST="${SITE_HOST:-$DOMAIN}"
+export PUBLIC_URL="https://${SITE_HOST}"
 MEDIA_BACKSTOP_DAYS="${MEDIA_BACKSTOP_DAYS:-400}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
