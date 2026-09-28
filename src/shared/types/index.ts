@@ -22,7 +22,12 @@ export const PROVINCES: string[] = [
 export interface FinalAnswer {
   asking: string;
   understanding: string;
-  risk: { level: Severity; score: number; flags: string[] };
+  /**
+   * `uncertaintyDriven` is true when nothing but the platform's own failure to
+   * understand raised this level — so the badge can say "we did not follow
+   * you" instead of telling a citizen their health is at high risk.
+   */
+  risk: { level: Severity; score: number; flags: string[]; uncertaintyDriven?: boolean };
   action: string;
   escalation: { required: boolean; to: string | null; reason: string | null };
   confidence: { score: number; low: boolean };

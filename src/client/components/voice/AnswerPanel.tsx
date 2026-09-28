@@ -37,9 +37,24 @@ export function AnswerPanel({ result, speaking, onSpeak, onStop, onFollowUp, onF
               <p className="text-[15px] leading-relaxed text-ink">{a.action}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`tag ${RISK_CLS[a.risk.level]}`}>
-                {t("risk")} : {t(`risk_${a.risk.level}` as const)}
-              </span>
+              {/*
+                A level raised only by our own failure to understand says so.
+
+                Someone whose voice note transcribed badly was shown "Niveau de
+                risque : Élevé" beside "Confiance 15 %". That reads as a
+                judgement about their health when it is a statement about our
+                hearing, and it spends the badge's credibility on a turn where
+                it means nothing — leaving less of it for the turn where the
+                level is real. The escalation beside it is unchanged: a health
+                question we did not follow still goes to a person.
+              */}
+              {a.risk.uncertaintyDriven ? (
+                <span className="tag tag-warn">{t("risk_unclear")}</span>
+              ) : (
+                <span className={`tag ${RISK_CLS[a.risk.level]}`}>
+                  {t("risk")} : {t(`risk_${a.risk.level}` as const)}
+                </span>
+              )}
               <span className={`tag ${a.escalation.required ? "tag-case" : "tag-muted"}`}>{a.escalation.required ? t("escalated") : t("notEscalated")}</span>
               <span className={`tag ${a.confidence.low ? "tag-warn" : "tag-muted"}`}>
                 {t("confidence")} {Math.round(a.confidence.score * 100)}%

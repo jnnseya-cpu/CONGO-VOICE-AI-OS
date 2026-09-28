@@ -52,6 +52,19 @@ export interface RiskResult {
   /** Final protocol severity after the "raise only" rule; null outside protocol-driven modules. */
   severityLevel: SeverityLevel | null;
   riskBand: RiskBand | null;
+  /**
+   * True when the only thing raising this turn's level is that the platform
+   * did not understand it — no danger sign, no protocol severity, no blocked
+   * claim, no safeguarding disclosure.
+   *
+   * It exists so the citizen can be told the truth. Someone whose voice note
+   * transcribed badly was shown "Niveau de risque : Élevé" next to "Confiance
+   * 15 %", which reads as a judgement about their health when it is a
+   * statement about our hearing. A person who is frightened by that, or who
+   * stops trusting the badge because of it, is a cost this platform pays at
+   * the moment the badge is real.
+   */
+  uncertaintyDriven: boolean;
   /** False when a health or agriculture recommendation carries no citation. */
   citationsOk: boolean;
   /** True when the recommendation must not be delivered as written (uncited or prohibited). */
@@ -228,10 +241,27 @@ export function scoreRisk(input: RiskInput): RiskResult {
   const humanReviewRequired = Boolean(input.humanReviewRequired) || escalationRequired || blocked || Boolean(input.safeguarding);
   const riskBand: RiskBand | null = severityLevel !== null ? (blocked ? LEVEL_BAND[severityLevel] : (input.riskBand ?? LEVEL_BAND[severityLevel])) : (input.riskBand ?? null);
 
+  /**
+   * Was anything other than our own uncertainty driving this?
+   *
+   * Deliberately strict: any real signal at all — a danger sign, a protocol
+   * severity above the floor, a blocked claim, a safeguarding disclosure, a
+   * safety violation — means the level is about the situation and the badge
+   * must say so.
+   */
+  const uncertaintyDriven =
+    lowConfidence &&
+    !blocked &&
+    !input.safeguarding &&
+    !(input.safetyViolations?.length) &&
+    !(input.health?.emergencyFlags?.length) &&
+    (severityLevel === null || severityLevel <= 1);
+
   return {
     score: Number(score.toFixed(2)),
     level,
     flags,
+    uncertaintyDriven,
     escalationRequired,
     escalationReason: escalationRequired ? reason : null,
     lowConfidence,

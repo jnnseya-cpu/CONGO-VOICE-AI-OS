@@ -475,7 +475,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     const answer: FinalAnswer = {
       asking: textFr,
       understanding,
-      risk: { level: risk.level, score: risk.score, flags: risk.flags },
+      risk: { level: risk.level, score: risk.score, flags: risk.flags, uncertaintyDriven: risk.uncertaintyDriven },
       action: actionFr.trim(),
       escalation: { required: risk.escalationRequired, to: escalationTo, reason: risk.escalationReason },
       confidence: { score: risk.confidence, low: risk.lowConfidence },
@@ -795,7 +795,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
       const answer: FinalAnswer = {
         asking: transcriptForFallback.slice(0, 500),
         understanding: "Signe de danger détecté sans l'aide d'un modèle : les services d'IA étaient indisponibles.",
-        risk: { level: "critical", score: 1, flags: ["signe_de_danger", "repli_hors_ligne", ...dangerSigns.slice(0, 5)] },
+        risk: { level: "critical", score: 1, flags: ["signe_de_danger", "repli_hors_ligne", ...dangerSigns.slice(0, 5)], uncertaintyDriven: false },
         action: scripted,
         escalation: { required: true, to: ROLE_LABEL.health, reason: "Signe de danger détecté hors ligne (NFR-A-01)" },
         confidence: { score: 0, low: true },
@@ -833,7 +833,7 @@ function failedOutput(interactionId: string, language: LanguageCode, message: st
   const empty: FinalAnswer = {
     asking: "",
     understanding: "",
-    risk: { level: "low", score: 0, flags: [] },
+    risk: { level: "low", score: 0, flags: [], uncertaintyDriven: false },
     action: message,
     escalation: { required: false, to: null, reason: null },
     confidence: { score: 0, low: true },

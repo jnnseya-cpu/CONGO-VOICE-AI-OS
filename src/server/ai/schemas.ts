@@ -119,7 +119,18 @@ export const Localisation = z.object({
 export const FinalAnswer = z.object({
   asking: z.string(),
   understanding: z.string(),
-  risk: z.object({ level: severity, score: z.number().min(0).max(1), flags: z.array(z.string()) }),
+  risk: z.object({
+    level: severity,
+    score: z.number().min(0).max(1),
+    flags: z.array(z.string()),
+    /**
+     * Set by the risk agent, never by a model — optional here because this
+     * schema is also what a provider is asked to fill in, and whether the
+     * platform understood the citizen is not a thing to ask the model that
+     * did the understanding.
+     */
+    uncertaintyDriven: z.boolean().optional(),
+  }),
   action: z.string(),
   escalation: z.object({ required: z.boolean(), to: z.string().nullable(), reason: z.string().nullable() }),
   confidence: z.object({ score: z.number().min(0).max(1), low: z.boolean() }),
