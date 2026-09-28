@@ -77,12 +77,29 @@ export async function pruneAuthAttempts(db: Database, olderThanMs = 86_400_000, 
   return rows.length;
 }
 
-/** Rejects PINs that appear in every attacker's first hundred guesses, and obvious runs. */
+/**
+ * Rejects codes that appear in every attacker's first hundred guesses, and
+ * obvious runs.
+ *
+ * "PIN" is the name a citizen sees and four digits is the ordinary case, but
+ * the credential is not required to be numeric: the bootstrap endpoint takes
+ * six to twelve characters of anything, so a platform administrator's code can
+ * contain letters. Every check here used to assume digits, which meant they all
+ * quietly passed over exactly the account that matters most — "aaaaaa" and
+ * "abcdef" were accepted for the one account that can read the whole directory
+ * and create every other account, while "111111" and "123456" were refused.
+ *
+ * The run and repetition tests now work on code points rather than on digits,
+ * so they catch a run of letters the same way they catch a run of numbers.
+ */
 export function isWeakPin(pin: string): boolean {
   if (env.auth.forbiddenPins.includes(pin)) return true;
-  if (/^(\d)\1+$/.test(pin)) return true;
-  const digits = [...pin].map(Number);
-  if (digits.every((d, i) => i === 0 || d === digits[i - 1] + 1)) return true;
-  if (digits.every((d, i) => i === 0 || d === digits[i - 1] - 1)) return true;
+  if (env.auth.forbiddenPins.includes(pin.toLowerCase())) return true;
+  // One character repeated, whatever the character is.
+  if (/^(.)\1+$/.test(pin)) return true;
+  // A run in either direction: 1234, 4321, abcd, dcba.
+  const points = [...pin].map((c) => c.toLowerCase().codePointAt(0) ?? 0);
+  if (points.length > 1 && points.every((c, i) => i === 0 || c === points[i - 1] + 1)) return true;
+  if (points.length > 1 && points.every((c, i) => i === 0 || c === points[i - 1] - 1)) return true;
   return false;
 }

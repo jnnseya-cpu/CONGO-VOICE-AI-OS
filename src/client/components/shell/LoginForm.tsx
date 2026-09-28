@@ -11,6 +11,21 @@ export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
+  /**
+   * Whether this account's code contains letters.
+   *
+   * The keypad used to be numeric with no way out, and on a phone that is not
+   * a hint — it is the only keyboard offered. An administrator whose code was
+   * set through the bootstrap endpoint, which accepts six to twelve characters
+   * of anything, could not type their own credential on the handset they were
+   * holding. There is no password reset on this platform and no second
+   * administrator to ask, so that was a locked door with nobody behind it.
+   *
+   * Numeric stays the default because it is right for almost everyone: a
+   * citizen's code is four digits and a numeric keypad on a feature phone is a
+   * real kindness. This is the way out for the few accounts it is wrong for.
+   */
+  const [lettersInCode, setLettersInCode] = useState(false);
   const [province, setProvince] = useState("Kinshasa");
   const [busy, setBusy] = useState<"login" | "anon" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,8 +66,11 @@ export function LoginForm({ next }: { next: string }) {
         </label>
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-ink-2">{t("pin")}</span>
-          <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" inputMode="numeric" autoComplete="current-password" className="h-11 w-full rounded-lg border border-line-strong px-3 outline-none focus:border-brand-2 focus:ring-4 focus:ring-brand-soft" />
+          <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" inputMode={lettersInCode ? "text" : "numeric"} autoComplete="current-password" className="h-11 w-full rounded-lg border border-line-strong px-3 outline-none focus:border-brand-2 focus:ring-4 focus:ring-brand-soft" />
         </label>
+        <button type="button" onClick={() => setLettersInCode((v) => !v)} className="text-[12.5px] text-brand underline underline-offset-2">
+          {lettersInCode ? t("codeDigitsOnly") : t("codeHasLetters")}
+        </button>
         {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
         <button type="submit" disabled={busy !== null} className="btn btn-primary h-11 w-full">
           {busy === "login" ? <IconSpinner size={18} /> : null} {t("login")}
