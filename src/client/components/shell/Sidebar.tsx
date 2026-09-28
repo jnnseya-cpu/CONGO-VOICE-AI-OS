@@ -15,6 +15,8 @@ interface NavItem {
   icon: ComponentType<{ size?: number }>;
   roles?: Role[];
   badge?: number;
+  /** Needs a real account, not an anonymous session. */
+  account?: boolean;
 }
 
 const INSTITUTIONAL: Role[] = ["chw", "agri_officer", "teacher", "ngo", "gov_admin", "platform_admin"];
@@ -41,14 +43,27 @@ export function Sidebar({ user, unread, open, onClose }: { user: SessionUser | n
     { href: "/education", key: "nav_edu", icon: IconGraduation },
     { href: "/cas", key: "nav_cases", icon: IconBriefcase, roles: INSTITUTIONAL },
     { href: "/rapports", key: "nav_reports", icon: IconChart, roles: INSTITUTIONAL },
-    { href: "/notifications", key: "nav_notifications", icon: IconBell, badge: unread },
+    { href: "/notifications", key: "nav_notifications", icon: IconBell, badge: unread, account: true },
     { href: "/messages", key: "nav_messages", icon: IconMessage },
     { href: "/ressources", key: "nav_resources", icon: IconBook },
     { href: "/langues", key: "nav_languages", icon: IconLanguage, roles: INSTITUTIONAL },
     { href: "/admin", key: "nav_admin", icon: IconShield, roles: ["platform_admin", "gov_admin"] },
-    { href: "/parametres", key: "nav_settings", icon: IconSettings },
+    { href: "/parametres", key: "nav_settings", icon: IconSettings, account: true },
   ];
-  const visible = items.filter((i) => !i.roles || i.roles.includes(role));
+  /**
+   * An anonymous session is a citizen for permissions, so filtering on role
+   * alone offered a visitor with no account both a notifications bell and a
+   * settings page. Neither holds anything of theirs: notifications are
+   * addressed to a person, and settings keep a profile, a language preference,
+   * consents and data rights under a name. Offering them is an invitation to a
+   * dead end, and the bell was worse than a dead end — it was showing other
+   * people's alerts.
+   *
+   * Asking a question stays free and account-free. This removes only what an
+   * account is a prerequisite for.
+   */
+  const signedUp = Boolean(user) && !user!.anonymous;
+  const visible = items.filter((i) => (!i.roles || i.roles.includes(role)) && (!i.account || signedUp));
 
   return (
     <>

@@ -425,7 +425,15 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
           <div className="flex gap-2">
             <label className="btn btn-ghost h-11 cursor-pointer" id="envoyer">
               <IconImage size={18} /> <span className="hidden sm:inline">{t("addPhoto")}</span>
-              <input type="file" accept="image/*,video/*" multiple capture="environment" className="sr-only" onChange={(e) => setImages((prev) => [...prev, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
+              {/*
+                Naming the formats rather than asking for image/* is what makes
+                iOS hand over a JPEG instead of the HEIC its camera saves. HEIC
+                is still listed so that a photograph already in the gallery can
+                be chosen rather than hidden — the server converts that one. The
+                order matters: the first type is what the platform transcodes to
+                when it offers.
+              */}
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm" multiple capture="environment" className="sr-only" onChange={(e) => setImages((prev) => [...prev, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
             </label>
             <button type="submit" disabled={busy || (!text.trim() && images.length === 0)} className="btn btn-primary h-11 min-w-[110px]">
               {t("send")}

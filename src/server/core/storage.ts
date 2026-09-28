@@ -119,6 +119,11 @@ const EXT: Record<string, string> = {
   "audio/wav": "wav",
   "audio/x-wav": "wav",
   "image/jpeg": "jpg",
+  // What a phone's camera actually saves. Converted to JPEG on the way in — see
+  // src/server/core/images.ts — so these extensions are only ever reached if a
+  // caller stores one deliberately without normalising it first.
+  "image/heic": "heic",
+  "image/heif": "heif",
   "image/png": "png",
   "image/webp": "webp",
   "video/mp4": "mp4",
@@ -165,6 +170,11 @@ const MAGIC: Record<string, Array<{ offset: number; bytes: number[] }>> = {
   ],
   // %PDF-
   "application/pdf": [{ offset: 0, bytes: [0x25, 0x50, 0x44, 0x46, 0x2d] }],
+  // ISO base media container: "ftyp" at offset 4. The brand that follows says
+  // which flavour, and looksLikeHeic() in images.ts checks it properly; here it
+  // is enough that the file is an ISO-BMFF container and not something else.
+  "image/heic": [{ offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] }],
+  "image/heif": [{ offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] }],
 };
 
 /** True when the bytes are consistent with the declared type, or unchecked. */

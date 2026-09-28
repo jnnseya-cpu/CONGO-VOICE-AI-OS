@@ -4,6 +4,7 @@ import { handle, paging } from "@server/core/api";
 import { badRequest } from "@server/core/errors";
 import { hasPermission } from "@server/core/rbac";
 import { isAllowedMime, kindFromMime, storeUpload } from "@server/core/storage";
+import { IMAGE_UNREADABLE, needsJpegConversion, normaliseImage } from "@server/core/images";
 import { env } from "@server/core/env";
 import { schema } from "@server/db/client";
 import { runInteraction } from "@server/ai/agents/orchestrator";
@@ -46,9 +47,34 @@ export const POST = handle({ permission: "interaction:create", limit: "ai" }, as
     }
     for (const entry of form.getAll("images")) {
       if (!(entry instanceof File) || entry.size === 0) continue;
-      const mime = entry.type.split(";")[0];
-      if (!isAllowedMime(mime) || (!mime.startsWith("image/") && !mime.startsWith("video/"))) throw badRequest(`Format non pris en charge : ${mime}`);
-      const data = Buffer.from(await entry.arrayBuffer());
+      const declared = entry.type.split(";")[0];
+      const raw = Buffer.from(await entry.arrayBuffer());
+
+      /**
+       * A photograph is normalised before anything else looks at it.
+       *
+       * The camera on the phone in the citizen's hand saves HEIC, no vision
+       * provider reads HEIC, and refusing it told a farmer his own camera's
+       * format was "non pris en charge" — which is true and useless. Converting
+       * here means the file that is stored, shown to a worker and sent to a
+       * model is the same JPEG.
+       */
+      let data = raw;
+      let mime = declared;
+      if (declared.startsWith("image/") || needsJpegConversion(raw, declared)) {
+        try {
+          const normalised = await normaliseImage(raw, declared || "image/jpeg");
+          data = normalised.data;
+          mime = normalised.mimeType;
+        } catch (err) {
+          console.warn("[interactions] a photograph could not be decoded", err instanceof Error ? err.message : err);
+          throw badRequest(IMAGE_UNREADABLE[user.language] ?? IMAGE_UNREADABLE.fr);
+        }
+      }
+
+      if (!isAllowedMime(mime) || (!mime.startsWith("image/") && !mime.startsWith("video/"))) {
+        throw badRequest(IMAGE_UNREADABLE[user.language] ?? IMAGE_UNREADABLE.fr);
+      }
       const stored = await storeUpload(data, mime, "evidence");
       const [f] = await db.insert(schema.files).values({ userId: user.userId, kind: kindFromMime(mime), storageKey: stored.key, mimeType: mime, sizeBytes: stored.sizeBytes, sha256: stored.sha256 }).returning();
       if (mime.startsWith("image/")) images.push({ data, mimeType: mime, fileId: f.id });

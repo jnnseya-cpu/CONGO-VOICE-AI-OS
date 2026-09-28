@@ -168,7 +168,37 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     let sttLanguage: LanguageCode | null = null;
     let sttConfidence: number | null = null;
     if (input.audio) {
-      const stt = await aiGateway().transcribe({ audio: input.audio.data, mimeType: input.audio.mimeType, languageHint: input.user?.language ?? null }, { interactionId });
+      /**
+       * Speech recognition failing is not the turn failing.
+       *
+       * Every provider being unreachable, a quota exhausted, a container format
+       * the provider will not take — all of these threw out of here and fell into
+       * the catch at the bottom, which answered "Le service est momentanément
+       * indisponible, réessayez dans quelques instants". For a voice note that is
+       * also the end of the road: there is no typed text, so the deterministic
+       * danger-sign fallback has nothing to read and cannot fire either.
+       *
+       * An empty transcript already has a good answer a few lines below — it
+       * tells the citizen what to do and offers writing instead — so a failure
+       * here is turned into that, and the recording itself is kept on the
+       * interaction so nothing the person said is lost.
+       */
+      const stt = await aiGateway()
+        .transcribe({ audio: input.audio.data, mimeType: input.audio.mimeType, languageHint: input.user?.language ?? null }, { interactionId })
+        .catch(async (err: unknown) => {
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error(`[orchestrator] speech recognition failed (${input.audio?.mimeType ?? "unknown format"}):`, reason);
+          await save({ errorMessage: `stt_failed: ${reason}`.slice(0, 500) }).catch(() => undefined);
+          await audit({
+            action: "interaction.stt_failed",
+            actorUserId: userId,
+            entityType: "interaction",
+            entityId: interactionId,
+            systemEvent: "stt_failure",
+            after: { mimeType: input.audio?.mimeType ?? null, reason: reason.slice(0, 200) },
+          });
+          return { text: "", language: null, confidence: null };
+        });
       if (stt.text.trim()) {
         transcript = transcript ? `${stt.text.trim()}\n${transcript}` : stt.text.trim();
         sttLanguage = stt.language ?? null;
