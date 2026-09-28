@@ -7,6 +7,7 @@ import { EMERGENCY_INSTRUCTIONS, FACILITY_UNKNOWN_NOTE, detectRoutingDangerSigns
 import { useLanguage } from "../shell/LanguageProvider";
 import { IconImage, IconMic, IconSpinner, IconStop, IconThumbDown, IconThumbUp, IconVolume, IconX } from "../icons";
 import { AnswerPanel } from "./AnswerPanel";
+import { shrinkPhoto, uploadDeadlineMs } from "@client/lib/shrink-photo";
 
 interface Turn {
   id: string;
@@ -48,8 +49,17 @@ function subscribeToConnection(onChange: () => void): () => void {
   };
 }
 
-/** How long the handset waits before deciding the request will not arrive. */
-const REQUEST_TIMEOUT_MS = 45_000;
+/**
+ * How long the handset waits before deciding the request will not arrive.
+ *
+ * Proportional to what is being sent — see uploadDeadlineMs. A flat deadline
+ * aborted photograph uploads that were still in progress.
+ */
+function payloadBytes(form: FormData): number {
+  let total = 0;
+  for (const [, value] of form) total += value instanceof File ? value.size : value.length;
+  return total;
+}
 
 /**
  * One attempt at sending a turn, with a deadline.
@@ -61,7 +71,7 @@ const REQUEST_TIMEOUT_MS = 45_000;
  */
 async function postInteraction(form: FormData): Promise<InteractionResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), uploadDeadlineMs(payloadBytes(form)));
   try {
     const res = await fetch("/api/v1/interactions", { method: "POST", body: form, signal: controller.signal });
     const json = (await res.json()) as InteractionResult | { error: { message: string } };
@@ -433,7 +443,12 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
                 order matters: the first type is what the platform transcodes to
                 when it offers.
               */}
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm" multiple capture="environment" className="sr-only" onChange={(e) => setImages((prev) => [...prev, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm" multiple capture="environment" className="sr-only" onChange={(e) => {
+                const picked = Array.from(e.target.files ?? []);
+                // Shrink before it is queued, so the size shown and the size
+                // sent are the same and the deadline is computed on the truth.
+                void Promise.all(picked.map(shrinkPhoto)).then((ready) => setImages((prev) => [...prev, ...ready].slice(0, 5)));
+              }} />
             </label>
             <button type="submit" disabled={busy || (!text.trim() && images.length === 0)} className="btn btn-primary h-11 min-w-[110px]">
               {t("send")}

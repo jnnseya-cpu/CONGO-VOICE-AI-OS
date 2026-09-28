@@ -27,7 +27,7 @@ import type { NextConfig } from "next";
  * runtime string. Declared once: the same list marks them external and pulls
  * their dependency trees into the image, so the two cannot disagree.
  */
-const EXTERNAL_PACKAGES = ["@electric-sql/pglite", "pg", "pdfkit", "exceljs", "@google-cloud/storage"];
+const EXTERNAL_PACKAGES = ["@electric-sql/pglite", "pg", "pdfkit", "exceljs", "@google-cloud/storage", "sharp", "heic-decode"];
 
 function runtimeClosure(entry: string, root = process.cwd()): string[] {
   const found = new Set<string>();
@@ -53,8 +53,18 @@ function runtimeClosure(entry: string, root = process.cwd()): string[] {
     if (name.startsWith("@types/")) return;
     found.add(name);
     try {
-      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-      for (const dep of Object.keys(pkg.dependencies ?? {})) walk(dep, dir);
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+        dependencies?: Record<string, string>;
+        optionalDependencies?: Record<string, string>;
+      };
+      // Optional dependencies as well as required ones. sharp ships its native
+      // libvips as one optional package per platform and requires whichever
+      // matches at runtime; walking only `dependencies` would carry the
+      // JavaScript and leave the decoder behind — the same shape of fault as
+      // the missing WebAssembly it was brought in to replace. `locate` returns
+      // null for the twenty-odd platforms npm did not install, so they cost
+      // nothing.
+      for (const dep of Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies })) walk(dep, dir);
     } catch {
       /* a package without a readable manifest carries nothing further */
     }

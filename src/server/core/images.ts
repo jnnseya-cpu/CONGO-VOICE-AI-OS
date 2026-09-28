@@ -7,21 +7,47 @@ import "server-only";
  * answered "Format non pris en charge : image/heic". HEIC is what an iPhone and
  * most recent Android cameras save by default, and the agriculture module exists
  * to look at photographs of crops, so the one format the camera produces was the
- * one format refused. The allowlist had jpeg, png and webp and nothing else.
+ * one format refused.
  *
- * Refusing it is not an option a citizen can act on — they cannot change their
- * camera's format from inside this app, and telling them to is asking a farmer
- * to go into iOS settings before they can ask about their field. So the file is
- * accepted and converted here, once, on the way in. What is stored and what the
- * vision model sees is a JPEG; no model provider accepts HEIC either, so the
- * conversion would be needed even if storage did.
+ * Accepting it was only half the job, and the half that shipped was the wrong
+ * half. The decode ran through libheif compiled to WebAssembly, and the bundler
+ * inlined the emscripten glue while leaving `libheif.wasm` behind: the built
+ * image referenced a path that did not exist in the container. Every photograph
+ * reached a decoder that could not load, and the citizen watched the connection
+ * die rather than getting an answer. Hence EXTERNAL_PACKAGES in next.config.ts,
+ * which keeps the package whole on disk instead of inlined into a chunk.
  *
- * Not verified in this container: decoding a genuine camera HEIC. No HEIC
- * encoder is available here to produce a real one, so the tests cover detection,
- * routing and the failure path, and a real photograph from a real phone remains
- * unproven until someone attaches one. The failure path is written on the
- * assumption that it will sometimes be needed.
+ * Two decoders, because neither does the whole job:
+ *
+ *   - HEIC from a camera is HEVC-coded, and the libvips inside sharp is built
+ *     with AV1 only — HEVC is patent-encumbered, so the prebuilt binaries leave
+ *     it out. sharp reads the container and reports "heif 1280x854" but cannot
+ *     decode a pixel of it, which is a trap: the header parse looks exactly like
+ *     success. libheif, via heic-decode, does the actual decode.
+ *   - Everything else — JPEG, PNG, WebP, AVIF — sharp decodes natively, and it
+ *     does the resize and re-encode for all of them including HEIC.
+ *
+ * Both halves are proven against tests/fixtures/camera-photo.heic, a genuine
+ * HEVC-coded HEIC, by the test suite and again by scripts/check-standalone.mjs
+ * against the built artefact. The artefact check is the one that matters: it is
+ * what turned this comment from an assumption into a fact, and it is what
+ * caught sharp being unable to decode HEVC after this file had already been
+ * rewritten to depend on it.
  */
+
+const MAX_EDGE = 2048;
+
+/**
+ * The most pixels worth decoding.
+ *
+ * Not a preference — a memory bound. Cloud Run gives this service one vCPU and
+ * a gigabyte, sixteen requests at a time; a decoded image costs four bytes a
+ * pixel before anything is done with it, so an unbounded decode is how a phone
+ * camera takes the instance down and every other caller's turn with it. 80
+ * megapixels clears any handset on sale and refuses a crafted header claiming
+ * four billion.
+ */
+const MAX_INPUT_PIXELS = 80_000_000;
 
 /** What a phone calls its own photographs. */
 export const HEIC_MIME_TYPES: ReadonlySet<string> = new Set([
@@ -59,20 +85,92 @@ export interface NormalisedImage {
   mimeType: string;
   /** True when the bytes were re-encoded on the way in. */
   converted: boolean;
+  width: number;
+  height: number;
+}
+
+/**
+ * One decode at a time, per instance.
+ *
+ * Bounding a single image is not enough when sixteen requests share a gigabyte:
+ * the bound has to hold across callers, or sixteen lawful photographs do what
+ * one unlawful one could not. Queueing costs a few seconds under load and keeps
+ * the instance alive, which is the better trade for everyone in the queue.
+ */
+let decoding: Promise<unknown> = Promise.resolve();
+function serialised<T>(work: () => Promise<T>): Promise<T> {
+  const next = decoding.then(work, work);
+  // Never let one caller's failure reject the next caller's turn.
+  decoding = next.then(() => undefined, () => undefined);
+  return next;
 }
 
 /**
  * Returns a picture every downstream component can read.
  *
- * Quality is set high because the subject is a leaf lesion or a rash, and the
- * thing being looked for is often a few pixels of discolouration; the file is
- * already bounded by the upload limit.
+ * Three things happen on the way through, and each is here for a reason.
+ *
+ * `rotate()` with no argument applies the EXIF orientation and then drops the
+ * tag. Phones record orientation rather than rotating the pixels, so a rash
+ * photographed in portrait arrives on its side; a health worker reading it
+ * sideways, or a model describing it sideways, is a real cost for one call.
+ * HEIC does not need it: libheif has already applied the container's rotation.
+ *
+ * Resizing to 2048 on the long edge is the memory bound made permanent. A leaf
+ * lesion and a skin lesion are both legible well below it, and every vision
+ * provider downscales further before looking, so the pixels being discarded are
+ * ones no one would have seen — while the bytes saved are bytes that would
+ * otherwise cross a mobile link and sit in storage for the retention period.
+ *
+ * Re-encoding drops every other EXIF field with the orientation, and that
+ * includes GPS. A phone stamps a photograph with where it was taken; a
+ * photograph of a sick child, carrying the household's coordinates, is not
+ * something this platform should hold because a camera put it there by default.
+ * Location is recorded when the citizen gives it, at the province level the
+ * service actually uses.
  */
 export async function normaliseImage(data: Buffer<ArrayBuffer>, mime: string): Promise<NormalisedImage> {
-  if (!needsJpegConversion(data, mime)) return { data, mimeType: mime, converted: false };
-  const convert = (await import("heic-convert")).default;
-  const out = await convert({ buffer: new Uint8Array(data), format: "JPEG", quality: 0.92 });
-  return { data: Buffer.from(out), mimeType: "image/jpeg", converted: true };
+  const sharp = (await import("sharp")).default;
+  const heic = needsJpegConversion(data, mime);
+
+  return serialised(async () => {
+    /**
+     * Read the dimensions before decoding anything.
+     *
+     * sharp parses the container without decoding the pixels, which makes this
+     * the cheap half of the memory bound: a header claiming forty thousand
+     * pixels a side is refused for the price of reading a few hundred bytes,
+     * rather than for the price of trying.
+     */
+    const probe = await sharp(data, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+    if ((probe.width ?? 0) * (probe.height ?? 0) > MAX_INPUT_PIXELS) {
+      throw new Error(`image too large to decode: ${probe.width}x${probe.height}`);
+    }
+
+    let pipeline;
+    if (heic) {
+      // libheif returns pixels with the container's rotation already applied,
+      // so there is no EXIF orientation left to honour on this path.
+      const decode = (await import("heic-decode")).default;
+      const raw = await decode({ buffer: new Uint8Array(data) });
+      pipeline = sharp(Buffer.from(raw.data), { raw: { width: raw.width, height: raw.height, channels: 4 } });
+    } else {
+      pipeline = sharp(data, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" }).rotate();
+    }
+
+    const out = await pipeline
+      .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer({ resolveWithObject: true });
+
+    return {
+      data: out.data as Buffer<ArrayBuffer>,
+      mimeType: "image/jpeg",
+      converted: true,
+      width: out.info.width,
+      height: out.info.height,
+    };
+  });
 }
 
 /**

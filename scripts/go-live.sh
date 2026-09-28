@@ -459,6 +459,16 @@ SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 #
 # --cpu-boost shortens the cold start, which on a voice turn is the difference a
 # caller actually notices.
+#
+# Two gigabytes rather than one because of photographs. Decoding a HEIC means
+# holding it uncompressed — four bytes a pixel, so roughly fifty megabytes for a
+# twelve-megapixel phone picture — on top of Node, Next and the connection pool,
+# and sixteen requests share the instance. src/server/core/images.ts caps the
+# input at eighty megapixels and decodes one at a time so the peak is bounded
+# and predictable rather than a function of who uploads at once; this is the
+# headroom that bound needs to sit inside. An instance killed for memory takes
+# every other caller's turn down with it, and it does so silently: the citizen
+# sees the connection drop, which is what happened here.
 if ! gc run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -467,7 +477,7 @@ if ! gc run deploy "$SERVICE" \
   --subnet="$NETWORK" \
   --vpc-egress=private-ranges-only \
   --port=8080 \
-  --cpu=1 --memory=1Gi \
+  --cpu=1 --memory=2Gi \
   --cpu-boost \
   --concurrency="${CONCURRENCY:-16}" \
   --timeout="${REQUEST_TIMEOUT:-3600}" \

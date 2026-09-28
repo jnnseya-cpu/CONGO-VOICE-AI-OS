@@ -140,7 +140,11 @@ export interface ClarificationPlan {
   reasons: string[];
 }
 
-export function planClarification(reading: LanguageReading, roundsAlreadyAsked = 0): ClarificationPlan {
+export function planClarification(
+  reading: LanguageReading,
+  roundsAlreadyAsked = 0,
+  opts: { detailIsTrustworthy?: boolean } = {},
+): ClarificationPlan {
   const questions: string[] = [];
   const reasons: string[] = [];
 
@@ -148,9 +152,22 @@ export function planClarification(reading: LanguageReading, roundsAlreadyAsked =
     questions.push(languageConfirmationPrompt(reading));
     reasons.push("langue_incertaine");
   }
-  for (const element of elementsNeedingConfirmation(reading)) {
-    questions.push(elementConfirmationPrompt(element));
-    reasons.push(`element_incertain:${element.kind}`);
+  /**
+   * Reading a detail back only helps when the detail came from the citizen.
+   *
+   * A looping transcription repeats whatever it latched onto, and the platform
+   * asked someone "J'ai entendu « ST' 501 » pour le nombre. Est-ce correct ?" —
+   * a number the speech model invented, put to a sick person as though they had
+   * said it. When the transcript cannot be trusted at that resolution there is
+   * nothing to confirm; the turn asks them to say it again instead.
+   */
+  if (opts.detailIsTrustworthy !== false) {
+    for (const element of elementsNeedingConfirmation(reading)) {
+      questions.push(elementConfirmationPrompt(element));
+      reasons.push(`element_incertain:${element.kind}`);
+    }
+  } else {
+    reasons.push("transcription_degradee");
   }
 
   // Two rounds is the whole budget. A third would be the system failing slowly

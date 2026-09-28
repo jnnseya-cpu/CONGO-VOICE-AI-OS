@@ -36,6 +36,7 @@ import { confidenceVector, planClarification, type ConfidenceVector } from "../l
 import { toSpokenText } from "../language/voice";
 import { scriptText } from "../language/scripts";
 import { languageMode, type LanguageStatus } from "../language/gates";
+import { assessTranscript } from "@shared/transcription";
 
 export interface InteractionInput {
   user: { userId: string; role: Role; language: LanguageCode; province?: string | null } | null;
@@ -167,6 +168,8 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
     let transcript = (input.text ?? "").trim();
     let sttLanguage: LanguageCode | null = null;
     let sttConfidence: number | null = null;
+    /** True when the transcript looped and its detail cannot be trusted. */
+    let transcriptDegraded = false;
     if (input.audio) {
       /**
        * Speech recognition failing is not the turn failing.
@@ -199,10 +202,39 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
           });
           return { text: "", language: null, confidence: null };
         });
-      if (stt.text.trim()) {
-        transcript = transcript ? `${stt.text.trim()}\n${transcript}` : stt.text.trim();
+      /**
+       * A transcript the model invented is not a message.
+       *
+       * Whisper answers unusable audio with subtitle-shaped text rather than
+       * silence. "Sous-titrage ST' 501" reached a citizen as their own words,
+       * was classified, opened a case, alerted a community health worker and
+       * came back asking them to confirm they had said "ST' 501". Treating it
+       * as nothing heard sends them to the "say it again, or write it" path a
+       * few lines below, which is what the audio actually warranted.
+       *
+       * The raw text is still saved: a transcript this platform threw away is
+       * something a reviewer needs to be able to see.
+       */
+      const assessment = assessTranscript(stt.text);
+      if (assessment.verdict === "artefact") {
+        await audit({
+          action: "interaction.transcript_discarded",
+          actorUserId: userId,
+          entityType: "interaction",
+          entityId: interactionId,
+          systemEvent: "transcript_artefact",
+          after: { raw: stt.text.slice(0, 200), artefacts: assessment.artefacts, repetition: assessment.repetition },
+        });
+      }
+      const heard = assessment.verdict === "artefact" ? "" : assessment.cleaned.trim();
+      if (heard) {
+        transcript = transcript ? `${heard}\n${transcript}` : heard;
         sttLanguage = stt.language ?? null;
-        sttConfidence = stt.confidence ?? null;
+        // A looping transcript contains the sentence once and then noise. It is
+        // worth answering, but never worth being confident about, and the
+        // clarifying questions must not read its numbers back.
+        sttConfidence = assessment.verdict === "repetitive" ? Math.min(stt.confidence ?? 0.3, 0.3) : (stt.confidence ?? null);
+        transcriptDegraded = assessment.verdict === "repetitive";
         transcriptForFallback = transcript;
       }
       await save({ transcript, status: "processing" });
@@ -354,7 +386,7 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
      * the instruction goes out first.
      */
     const emergency = risk.level === "critical";
-    const clarification = emergency ? { questions: [], routeToHuman: false, reasons: [] } : planClarification(lang);
+    const clarification = emergency ? { questions: [], routeToHuman: false, reasons: [] } : planClarification(lang, 0, { detailIsTrustworthy: !transcriptDegraded });
     if (!emergency && clarification.questions.length > 0) {
       actionFr += ` ${clarification.questions[0]}`;
     } else if (!emergency && risk.lowConfidence && risk.confidenceBand !== "caution") {
