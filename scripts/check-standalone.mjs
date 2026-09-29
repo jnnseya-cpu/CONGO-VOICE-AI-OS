@@ -125,7 +125,17 @@ for (const [rel, why] of REQUIRED_FILES) {
 async function decodesARealPhotograph() {
   const fixture = join(ROOT, "tests", "fixtures", "camera-photo.heic");
   if (!existsSync(fixture)) {
-    console.log("  MISS tests/fixtures/camera-photo.heic — the HEIC the decode check needs");
+    /**
+     * Absent here almost always means absent from the build context, not
+     * deleted from the repository — and that failure has already cost a day.
+     * .dockerignore excluded the whole tests directory, so this check ran
+     * inside the image build, could not find the file, and failed the build.
+     * Every deploy stopped, with "build step 0 docker failed" and nothing
+     * saying why. So the message names the file that decides it.
+     */
+    console.log("  MISS tests/fixtures/camera-photo.heic — the HEIC this check decodes");
+    console.log("       If the repository has it, the build context does not: see");
+    console.log("       .dockerignore, which must keep the `!tests/fixtures` exception.");
     return false;
   }
 

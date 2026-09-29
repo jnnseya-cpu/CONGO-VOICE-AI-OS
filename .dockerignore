@@ -7,6 +7,21 @@ data
 screenshots-blog
 docs
 tests
+# …except the fixtures, which the build itself needs.
+#
+# scripts/check-standalone.mjs runs as postbuild and decodes a real HEIC with
+# the copies of the decoders that are in .next/standalone. Excluding the whole
+# tests directory meant the file was absent inside the image build, so the check
+# reported it missing and failed — and the Docker build with it. Every deploy
+# stopped, and the recovery endpoint could not reach production because no image
+# carrying it was ever produced.
+#
+# The right fix is to carry the fixture rather than to soften the check. The
+# Docker build is the artefact that gets deployed; a check that cannot run there
+# is a check that does not run where it matters. It costs 718 KB in the build
+# stage and nothing in the runtime image, which copies only .next/standalone.
+!tests/fixtures
+!tests/fixtures/**
 *.md
 !README.md
 .env
