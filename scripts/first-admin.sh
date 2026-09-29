@@ -25,7 +25,8 @@ set -uo pipefail
 PROJECT="${PROJECT:-congo-voice}"
 REGION="${REGION:-africa-south1}"
 ENVIRONMENT="${ENVIRONMENT:-pilot}"
-SERVICE="congovoice-${ENVIRONMENT}"
+NAME="congovoice-${ENVIRONMENT}"
+SERVICE="$NAME"
 
 step() { printf '\n\033[1m── %s\033[0m\n' "$*"; }
 note() { printf '   %s\n' "$*"; }
@@ -39,25 +40,53 @@ URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='value(sta
 note "service: $URL"
 
 step "Reading the bootstrap token the service already has"
-TOKEN=$(gc secrets versions access latest --secret=bootstrap_token 2>/dev/null) \
-  || die "Could not read the secret 'bootstrap_token'. Check its name with: gcloud secrets list --project=$PROJECT"
-[[ -n "$TOKEN" ]] || die "The secret is empty."
-note "read (not printed)"
+#
+# scripts/go-live.sh names every secret "${NAME}-${key}", so the one attached as
+# BOOTSTRAP_TOKEN is congovoice-<environment>-bootstrap_token. This script looked
+# for a bare "bootstrap_token" and stopped, which is a script bug rather than
+# anything wrong with the deployment. Both names are tried, and if neither is
+# readable the actual list is printed rather than a guess.
+TOKEN=""
+for candidate in ${SECRET_NAME:+"$SECRET_NAME"} "${NAME}-bootstrap_token" "bootstrap_token"; do
+  if TOKEN=$(gc secrets versions access latest --secret="$candidate" 2>/dev/null) && [[ -n "$TOKEN" ]]; then
+    note "read from ${candidate} (value not printed)"
+    break
+  fi
+  TOKEN=""
+done
+if [[ -z "$TOKEN" ]]; then
+  printf '\n'
+  note "Could not read a bootstrap token secret. These exist in ${PROJECT}:"
+  gc secrets list --format='value(name)' 2>/dev/null | sed 's/^/     /' || note "  (could not list secrets either — check permissions)"
+  printf '\n'
+  die "Pass the right one explicitly:  SECRET_NAME=<name> bash scripts/first-admin.sh"
+fi
 
 step "The administrator account"
 note "The code is 6 to 12 characters. Letters are allowed, but NOT more than 12"
 note "characters — a longer password is refused, and that refusal is the most"
 note "likely reason there is no account now."
 read -r -p "   Phone number, with country code (e.g. +447952030184): " PHONE
-read -r -p "   Name: " NAME
+# +7952030184 was typed once where +447952030184 was meant — the country code
+# fell off, the lookup found nothing, and the answer was indistinguishable from
+# a wrong code. Ten digits or fewer after the + is almost certainly that.
+DIGITS=$(printf '%s' "$PHONE" | tr -cd '0-9')
+if [[ ${#DIGITS} -lt 11 ]]; then
+  note "That is ${#DIGITS} digits: ${PHONE}"
+  note "A number with its country code is usually 11 to 15. Check the country"
+  note "code is there — a UK number is +44 then 10 digits."
+  read -r -p "   Use it anyway? [y/N] " CONFIRM
+  [[ "$CONFIRM" == "y" || "$CONFIRM" == "Y" ]] || die "Stopped. Nothing was sent."
+fi
+read -r -p "   Your name: " ADMIN_NAME
 read -r -s -p "   Code (6-12 characters): " PIN; echo
 read -r -s -p "   Again: " PIN2; echo
 [[ "$PIN" == "$PIN2" ]] || die "The two codes do not match."
 [[ ${#PIN} -ge 6 && ${#PIN} -le 12 ]] || die "The code is ${#PIN} characters. It must be 6 to 12."
-[[ -n "$PHONE" && -n "$NAME" ]] || die "The number and the name are both required."
+[[ -n "$PHONE" && -n "$ADMIN_NAME" ]] || die "The number and the name are both required."
 
 step "Asking the service"
-BODY=$(PHONE="$PHONE" PIN="$PIN" NAME="$NAME" python3 -c 'import json,os; print(json.dumps({"phone":os.environ["PHONE"],"pin":os.environ["PIN"],"name":os.environ["NAME"]}))')
+BODY=$(PHONE="$PHONE" PIN="$PIN" NAME="$ADMIN_NAME" python3 -c 'import json,os; print(json.dumps({"phone":os.environ["PHONE"],"pin":os.environ["PIN"],"name":os.environ["NAME"]}))')
 RESPONSE=$(curl -sS -X POST "${URL}/api/v1/system/bootstrap" \
   -H "content-type: application/json" -H "x-bootstrap-token: ${TOKEN}" \
   -w '\n%{http_code}' -d "$BODY")

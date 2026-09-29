@@ -102,8 +102,19 @@ disarm() {
 trap disarm EXIT
 
 step "The administrator to recover"
-read -r -p "   Phone number, exactly as registered (e.g. +243...): " PHONE
+read -r -p "   Phone number, exactly as registered (e.g. +447952030184): " PHONE
 [[ -n "$PHONE" ]] || die "No number given."
+# +7952030184 was typed once where +447952030184 was meant. The country code
+# fell off, nothing matched, and the answer was indistinguishable from a wrong
+# code — which is correct behaviour and useless to the person typing.
+DIGITS=$(printf '%s' "$PHONE" | tr -cd '0-9')
+if [[ ${#DIGITS} -lt 11 ]]; then
+  note "That is ${#DIGITS} digits: ${PHONE}"
+  note "A number with its country code is usually 11 to 15. A UK number is +44"
+  note "then 10 digits; a Congolese one is +243 then 9."
+  read -r -p "   Use it anyway? [y/N] " CONFIRM
+  [[ "$CONFIRM" == "y" || "$CONFIRM" == "Y" ]] || die "Stopped. Nothing was sent."
+fi
 read -r -s -p "   New code (6 to 12 characters, letters allowed): " PIN; echo
 read -r -s -p "   Again: " PIN2; echo
 [[ "$PIN" == "$PIN2" ]] || die "The two codes do not match."
