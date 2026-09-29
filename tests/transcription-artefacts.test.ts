@@ -92,3 +92,33 @@ describe("transcripts that are a real person speaking", () => {
     expect(a.cleaned).toContain("Mon bébé a la diarrhée depuis trois jours");
   });
 });
+
+describe("a decoder that locked onto one sentence", () => {
+  /** Verbatim, shown to a farmer asking about his field. */
+  const LOOP =
+    "Les enfants de la République démocratique du Congo ont besoin d'un soutien médical et d'un soutien sanitaire. " +
+    "Les enfants de la République démocratique du Congo ont besoin d'un soutien médical et d'un soutien sanitaire. " +
+    "Les enfants de la République démocratique du Congo ont besoin d'un soutien médical et d'un soutien sanitaire. " +
+    "Les enfants de la République démocratique du Congo ont besoin d'un soutien médical et d'un soutien sanitaire.";
+
+  it("is nothing heard, not a quiet message", () => {
+    const a = assessTranscript(LOOP);
+    expect(a.verdict).toBe("artefact");
+    expect(a.cleaned).toBe("");
+  });
+
+  it("does not catch somebody repeating a short plea", () => {
+    // Distress sounds like this, and it must reach a person.
+    expect(assessTranscript("Aidez-moi. Aidez-moi. Aidez-moi.").verdict).not.toBe("artefact");
+  });
+
+  it("does not catch a message that repeats itself but says more", () => {
+    const real =
+      "Mon enfant a de la fièvre depuis trois jours et ne veut pas manger. " +
+      "Mon enfant a de la fièvre depuis trois jours et ne veut pas manger. " +
+      "Il respire vite aussi.";
+    const a = assessTranscript(real);
+    expect(a.verdict).not.toBe("artefact");
+    expect(a.cleaned).toContain("respire vite");
+  });
+});

@@ -238,6 +238,25 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
        * something a reviewer needs to be able to see.
        */
       const assessment = assessTranscript(stt.text);
+      /**
+       * One line per voice turn, saying what actually came back.
+       *
+       * "Nous n'avons pas pu comprendre votre message vocal" is produced by
+       * three different situations — the provider refused, the words were the
+       * model's own invention and were discarded, or nothing was heard — and
+       * from the outside they are identical. A citizen should not be told the
+       * difference; whoever is running the platform cannot fix it without
+       * knowing it. The recording's size is here because an empty or
+       * near-silent upload is the one cause that is not in the server at all,
+       * and nothing else distinguishes it.
+       */
+      console.log(
+        `[stt] ${recording.mimeType} ${recording.data.length}B via ${"providerKey" in stt ? stt.providerKey : "unknown"} → ` +
+          `${stt.text.length} chars, verdict=${assessment.verdict}` +
+          (assessment.artefacts.length ? `, artefacts=${assessment.artefacts.join("|")}` : "") +
+          (assessment.repetition > 0 ? `, repetition=${assessment.repetition.toFixed(2)}` : "") +
+          (stt.confidence !== null && stt.confidence !== undefined ? `, confidence=${stt.confidence}` : ""),
+      );
       if (assessment.verdict === "artefact") {
         await audit({
           action: "interaction.transcript_discarded",
@@ -270,6 +289,9 @@ export async function runInteraction(input: InteractionInput): Promise<Interacti
         sw: "Hatukuweza kuelewa ujumbe wako wa sauti. Jaribu tena karibu na simu, au andika swali lako.",
         lua: "Katuvua mua kumvua mukenji webe. Teta kabidi pabuipi ne telefone, anyi funda lukonko luebe.",
       };
+      console.warn(
+        `[stt] nothing usable to answer: audio=${input.audio ? "yes" : "no"}, images=${input.images?.length ?? 0}, typed=${(input.text ?? "").trim().length} chars`,
+      );
       await save({ status: "failed", errorMessage: "empty_transcript", latencyMs: Date.now() - started });
       await audit({ action: "interaction.failed", actorUserId: userId, entityType: "interaction", entityId: interactionId, systemEvent: "empty_transcript" });
       return failedOutput(interactionId, language, msg[language], started);

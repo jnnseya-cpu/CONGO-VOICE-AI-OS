@@ -94,27 +94,35 @@ export class OpenAiProvider implements LlmProvider, SttProvider, TtsProvider {
   private static readonly WHISPER_LANGUAGES: ReadonlySet<LanguageCode> = new Set<LanguageCode>(["fr", "sw", "ln"]);
 
   /**
-   * What the audio is expected to contain.
+   * No domain prompt, and no temperature override. Both were tried here and
+   * both made things worse; this comment is the record of why they are absent.
    *
-   * Whisper was trained on subtitle tracks, so with nothing to go on it decodes
-   * unclear audio towards subtitle text — caption credits and sign-offs to an
-   * audience. Naming the domain moves the prior somewhere useful. It is a
-   * nudge, not a guarantee: src/shared/transcription.ts catches what still gets
-   * through, and has to, because this cannot be relied on.
+   * Whisper's `prompt` biases the decoder towards the words it contains. The
+   * intention was to steer it away from subtitle text, and it worked — it
+   * steered it towards the prompt instead. Given audio it could not parse, it
+   * produced "Les enfants de la République démocratique du Congo ont besoin
+   * d'un soutien médical et d'un soutien sanitaire", four times, to a farmer
+   * asking about his field. That is a far more dangerous failure than the
+   * caption credit it replaced: a subtitle credit is visibly not the citizen
+   * speaking, and a plausible sentence about sick children is not. Priming a
+   * speech model with the domain it is about to be wrong in makes its
+   * inventions look like the real thing.
+   *
+   * `temperature: 0` was the other half of the same mistake. Greedy decoding
+   * is what gets Whisper stuck repeating a clause until the audio runs out;
+   * the temperature fallback it applies on its own is the mechanism that
+   * escapes those loops, and switching it off removed the escape. The four
+   * identical sentences above are that.
+   *
+   * What is left is the transcript as the model would give it to anybody, and
+   * src/shared/transcription.ts deciding afterwards whether it is speech.
+   * Judging the output is sound; steering it towards a plausible answer is not.
    */
-  private static readonly DOMAIN_PROMPT =
-    "Message vocal d'un habitant de la République démocratique du Congo posant une question de santé, d'agriculture ou d'éducation : symptômes, grossesse, enfant malade, vaccination, culture, semis, maladie des plantes, école.";
-
   async transcribe(req: TranscribeRequest): Promise<TranscribeResult> {
     const form = new FormData();
     form.append("file", new Blob([new Uint8Array(req.audio)], { type: req.mimeType }), "voice." + (req.mimeType.split("/")[1] ?? "webm"));
     form.append("model", this.sttModel);
     form.append("response_format", "verbose_json");
-    form.append("prompt", OpenAiProvider.DOMAIN_PROMPT);
-    // Greedy decoding. The temperature fallback Whisper applies on its own is
-    // what produces the repeated-clause loops; at zero it returns a short
-    // result instead of inventing a long one.
-    form.append("temperature", "0");
     if (req.languageHint && OpenAiProvider.WHISPER_LANGUAGES.has(req.languageHint)) form.append("language", ISO[req.languageHint]);
     const res = await fetch(`${this.baseUrl}/audio/transcriptions`, { method: "POST", headers: this.headers(), body: form });
     const json = (await res.json().catch(() => ({}))) as {

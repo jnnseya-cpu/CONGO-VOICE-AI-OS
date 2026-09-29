@@ -129,6 +129,7 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
+  const peakRef = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const draftKey = `console:${module}`;
@@ -196,7 +197,27 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
       rec.onstop = () => {
         stream.getTracks().forEach((tr) => tr.stop());
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-        if (blob.size > 0) submitRef.current({ audio: blob });
+        if (blob.size === 0) return;
+        /**
+         * Silence is not sent.
+         *
+         * A recording that carried no sound reaches the speech model as noise,
+         * and a speech model given noise does not return nothing — it returns
+         * its best guess at what noise of that length usually is, which is how
+         * a farmer asking about his field was shown four sentences about
+         * children needing medical care. Refusing here costs the citizen one
+         * message and saves them an answer to something they never said.
+         *
+         * The threshold is deliberately low. Someone speaking quietly, or at
+         * arm's length, or in Lingala into a cheap handset, must still get
+         * through; this is meant to catch a microphone that is muted, covered,
+         * or was never really granted.
+         */
+        if (peakRef.current < 0.015) {
+          setMicError(t("micSilent"));
+          return;
+        }
+        submitRef.current({ audio: blob });
       };
       rec.start(250);
       recorderRef.current = rec;
@@ -214,11 +235,14 @@ export function VoiceConsole({ module, accent, examples }: { module: ModuleType;
       analyser.fftSize = 512;
       src.connect(analyser);
       const data = new Uint8Array(analyser.frequencyBinCount);
+      peakRef.current = 0;
       const tick = () => {
         analyser.getByteTimeDomainData(data);
         let sum = 0;
         for (const v of data) sum += (v - 128) * (v - 128);
-        setLevel(Math.min(1, Math.sqrt(sum / data.length) / 40));
+        const now = Math.min(1, Math.sqrt(sum / data.length) / 40);
+        if (now > peakRef.current) peakRef.current = now;
+        setLevel(now);
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();

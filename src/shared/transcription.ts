@@ -167,6 +167,37 @@ export function repetitionRatio(text: string): number {
   return 1 - new Set(windows).size / windows.length;
 }
 
+/**
+ * One long sentence, said again and again, and nothing else.
+ *
+ * A farmer asked about his field and was shown, as his own words:
+ *
+ *   "Les enfants de la République démocratique du Congo ont besoin d'un
+ *    soutien médical et d'un soutien sanitaire." — four times, verbatim.
+ *
+ * repetitionRatio caught it and capped the confidence, which was right but not
+ * enough: the text still went to the agents as the citizen's message, and they
+ * answered it. There is nothing in there to answer. A decoder that has locked
+ * onto one clause and emitted it until the audio ran out has told us only that
+ * it could not hear.
+ *
+ * The rule is narrow on purpose. A long sentence — eight words or more —
+ * repeated word for word three times or more, with nothing else in the
+ * transcript. Somebody genuinely repeating themselves says short things
+ * ("aidez-moi, aidez-moi"), varies the wording, or says something else as
+ * well, and all three keep them out of this.
+ */
+function isDecoderLoop(text: string): boolean {
+  const sentences = text
+    .split(/(?<=[.!?])\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  if (sentences.length < 3) return false;
+  const distinct = new Set(sentences.map((t) => words(t).join(" ")));
+  if (distinct.size !== 1) return false;
+  return words(sentences[0]).length >= 8;
+}
+
 /** What the transcript turned out to be. */
 export type TranscriptVerdict = "usable" | "artefact" | "repetitive";
 
@@ -251,6 +282,8 @@ export function assessTranscript(text: string): TranscriptAssessment {
   cleaned = cleaned.replace(/\s+/g, " ").trim();
 
   const repetition = repetitionRatio(text);
+  // One sentence looped is not a short message; it is no message.
+  if (isDecoderLoop(text)) return { verdict: "artefact", artefacts, repetition, cleaned: "" };
   if (artefacts.length > 0 && meaningfulWords(cleaned).length < MIN_MEANINGFUL_WORDS) {
     return { verdict: "artefact", artefacts, repetition, cleaned: "" };
   }

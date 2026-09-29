@@ -46,7 +46,20 @@ note "These are the exact exceptions behind 'service momentanément indisponible
 gc logging read \
   "resource.type=cloud_run_revision AND resource.labels.service_name=${SERVICE} AND (textPayload:\"[orchestrator]\" OR textPayload:\"[api]\" OR severity>=ERROR)" \
   --freshness="${MINUTES}m" --limit=40 --order=desc \
-  --format='value(timestamp, severity, textPayload)' || true
+  --format='value(timestamp, severity, textPayload, jsonPayload.message, jsonPayload.msg)' || true
+
+step "The voice path in the last ${MINUTES} minutes"
+note "Why a voice note produced no answer. There are three different causes and"
+note "they are not interchangeable:"
+note "  speech recognition failed  — the provider refused or was unreachable;"
+note "  transcript discarded       — words came back but were the model's own"
+note "                               invention (subtitle text, a repeat loop);"
+note "  empty_transcript           — nothing was heard at all, which usually"
+note "                               means the recording carried no speech."
+gc logging read \
+  "resource.type=cloud_run_revision AND resource.labels.service_name=${SERVICE} AND (textPayload:\"speech recognition failed\" OR textPayload:\"transcript\" OR textPayload:\"stt\" OR jsonPayload.message:\"speech recognition failed\")" \
+  --freshness="${MINUTES}m" --limit=25 --order=desc \
+  --format='value(timestamp, textPayload, jsonPayload.message)' || true
 
 step "AI provider failures in the last ${MINUTES} minutes"
 note "One line per provider that refused. If all of them appear, the keys, the"
