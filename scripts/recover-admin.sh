@@ -119,13 +119,19 @@ if ! printf '%s' "$LIST" | python3 -c 'import json,sys; json.load(sys.stdin)["ad
   die "Deploy the current code with scripts/ship.sh, then run this again."
 fi
 
+# Built without nested quotes of any kind. The first version escaped double
+# quotes inside an f-string inside shell single quotes, which bash passes
+# through literally and Python rejects — so the listing died with a
+# SyntaxError, the recovery carried on regardless, and the number the whole
+# exercise existed to reveal was never printed.
 printf '%s' "$LIST" | python3 -c '
 import json, sys
 rows = json.load(sys.stdin)["administrators"]
 if not rows:
-    print("   (none — there is no platform administrator at all)")
+    print("   (none - there is no platform administrator at all)")
 for i, r in enumerate(rows, 1):
-    print(f"   {i}. {r[\"name\"] or \"(no name)\"}  ·  {r[\"phone\"]}  ·  {r[\"status\"]}")
+    name = r["name"] or "(no name)"
+    print("   %d. %s  |  number ending %s  |  %s" % (i, name, r["phone"], r["status"]))
 '
 COUNT=$(printf '%s' "$LIST" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["administrators"]))')
 [[ "$COUNT" -gt 0 ]] || die "There is no platform administrator. Use scripts/first-admin.sh to create one."
@@ -162,7 +168,15 @@ BODY_OUT=$(printf '%s' "$RESPONSE" | sed '$d')
 
 case "$CODE" in
   200)
-    note "Done. Sign in with that number and the new code."
+    note "Done."
+    printf '\n'
+    printf '%s' "$BODY_OUT" | python3 -c '
+import json, sys
+r = json.load(sys.stdin)["recovered"]
+print("   Sign in as:  %s" % (r["name"] or "(no name)"))
+print("   Number ending:  %s" % r["phone"])
+print("   Code: the one you just typed twice.")
+' 2>/dev/null || true
     printf '\n%s\n' "$BODY_OUT"
     ;;
   404)

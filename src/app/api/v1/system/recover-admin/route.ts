@@ -112,7 +112,11 @@ export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
     "userId" in body
       ? and(eq(schema.users.id, body.userId), eq(schema.users.role, "platform_admin"))
       : and(eq(schema.users.phoneIndex, phoneLookup(body.phone)), eq(schema.users.role, "platform_admin"));
-  const [admin] = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(where).limit(1);
+  const [admin] = await db
+    .select({ id: schema.users.id, name: schema.users.name, phone: schema.users.phone })
+    .from(schema.users)
+    .where(where)
+    .limit(1);
   // Deliberately the same answer as a missing token: an unknown number must not
   // tell an attacker that some other number would have worked.
   if (!admin) throw notFound();
@@ -137,7 +141,13 @@ export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
   });
 
   return {
-    recovered: { id: admin.id, name: admin.name },
+    /**
+     * The number is in the answer, masked, because it is the other half of
+     * signing in and the person resetting the code may not know it. The first
+     * successful recovery reset the code and did not say which number it
+     * belonged to, which left the account exactly as unreachable as before.
+     */
+    recovered: { id: admin.id, name: admin.name, phone: maskStoredPhone(admin.phone) ?? "(illisible)" },
     next: "Connectez-vous avec ce numéro et ce nouveau code.",
     warning:
       "Toutes les sessions ouvertes de ce compte ont été fermées. Retirez ADMIN_RECOVERY_TOKEN du déploiement maintenant, puis créez un second administrateur depuis /admin/utilisateurs.",
