@@ -6,7 +6,7 @@ import { clearFailures, isWeakPin } from "@server/core/lockout";
 import { audit } from "@server/core/audit";
 import { badRequest, notFound } from "@server/core/errors";
 import { schema } from "@server/db/client";
-import { phoneLookup } from "@server/core/phone";
+import { maskStoredPhone, phoneLookup } from "@server/core/phone";
 import { secretMatches } from "@server/core/service-identity";
 
 /**
@@ -44,10 +44,27 @@ import { secretMatches } from "@server/core/service-identity";
  * leaves a door that opens with one secret; unlike BOOTSTRAP_TOKEN, this one
  * does not go inert by itself.
  */
-const Recover = z.object({
-  phone: z.string().min(6).max(32),
-  pin: z.string().min(6).max(12),
-});
+/**
+ * Two requests, because looking the account up by number assumed the number
+ * was known, and it was not.
+ *
+ * An administrator locked out of this platform was told by the bootstrap
+ * endpoint that an administrator exists — that check asks only whether any
+ * platform_admin row is present, never which number it carries — and then told
+ * by this one, repeatedly, that no administrator matched the number they were
+ * certain of. Both answers were true. The account had been created with a
+ * different number, and nothing either endpoint said could reveal that.
+ *
+ * `{ list: true }` answers the question that was actually blocking: which
+ * administrators exist, and what number is each one under. The numbers come
+ * back masked to their last four digits — enough to recognise your own, not
+ * enough to be a directory dump if the token ever leaks.
+ */
+const Recover = z.union([
+  z.object({ list: z.literal(true) }),
+  z.object({ phone: z.string().min(6).max(32), pin: z.string().min(6).max(12) }),
+  z.object({ userId: z.string().uuid(), pin: z.string().min(6).max(12) }),
+]);
 
 export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
   const expected = process.env.ADMIN_RECOVERY_TOKEN?.trim();
@@ -55,15 +72,47 @@ export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
   if (!secretMatches(req.headers.get("x-recovery-token"), expected)) throw notFound();
 
   const body = await json(Recover);
+
+  if ("list" in body) {
+    const rows = await db
+      .select({
+        id: schema.users.id,
+        name: schema.users.name,
+        phone: schema.users.phone,
+        status: schema.users.status,
+        createdAt: schema.users.createdAt,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.role, "platform_admin"));
+    await audit({
+      action: "user.admin_listed",
+      entityType: "user",
+      entityId: "platform_admins",
+      systemEvent: "admin_recovery_list",
+      after: { count: rows.length },
+      ip,
+    });
+    return {
+      administrators: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        // Last four digits only. Enough to recognise your own number.
+        phone: maskStoredPhone(r.phone) ?? "(illisible)",
+        status: r.status,
+        createdAt: r.createdAt,
+      })),
+    };
+  }
+
   // Six characters minimum, as at bootstrap: this account can create every
   // other account and read the whole directory.
   if (isWeakPin(body.pin)) throw badRequest("Ce code est trop courant. Choisissez-en un autre.");
 
-  const [admin] = await db
-    .select({ id: schema.users.id, name: schema.users.name })
-    .from(schema.users)
-    .where(and(eq(schema.users.phoneIndex, phoneLookup(body.phone)), eq(schema.users.role, "platform_admin")))
-    .limit(1);
+  const where =
+    "userId" in body
+      ? and(eq(schema.users.id, body.userId), eq(schema.users.role, "platform_admin"))
+      : and(eq(schema.users.phoneIndex, phoneLookup(body.phone)), eq(schema.users.role, "platform_admin"));
+  const [admin] = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(where).limit(1);
   // Deliberately the same answer as a missing token: an unknown number must not
   // tell an attacker that some other number would have worked.
   if (!admin) throw notFound();
@@ -75,7 +124,7 @@ export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
 
   // The lockout counter is cleared too: an administrator who has just proved
   // they hold the recovery secret should not then be told to wait.
-  await clearFailures(db, "phone", body.phone);
+  if ("phone" in body) await clearFailures(db, "phone", body.phone);
 
   await audit({
     action: "user.admin_recovered",

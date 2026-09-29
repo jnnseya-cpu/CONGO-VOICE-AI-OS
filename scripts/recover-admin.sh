@@ -101,27 +101,57 @@ disarm() {
 }
 trap disarm EXIT
 
-step "The administrator to recover"
-read -r -p "   Phone number, exactly as registered (e.g. +447952030184): " PHONE
-[[ -n "$PHONE" ]] || die "No number given."
-# +7952030184 was typed once where +447952030184 was meant. The country code
-# fell off, nothing matched, and the answer was indistinguishable from a wrong
-# code — which is correct behaviour and useless to the person typing.
-DIGITS=$(printf '%s' "$PHONE" | tr -cd '0-9')
-if [[ ${#DIGITS} -lt 11 ]]; then
-  note "That is ${#DIGITS} digits: ${PHONE}"
-  note "A number with its country code is usually 11 to 15. A UK number is +44"
-  note "then 10 digits; a Congolese one is +243 then 9."
-  read -r -p "   Use it anyway? [y/N] " CONFIRM
-  [[ "$CONFIRM" == "y" || "$CONFIRM" == "Y" ]] || die "Stopped. Nothing was sent."
+step "Which administrators exist"
+#
+# Asked before anything else, because the number was the thing nobody knew.
+# bootstrap says "an administrator exists" without saying which number it is
+# under, and this endpoint used to say "no administrator with that number"
+# without saying what the numbers were. Both were true at once, and between
+# them a person spent an afternoon typing a number that had never been the
+# right one.
+LIST=$(curl -sS -X POST "${URL}/api/v1/system/recover-admin" \
+  -H "content-type: application/json" -H "x-recovery-token: ${TOKEN}" \
+  -d '{"list":true}' 2>/dev/null)
+
+if ! printf '%s' "$LIST" | python3 -c 'import json,sys; json.load(sys.stdin)["administrators"]' 2>/dev/null; then
+  note "Could not list the administrators. The service said:"
+  printf '%s\n' "$LIST"
+  die "Deploy the current code with scripts/ship.sh, then run this again."
 fi
+
+printf '%s' "$LIST" | python3 -c '
+import json, sys
+rows = json.load(sys.stdin)["administrators"]
+if not rows:
+    print("   (none — there is no platform administrator at all)")
+for i, r in enumerate(rows, 1):
+    print(f"   {i}. {r[\"name\"] or \"(no name)\"}  ·  {r[\"phone\"]}  ·  {r[\"status\"]}")
+'
+COUNT=$(printf '%s' "$LIST" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["administrators"]))')
+[[ "$COUNT" -gt 0 ]] || die "There is no platform administrator. Use scripts/first-admin.sh to create one."
+
+step "The administrator to recover"
+if [[ "$COUNT" == "1" ]]; then
+  CHOICE=1
+  note "One administrator. Recovering that one."
+else
+  read -r -p "   Which one? [1-${COUNT}] " CHOICE
+fi
+USER_ID=$(printf '%s' "$LIST" | CHOICE="$CHOICE" python3 -c '
+import json, os, sys
+rows = json.load(sys.stdin)["administrators"]
+i = int(os.environ["CHOICE"]) - 1
+print(rows[i]["id"] if 0 <= i < len(rows) else "")
+')
+[[ -n "$USER_ID" ]] || die "That is not one of the numbers listed."
+
 read -r -s -p "   New code (6 to 12 characters, letters allowed): " PIN; echo
 read -r -s -p "   Again: " PIN2; echo
 [[ "$PIN" == "$PIN2" ]] || die "The two codes do not match."
 [[ ${#PIN} -ge 6 && ${#PIN} -le 12 ]] || die "The code must be 6 to 12 characters."
 
 step "Calling the service"
-BODY=$(PHONE="$PHONE" PIN="$PIN" python3 -c 'import json,os; print(json.dumps({"phone":os.environ["PHONE"],"pin":os.environ["PIN"]}))')
+BODY=$(USER_ID="$USER_ID" PIN="$PIN" python3 -c 'import json,os; print(json.dumps({"userId":os.environ["USER_ID"],"pin":os.environ["PIN"]}))')
 RESPONSE=$(curl -sS -X POST "${URL}/api/v1/system/recover-admin" \
   -H "content-type: application/json" \
   -H "x-recovery-token: ${TOKEN}" \
@@ -136,14 +166,8 @@ case "$CODE" in
     printf '\n%s\n' "$BODY_OUT"
     ;;
   404)
-    note "The service answered 404. The probe above already established that the"
-    note "endpoint IS deployed, so this means the number did not match a platform"
-    note "administrator. The endpoint gives the same answer for an unknown number"
-    note "and a wrong token on purpose, so it cannot confirm guesses."
-    printf '\n'
-    note "The number is matched on its digits with the country code kept, exactly"
-    note "as it was typed at registration: +447952030184 and 07952030184 are two"
-    note "different accounts. Try the other spellings you might have used."
+    note "The account chosen above no longer matches. That should not happen —"
+    note "run this again, and if it repeats, send this output."
     ;;
   400)
     note "Refused: $BODY_OUT"

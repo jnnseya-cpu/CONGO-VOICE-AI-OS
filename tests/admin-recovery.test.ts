@@ -43,6 +43,68 @@ async function makeAdmin() {
   return u;
 }
 
+describe("listing the administrators", () => {
+  /**
+   * The gap that cost an afternoon. bootstrap answers "an administrator
+   * exists" without saying which number it is under; this endpoint answered
+   * "no administrator with that number" without saying what the numbers were.
+   * Both were true simultaneously, and between them there was no way to find
+   * out that the account had been created under a different number.
+   */
+  beforeAll(async () => {
+    resetDbForTests();
+    await getDb();
+  });
+  beforeEach(async () => {
+    process.env.ADMIN_RECOVERY_TOKEN = TOKEN;
+    resetRateLimits();
+    const db = await getDb();
+    await db.delete(schema.rateLimitCounters);
+  });
+  afterEach(async () => {
+    delete process.env.ADMIN_RECOVERY_TOKEN;
+    const db = await getDb();
+    await db.delete(schema.users).where(eq(schema.users.role, "platform_admin"));
+  });
+
+  it("names the administrators and the numbers they are under", async () => {
+    await makeAdmin();
+    const res = await call({ list: true }, TOKEN);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { administrators: Array<{ phone: string; name: string | null; id: string }> };
+    expect(body.administrators).toHaveLength(1);
+    // Masked: enough to recognise your own number, not a directory dump.
+    expect(body.administrators[0].phone).toContain("0001");
+    expect(body.administrators[0].phone).not.toContain("+24381");
+  });
+
+  it("is not offered without the token", async () => {
+    await makeAdmin();
+    expect((await call({ list: true })).status).toBe(404);
+    expect((await call({ list: true }, "wrong")).status).toBe(404);
+  });
+
+  it("resets by id, so the number never has to be guessed", async () => {
+    const before = await makeAdmin();
+    const listed = (await (await call({ list: true }, TOKEN)).json()) as { administrators: Array<{ id: string }> };
+    const res = await call({ userId: listed.administrators[0].id, pin: "Kx7mq2p" }, TOKEN);
+    expect(res.status).toBe(200);
+
+    const db = await getDb();
+    const [after] = await db.select().from(schema.users).where(eq(schema.users.id, before.id));
+    expect(verifyPin("Kx7mq2p", after.pinHash)).toBe(true);
+  });
+
+  it("refuses an id that is not a platform administrator", async () => {
+    const db = await getDb();
+    const [citizen] = await db
+      .insert(schema.users)
+      .values({ ...phoneColumns("+243810000009"), pinHash: hashPin("oldcode9"), role: "citizen", languagePreference: "fr", status: "active" })
+      .returning();
+    expect((await call({ userId: citizen.id, pin: "Kx7mq2p" }, TOKEN)).status).toBe(404);
+  });
+});
+
 describe("the recovery endpoint", () => {
   beforeAll(async () => {
     resetDbForTests();
