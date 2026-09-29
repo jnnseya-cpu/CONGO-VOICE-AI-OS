@@ -37,6 +37,41 @@ URL=$(gc run services describe "$SERVICE" --region="$REGION" --format='value(sta
 [[ -n "$URL" ]] || die "Could not read the service URL."
 note "service: $URL"
 
+step "Is this endpoint even in the image that is serving?"
+#
+# Asked before anything is armed, because the alternative is what happened the
+# first time this script ran: a token minted, a revision deployed, a 404, and a
+# second revision to undo it — all against an image built before the endpoint
+# existed. The script reported "either the revision does not carry this endpoint
+# or that number is not an administrator" and left a person to guess which.
+#
+# The route exports POST and nothing else, so Next answers GET with 405 when the
+# file is deployed and 404 when it is not. That distinguishes the two without a
+# token and without changing anything.
+PROBE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "${URL}/api/v1/system/recover-admin" 2>/dev/null || echo 000)
+case "$PROBE" in
+  405)
+    note "yes — the running revision carries it"
+    ;;
+  404)
+    printf '\n'
+    note "The revision serving right now does NOT carry this endpoint, so there"
+    note "is nothing to arm. Deploy the current code first:"
+    printf '\n'
+    note "    bash scripts/ship.sh"
+    printf '\n'
+    note "then run this again. Nothing has been changed."
+    exit 1
+    ;;
+  000)
+    die "Could not reach ${URL}. Check the service is serving before recovering."
+    ;;
+  *)
+    note "unexpected status ${PROBE} from the probe — continuing, but if the"
+    note "recovery below answers 404, deploy with scripts/ship.sh first."
+    ;;
+esac
+
 step "Arming the recovery token"
 TOKEN=$(openssl rand -hex 32)
 if gc secrets describe "$SECRET" >/dev/null 2>&1; then
@@ -90,9 +125,14 @@ case "$CODE" in
     printf '\n%s\n' "$BODY_OUT"
     ;;
   404)
-    note "The service answered 404. Either the revision serving does not yet"
-    note "carry this endpoint — deploy first — or that number is not a platform"
-    note "administrator. The two are deliberately the same answer."
+    note "The service answered 404. The probe above already established that the"
+    note "endpoint IS deployed, so this means the number did not match a platform"
+    note "administrator. The endpoint gives the same answer for an unknown number"
+    note "and a wrong token on purpose, so it cannot confirm guesses."
+    printf '\n'
+    note "The number is matched on its digits with the country code kept, exactly"
+    note "as it was typed at registration: +447952030184 and 07952030184 are two"
+    note "different accounts. Try the other spellings you might have used."
     ;;
   400)
     note "Refused: $BODY_OUT"
