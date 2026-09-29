@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { getDb, resetDbForTests, schema } from "@server/db/client";
 import { hashPin, verifyPin } from "@server/core/auth";
-import { phoneColumns } from "@server/core/phone";
+import { phoneColumns, phoneLookup } from "@server/core/phone";
 import { resetRateLimits } from "@server/core/rate-limit";
 
 const TOKEN = "recovery-token-for-tests";
@@ -197,5 +197,87 @@ describe("the recovery endpoint", () => {
     const db = await getDb();
     const rows = await db.select().from(schema.auditLogs).where(eq(schema.auditLogs.entityId, before.id));
     expect(rows.some((r) => r.action === "user.admin_recovered"), "a recovery is never merely something that happened").toBe(true);
+  });
+});
+
+describe("an account whose number was written under a different key", () => {
+  /**
+   * The failure this whole endpoint eventually turned out to be for.
+   *
+   * users.phone is encrypted and users.phone_index is a blind index keyed by
+   * the same secret. Change DATA_ENCRYPTION_KEY and the row keeps both columns
+   * but neither is usable: the phone reads back as "(illisible)", and
+   * phoneLookup() of the correct number computes an index that cannot match
+   * what is stored. That account is unreachable with ANY number and ANY code,
+   * and resetting the code — which is all this endpoint did at first — changes
+   * nothing at all. It was reset twice, successfully, and sign-in still failed.
+   */
+  beforeAll(async () => {
+    resetDbForTests();
+    await getDb();
+  });
+  beforeEach(async () => {
+    process.env.ADMIN_RECOVERY_TOKEN = TOKEN;
+    resetRateLimits();
+    const db = await getDb();
+    await db.delete(schema.rateLimitCounters);
+  });
+  afterEach(async () => {
+    delete process.env.ADMIN_RECOVERY_TOKEN;
+    const db = await getDb();
+    await db.delete(schema.users).where(eq(schema.users.role, "platform_admin"));
+  });
+
+  /** An admin row whose phone columns came from a key nobody now holds. */
+  async function adminWithForeignKeyPhone() {
+    const db = await getDb();
+    const [u] = await db
+      .insert(schema.users)
+      .values({
+        // A well-formed envelope this key cannot open: the right shape, the
+        // wrong secret. That is exactly what a rotated key leaves behind.
+        phone: "v1.AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCC",
+        phoneIndex: "an-index-from-a-key-nobody-has",
+        pinHash: hashPin("oldcode9"),
+        name: "Justin Nseya",
+        role: "platform_admin",
+        languagePreference: "fr",
+        status: "active",
+      })
+      .returning();
+    return u;
+  }
+
+  it("shows the number as unreadable rather than pretending", async () => {
+    await adminWithForeignKeyPhone();
+    const body = (await (await call({ list: true }, TOKEN)).json()) as { administrators: Array<{ phone: string }> };
+    expect(body.administrators[0].phone).toBe("(illisible)");
+  });
+
+  it("makes the account reachable again by rewriting the number", async () => {
+    const before = await adminWithForeignKeyPhone();
+    const res = await call({ userId: before.id, pin: "Kx7mq2p", phone: "+447952030184" }, TOKEN);
+    expect(res.status).toBe(200);
+
+    // The point of the whole exercise: sign-in looks the account up by the
+    // index it computes now, and that has to find this row.
+    const db = await getDb();
+    const [found] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.phoneIndex, phoneLookup("+447952030184")));
+    expect(found, "the account must now be findable by its number").toBeTruthy();
+    expect(found.id).toBe(before.id);
+    expect(verifyPin("Kx7mq2p", found.pinHash)).toBe(true);
+  });
+
+  it("will not take a number that belongs to somebody else", async () => {
+    const admin = await adminWithForeignKeyPhone();
+    const db = await getDb();
+    await db
+      .insert(schema.users)
+      .values({ ...phoneColumns("+447900000123"), role: "citizen", languagePreference: "fr", status: "active" });
+    const res = await call({ userId: admin.id, pin: "Kx7mq2p", phone: "+447900000123" }, TOKEN);
+    expect(res.status).toBe(400);
   });
 });

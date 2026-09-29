@@ -6,7 +6,7 @@ import { clearFailures, isWeakPin } from "@server/core/lockout";
 import { audit } from "@server/core/audit";
 import { badRequest, notFound } from "@server/core/errors";
 import { schema } from "@server/db/client";
-import { maskStoredPhone, phoneLookup } from "@server/core/phone";
+import { maskStoredPhone, phoneColumns, phoneLookup } from "@server/core/phone";
 import { secretMatches } from "@server/core/service-identity";
 
 /**
@@ -60,10 +60,33 @@ import { secretMatches } from "@server/core/service-identity";
  * back masked to their last four digits — enough to recognise your own, not
  * enough to be a directory dump if the token ever leaks.
  */
+/**
+ * Order matters. z.union takes the first branch that parses, and a plain
+ * z.object ignores unknown keys — so with the phone branch listed first, a
+ * payload carrying userId AND phone matched it, the id was dropped, and the
+ * lookup went back to searching by a number that cannot be found. The id
+ * branch is first for that reason.
+ */
 const Recover = z.union([
   z.object({ list: z.literal(true) }),
+  z.object({
+    userId: z.string().uuid(),
+    pin: z.string().min(6).max(12),
+    /**
+     * Rewrites the account's number with the key that is running now.
+     *
+     * A stored number that will not decrypt — the listing shows it as
+     * "(illisible)" — means the row was written under a different
+     * DATA_ENCRYPTION_KEY. The lookup index beside it is keyed by the same
+     * secret, so it cannot match anything this deployment computes: that
+     * account cannot be signed into with any number and any code, and no
+     * amount of resetting the code changes it. Setting the number here puts
+     * both columns back under the current key, which is the only thing that
+     * makes the account reachable again.
+     */
+    phone: z.string().min(6).max(32).optional(),
+  }),
   z.object({ phone: z.string().min(6).max(32), pin: z.string().min(6).max(12) }),
-  z.object({ userId: z.string().uuid(), pin: z.string().min(6).max(12) }),
 ]);
 
 export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
@@ -121,14 +144,30 @@ export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
   // tell an attacker that some other number would have worked.
   if (!admin) throw notFound();
 
+  const rewritePhone = "phone" in body && body.phone ? phoneColumns(body.phone) : null;
+  if (rewritePhone?.phoneIndex) {
+    // Refuse to collide with a different account that already holds it.
+    const [clash] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.phoneIndex, rewritePhone.phoneIndex))
+      .limit(1);
+    if (clash && clash.id !== admin.id) throw badRequest("Ce numéro est déjà enregistré sur un autre compte.");
+  }
+
   await db
     .update(schema.users)
-    .set({ pinHash: hashPin(body.pin), status: "active", sessionEpoch: new Date() })
+    .set({
+      pinHash: hashPin(body.pin),
+      status: "active",
+      sessionEpoch: new Date(),
+      ...(rewritePhone ? { phone: rewritePhone.phone, phoneIndex: rewritePhone.phoneIndex } : {}),
+    })
     .where(eq(schema.users.id, admin.id));
 
   // The lockout counter is cleared too: an administrator who has just proved
   // they hold the recovery secret should not then be told to wait.
-  if ("phone" in body) await clearFailures(db, "phone", body.phone);
+  if ("phone" in body && body.phone) await clearFailures(db, "phone", body.phone);
 
   await audit({
     action: "user.admin_recovered",
@@ -136,7 +175,7 @@ export const POST = handle({ limit: "auth" }, async ({ db, req, json, ip }) => {
     actorRole: "platform_admin",
     entityType: "user",
     entityId: admin.id,
-    after: { via: "admin_recovery_token", sessionsRevoked: true },
+    after: { via: "admin_recovery_token", sessionsRevoked: true, phoneRewritten: Boolean(rewritePhone) },
     ip,
   });
 

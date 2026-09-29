@@ -151,13 +151,42 @@ print(rows[i]["id"] if 0 <= i < len(rows) else "")
 ')
 [[ -n "$USER_ID" ]] || die "That is not one of the numbers listed."
 
+# A number that will not decrypt means the row was written under a different
+# DATA_ENCRYPTION_KEY, and the lookup index beside it is keyed by the same
+# secret — so that account cannot be signed into with any number and any code
+# until both columns are rewritten. Resetting the code alone does nothing, which
+# is exactly what happened: the reset succeeded twice and sign-in still failed.
+UNREADABLE=$(printf '%s' "$LIST" | CHOICE="$CHOICE" python3 -c '
+import json, os, sys
+rows = json.load(sys.stdin)["administrators"]
+i = int(os.environ["CHOICE"]) - 1
+print("yes" if rows[i]["phone"] == "(illisible)" else "no")
+')
+PHONE_ARG=""
+if [[ "$UNREADABLE" == "yes" ]]; then
+  printf '\n'
+  note "This account's number cannot be read with the encryption key this"
+  note "deployment is using, so nothing can match it at sign-in. The number"
+  note "has to be set again now, under the current key."
+  read -r -p "   Number to sign in with, e.g. +447952030184: " NEWPHONE
+  DIGITS=$(printf '%s' "$NEWPHONE" | tr -cd '0-9')
+  [[ ${#DIGITS} -ge 11 ]] || die "That is ${#DIGITS} digits. Include the country code."
+  PHONE_ARG="$NEWPHONE"
+fi
+
 read -r -s -p "   New code (6 to 12 characters, letters allowed): " PIN; echo
 read -r -s -p "   Again: " PIN2; echo
 [[ "$PIN" == "$PIN2" ]] || die "The two codes do not match."
 [[ ${#PIN} -ge 6 && ${#PIN} -le 12 ]] || die "The code must be 6 to 12 characters."
 
 step "Calling the service"
-BODY=$(USER_ID="$USER_ID" PIN="$PIN" python3 -c 'import json,os; print(json.dumps({"userId":os.environ["USER_ID"],"pin":os.environ["PIN"]}))')
+BODY=$(USER_ID="$USER_ID" PIN="$PIN" PHONE_ARG="$PHONE_ARG" python3 -c '
+import json, os
+body = {"userId": os.environ["USER_ID"], "pin": os.environ["PIN"]}
+if os.environ.get("PHONE_ARG"):
+    body["phone"] = os.environ["PHONE_ARG"]
+print(json.dumps(body))
+')
 RESPONSE=$(curl -sS -X POST "${URL}/api/v1/system/recover-admin" \
   -H "content-type: application/json" \
   -H "x-recovery-token: ${TOKEN}" \
