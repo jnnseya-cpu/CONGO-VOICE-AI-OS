@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the image the way a deployment would
-        run: docker build -t congovoice:ci .
+        run: docker build --pull -t congovoice:ci .
       - name: Scan it for known vulnerabilities
         uses: aquasecurity/trivy-action@0.28.0
         with:

@@ -26,6 +26,12 @@ steps:
     id: build
     args:
       - build
+      # Refetch the base image instead of trusting whatever layer is cached.
+      # node:22-bookworm-slim is a moving tag: a build that reuses a cached
+      # layer keeps shipping the Node patch level that was current when the
+      # layer was made, which is how a patched security release silently fails
+      # to reach production.
+      - --pull
       - --build-arg=NEXT_PUBLIC_SITE_URL=${_SITE_URL}
       - --build-arg=BUILD_ID=${_TAG}
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
