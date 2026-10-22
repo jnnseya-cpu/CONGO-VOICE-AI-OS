@@ -136,6 +136,12 @@ En **santé communautaire**, une personne décrit des symptômes et reçoit une 
 
 Dans les trois cas, la valeur ne vient pas de la conversation mais de ce qui suit : un cas ouvert, un humain prévenu, un délai de prise en charge suivi. C'est ce que décrit le programme dans son ensemble.
 
+Cette distinction mérite d'être appuyée, parce qu'elle sépare ce programme d'un assistant conversationnel. Un assistant répond et s'arrête ; un service public doit transformer une réponse en prise en charge. Concrètement, cela veut dire qu'un échange qui atteint un certain niveau de gravité ouvre un dossier avec un responsable unique et une horloge, qu'un dépassement de délai escalade automatiquement vers un superviseur, et qu'une clôture est refusée tant que le résultat, l'action effectuée, la joignabilité de la personne et la décision de suivi ne sont pas renseignés.
+
+Trois conséquences en découlent pour une institution. La première est qu'un chiffre d'usage ne suffit pas à juger le service : ce qui compte est la proportion d'alertes acquittées dans le délai prévu, par province. La deuxième est que la capacité humaine devient la contrainte principale, et qu'elle est visible — un taux de dépassement croissant dans un territoire signale un manque d'agents avant qu'une plainte ne le signale. La troisième est que chaque étape laisse une trace vérifiable, ce qui permet à une autorité de contrôle de reconstituer un parcours sans nous croire sur parole.
+
+C'est la raison pour laquelle l'essentiel de l'effort d'ingénierie de ce programme ne porte pas sur la conversation, qui est la partie visible, mais sur la mécanique de responsabilité qui la suit. Une IA vocale en langues congolaises utile à un service public se juge donc moins à la fluidité de ses phrases qu'à la fiabilité de ce qu'elle déclenche.
+
 ## Les limites que nous annonçons publiquement
 
 Publier ses limites fait partie de la méthode. Aujourd'hui :
