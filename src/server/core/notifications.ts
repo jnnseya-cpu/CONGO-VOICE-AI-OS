@@ -19,6 +19,7 @@
 import "server-only";
 import { and, count, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
+import { syncCredentials } from "./credentials";
 import { env } from "./env";
 import { readPhone } from "./phone";
 import { emitEvent } from "./events";
@@ -322,6 +323,11 @@ async function sendEmail(to: string | undefined, title: string, body: string): P
 
 async function dispatchOnce(channel: DeliveryChannel, to: string | undefined, title: string, body: string): Promise<DispatchResult> {
   if (channel === "in_app") return { ok: true, provider: "in_app" };
+  // The operator and its credentials may have been set from the console on
+  // another instance. This is the last point before a real send, and an alert
+  // that goes to the log instead of a person is the failure this platform most
+  // has to avoid, so the configuration is resolved here rather than assumed.
+  await syncCredentials().catch(() => undefined);
   if (channel === "email") return sendEmail(to, title, body);
   if (!to) return { ok: false, failureReason: "no_destination", provider: channel };
   const text = title ? `${title}\n${body}` : body;

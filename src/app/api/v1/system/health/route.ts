@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@server/db/client";
 import { readiness } from "@server/core/status";
+import { syncCredentials } from "@server/core/credentials";
 import { clinicalReadiness } from "@server/ai/review/gate";
 import { SCHEDULER_STALE_AFTER_MS, schedulerHealth } from "@server/core/scheduler";
 import { residencyReadiness } from "@server/core/residency";
@@ -18,6 +19,10 @@ export async function GET() {
     await db.execute(sql`select 1`);
     // Reachable is not the same as able to do the job: an escalation that
     // reaches nobody looks identical to a healthy service from outside.
+    // readiness() reads the environment, and an alert channel can have been
+    // wired from the console since this instance started. Hydrate first, or the
+    // probe reports "no alert channel" about a platform that has one.
+    await syncCredentials().catch(() => undefined);
     const ready = readiness();
     // Whether anyone clinically accountable has signed the content is part of
     // being able to do the job, not a separate concern (AI-10).

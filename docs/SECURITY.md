@@ -31,12 +31,55 @@ limit what one compromise reaches. Those are the properties pursued below.
 | In transit, platform to AI provider | TLS to the provider's API. Transcripts leave the country here — see §6 |
 | Recordings, photos, generated reports | AES-256-GCM in `core/crypto.ts`, applied by the storage layer so no caller can forget |
 | Second-factor seeds | AES-256-GCM, per-purpose key |
-| Everything else in the database | Whole-disk encryption by the database host. Field-level encryption of phone numbers is a gap — see §7 |
+| Phone numbers | AES-256-GCM, with a keyed blind index for lookup (`core/phone.ts`) |
+| Vendor credentials set from the console | AES-256-GCM under its own purpose (`core/credentials.ts`) — see the paragraph below, which states what that does and does not buy |
+| Everything else in the database | Whole-disk encryption by the database host |
 
 Keys derive from one root, `DATA_ENCRYPTION_KEY`, through HKDF with a purpose
 label, so a key that protects recordings cannot read second-factor seeds.
 **Losing the root key makes every stored recording unreadable.** It belongs in
 a secret manager with versioning, not in an environment file.
+
+### Vendor credentials in the database
+
+A platform administrator can set the AI, SMS, voice and WhatsApp credentials
+from `/admin`, because wiring an alert channel — the thing standing between an
+escalation and a person — otherwise needed the cloud console, the CLI and a
+redeploy. That convenience moves a secret, so the trade is written down rather
+than discovered:
+
+- **It widens the blast radius.** A key in Secret Manager is mounted by the
+  container and never touches the database. A key stored here is readable by
+  anyone who can read the database *and* holds the data key. That is the same
+  boundary as a citizen's recording, and it is wider than it was.
+- **What narrows it.** The value is encrypted under its own purpose, so the key
+  that reads credentials cannot read recordings. It is never returned by any
+  route — the console shows the last four characters and nothing else. Writing
+  one requires `platform_admin`, a second factor verified in the last fifteen
+  minutes, and leaves an audit entry carrying the last four characters, never the
+  value. The deployment's own variable applies again the moment the stored one is
+  withdrawn.
+- **What cannot be set this way, deliberately.** `DATA_ENCRYPTION_KEY` (it
+  encrypts this very table), `SESSION_SECRET` (it authenticates the
+  administrator making the change), `CRON_SECRET`, `BOOTSTRAP_TOKEN`,
+  `ADMIN_RECOVERY_TOKEN`, `OIDC_CLIENT_SECRET`, `DATABASE_URL` and
+  `DATABASE_CA_CERT`. Each protects the console itself; an administrator who
+  could rewrite them from inside a session could lock everyone out or leave
+  himself a permanent way back in. They are changed in the deployment, by someone
+  with the cloud project.
+- **Propagation is not atomic.** Every reader in the platform — the AI gateway,
+  the SMS client, the WhatsApp client, the outbound call, the readiness probe —
+  reads the process environment, so the stored value is copied into it at the
+  edges: on each `/api/v1` request, before each outbound send, and at the start
+  of each scheduler sweep. That read is held for a minute, so the instance that
+  served the write is current immediately and any other instance is current
+  within a minute or at its next sweep, whichever comes first. The one-minute
+  window is the honest figure: it is not a cluster-wide switch and is not
+  described as one in the console.
+
+Secret Manager remains the right home for a production deployment's keys. The
+console exists so that a pilot can be wired, and corrected, by the people running
+it.
 
 Rotation is not a drop-in. Phone numbers are found through a keyed digest
 derived from the same root, so a new key means every existing digest stops

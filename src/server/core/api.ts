@@ -14,6 +14,7 @@ import { hasPermission, type Permission } from "./rbac";
 import { checkSharedRateLimit } from "./rate-limit";
 import { env } from "./env";
 import { getDb, schema, type Database } from "@server/db/client";
+import { syncCredentials } from "./credentials";
 
 export interface ApiContext<P = Record<string, string>> {
   req: NextRequest;
@@ -94,6 +95,14 @@ export function handle<P = Record<string, string>>(opts: HandleOptions, fn: Hand
 
     try {
       db = await getDb();
+      /*
+       * A credential set from the console lives in the database; every reader in
+       * the platform reads `process.env`. This is where the two are reconciled,
+       * once per request and at most once a minute per instance, so an instance
+       * that has served no AI call still answers with the keys an administrator
+       * set rather than with the ones its revision started with.
+       */
+      await syncCredentials().catch(() => undefined);
       if ((opts.auth || opts.permission || opts.registered) && !session) throw unauthorized();
       if (opts.registered && session?.anonymous) {
         throw forbidden("Créez un compte pour accéder à cette partie du service. Poser une question reste libre et gratuit.");

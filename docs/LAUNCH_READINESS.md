@@ -117,7 +117,12 @@ without them.
 
 - `DEPLOYMENT_STAGE=pilot`, with a real provider configured for at least one
   alert channel. With none, an escalation reaches nobody and the platform says
-  so rather than telling the citizen a person was alerted.
+  so rather than telling the citizen a person was alerted. A platform
+  administrator can now do this wiring at `/admin` → « Clés des fournisseurs »
+  without a redeploy, and both halves are required: the operator's credentials
+  *and* the operator chosen in "Routage des canaux". A driver with no
+  credentials behind it is treated as no channel, so this check cannot be
+  cleared by a half-finished configuration.
 - `DATA_ENCRYPTION_KEY` and `SESSION_SECRET` set, and the encrypted data
   readable with the key in use. A restored or rotated key that does not match
   what wrote the data is reported, not silently ignored.

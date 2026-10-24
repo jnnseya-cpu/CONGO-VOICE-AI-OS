@@ -91,6 +91,28 @@ all absent, and each binds before the application does.
 | Recovery point honoured | the three post-snapshot rows are **gone** (0 found), pre-snapshot data intact | PASS |
 | Cloud SQL point-in-time restore | needs the cloud project | BLOCKED |
 
+## Wiring the vendors from the administration console (`/tmp/probe-keys.mjs`, `/tmp/probe-routing2.mjs`, against a running production build)
+
+| What was driven | Result | Status |
+|---|---|---|
+| The catalogue a platform administrator sees | 17 credentials in 5 groups; no value of any kind in the payload | PASS |
+| A write with no recent second factor, on a pristine instance | **403** « Double authentification requise », nothing stored | PASS |
+| A write after enrolling and verifying a factor | 200, hint `…WXYZ`, key not echoed back; the gateway moved from `mock` to `gemini,mock` and left offline mode on the same request | PASS |
+| An attempt to set `DATA_ENCRYPTION_KEY` | 400, refused by name | PASS |
+| A value that is not the shape of that vendor's key | 400, refused before storage | PASS |
+| Withdrawing the key | 200; gateway back to `mock`, offline mode on | PASS |
+| The audit trail afterwards | `credential.set`, `credential.rotated`, `credential.cleared` present; **no key anywhere in it** | PASS |
+| An alert channel's driver with no credentials behind it | `escalation_delivery` stays failing — a half-wired channel is not reported as a channel | PASS |
+| The credentials with no driver chosen | `escalation_delivery` stays failing | PASS |
+| Both halves set from the console | `escalation_delivery` **clears**, with no redeploy and no cloud console | PASS |
+| An operator the platform does not implement | 400, refused | PASS |
+| Everything withdrawn again | `escalation_delivery` fails again | PASS |
+
+No message left the machine: the Africa's Talking credentials used were
+fabricated, so what is demonstrated is the platform's own routing decision, not
+delivery by a carrier. Delivery still needs a real operator account, which is on
+the human-action list.
+
 ## Not tested, and why
 
 | Area | Why |

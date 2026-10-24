@@ -791,6 +791,35 @@ export const aiUsageLogs = pgTable("ai_usage_logs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Vendor credentials an administrator can set from the console.
+ *
+ * Why not `admin_config`: that table is read in bulk by every holder of
+ * `admin:config` and stores its values as plain JSON. A provider key has to be
+ * encrypted at rest and must never leave the server, so it gets its own table
+ * with its own route.
+ *
+ * `value` holds the AES-256-GCM envelope from `core/crypto.ts` under the
+ * `provider_key` purpose — the same construction as a citizen's recording. What
+ * this does and does not buy is written down in `docs/SECURITY.md`: it protects
+ * a leaked dump or a read-only view of the table, and it does not protect
+ * against someone who already owns the running server, because the server has
+ * to decrypt the key to use it.
+ *
+ * `name` is the environment variable the platform already reads, and it is
+ * checked against an allow-list in `core/credentials.ts` before anything is
+ * written — the secrets that protect the console itself are deliberately not on
+ * it.
+ */
+export const providerCredentials = pgTable("provider_credentials", {
+  name: varchar("name", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  /** False for an identifier such as a sender id, which may be shown back. */
+  secret: boolean("secret").default(true).notNull(),
+  updatedBy: uuid("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const adminConfig = pgTable("admin_config", {
   key: varchar("key", { length: 96 }).primaryKey(),
   value: jsonb("value").$type<unknown>().notNull(),
@@ -798,6 +827,7 @@ export const adminConfig = pgTable("admin_config", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export type ProviderCredential = typeof providerCredentials.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Interaction = typeof interactions.$inferSelect;

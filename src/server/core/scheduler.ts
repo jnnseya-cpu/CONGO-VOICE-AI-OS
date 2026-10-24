@@ -18,6 +18,7 @@ import "server-only";
 import { and, desc, eq, inArray, isNotNull, lte } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import { audit, verifyAuditChain } from "./audit";
+import { syncCredentials } from "./credentials";
 import { emitEvent } from "./events";
 import { hasReminderConsent, notifyRole, notifyTemplate, sendDueNotifications } from "./notifications";
 import { checkAcuCaps } from "./metering";
@@ -298,6 +299,14 @@ async function step<T>(name: string, errors: SchedulerReport["errors"], fn: () =
 export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
   const started = Date.now();
   const errors: SchedulerReport["errors"] = [];
+
+  /*
+   * Reminders and SLA alerts go out from here, so this run must use the
+   * credentials the console currently holds and not the ones this instance
+   * booted with. Forced, because the sweep is the documented way an instance
+   * that serves no traffic picks up a key set elsewhere.
+   */
+  await syncCredentials(true).catch(() => undefined);
 
   const reminders = await step("reminders", errors, () => fireDueSchedules(now), { fired: 0, cancelled: 0, failed: 0 });
   const deferred = await step("deferred_notifications", errors, () => sendDueNotifications(now), []);

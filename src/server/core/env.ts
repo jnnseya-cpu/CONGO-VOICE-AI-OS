@@ -87,14 +87,39 @@ export const env = {
     maxUploadBytes: num("MAX_UPLOAD_BYTES", 25 * 1024 * 1024),
   },
 
+  /*
+   * Read through, not snapshotted.
+   *
+   * Everything else in this object is deployment configuration that cannot
+   * change while the process runs. These can: a platform administrator sets the
+   * operator and its credentials from /admin, and the stored value is copied
+   * into `process.env`. Captured at import, as they were, the console would
+   * write a key the dispatcher never read — the alert would still be written to
+   * the log while the console showed it as wired. Getters keep every read
+   * current at the cost of nothing.
+   */
   notifications: {
-    smsProvider: process.env.SMS_PROVIDER ?? "log", // log | twilio | africastalking
-    whatsappProvider: process.env.WHATSAPP_PROVIDER ?? "log",
-    emailProvider: process.env.EMAIL_PROVIDER ?? "log",
-    adminEmail: process.env.ADMIN_ALERT_EMAIL,
-    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID,
-    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN,
-    twilioFrom: process.env.TWILIO_FROM,
+    get smsProvider() {
+      return process.env.SMS_PROVIDER ?? "log"; // log | twilio | africastalking
+    },
+    get whatsappProvider() {
+      return process.env.WHATSAPP_PROVIDER ?? "log";
+    },
+    get emailProvider() {
+      return process.env.EMAIL_PROVIDER ?? "log";
+    },
+    get adminEmail() {
+      return process.env.ADMIN_ALERT_EMAIL;
+    },
+    get twilioAccountSid() {
+      return process.env.TWILIO_ACCOUNT_SID;
+    },
+    get twilioAuthToken() {
+      return process.env.TWILIO_AUTH_TOKEN;
+    },
+    get twilioFrom() {
+      return process.env.TWILIO_FROM;
+    },
   },
 
   rateLimit: {

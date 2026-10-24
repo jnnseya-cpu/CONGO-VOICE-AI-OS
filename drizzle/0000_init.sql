@@ -736,6 +736,14 @@ CREATE TABLE "protocol_versions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "provider_credentials" (
+	"name" varchar(64) PRIMARY KEY NOT NULL,
+	"value" text NOT NULL,
+	"secret" boolean DEFAULT true NOT NULL,
+	"updated_by" uuid,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "provinces" (
 	"code" varchar(8) PRIMARY KEY NOT NULL,
 	"name" varchar(120) NOT NULL,

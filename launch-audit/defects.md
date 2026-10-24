@@ -123,6 +123,48 @@ a Node patch level below the 21 October security releases. Both retested.
 
 ---
 
+## D-07 — Three ways a key set in the console would not have reached the sender
+
+Found while verifying the administration console's new vendor-credential page
+against a running build, rather than against its own tests.
+
+- **Found** `node /tmp/probe-routing.mjs` and a reading of every call site that
+  decides whether a channel sends or journalises
+- **Reproduced** three separate faults, each of which would have produced the
+  same symptom — a credential visibly stored and an escalation still written to
+  the log:
+  1. **The readiness probe answered before anything hydrated the environment.**
+     `readiness()` reads `process.env`; the stored credentials are copied into it
+     by `syncCredentials()`, which at that point only the AI gateway called. The
+     probe therefore reported "Aucun fournisseur d'alerte configuré" about a
+     platform that had one, until something happened to touch the gateway first.
+  2. **`env.notifications` was a snapshot taken at import.** `notify()` — the
+     path an escalation actually takes — read the operator and the Twilio
+     credentials from that frozen object, so a key set from the console could
+     never be used by the process that stored it.
+  3. **A driver with no credentials cleared the readiness check.** The check read
+     `WHATSAPP_PROVIDER`/`VOICE_PROVIDER` alone, while the senders require the
+     credentials too. `VOICE_PROVIDER=twilio` with no Twilio account reported a
+     working alert channel and failed every call with `twilio_not_configured`.
+- **Impact** the whole point of the feature, and the one failure mode this
+  platform cannot have: a console that says an escalation channel is wired while
+  the escalation goes to a log file
+- **Fix** the stored credentials are copied into the environment at the edges —
+  every `/api/v1` request, every outbound send, every scheduler sweep, held for a
+  minute; `env.notifications` became read-through getters; and the driver and its
+  credentials are now resolved by one rule in `src/server/channels/modes.ts`,
+  which the senders and the readiness probe both ask
+- **Retest** 11 cases in `tests/channel-modes.test.ts` pin the half-wired states,
+  3 in `tests/provider-credentials.test.ts` prove an instance that never heard
+  about the key still sends through the operator, and live: `escalation_delivery`
+  cleared on a running build only once both halves were set, and failed again
+  when either was withdrawn
+- **Residual risk** propagation to other instances is within a minute, not
+  atomic. Stated in the console and in `docs/SECURITY.md` §2
+- **Status** FIXED
+
+---
+
 ## Observations that are not defects
 
 - `/api/v1/auth/me` answers 401 to a first-time visitor. A client discovering

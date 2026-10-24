@@ -12,6 +12,7 @@ import "server-only";
 import { env } from "@server/core/env";
 import { safeLog } from "@server/core/redact";
 import { permits } from "@server/core/residency";
+import { syncCredentials } from "@server/core/credentials";
 
 export interface BridgedCallInput {
   caseId: string;
@@ -31,6 +32,7 @@ function maskTail(number: string): string {
 }
 
 export async function placeBridgedCall(input: BridgedCallInput): Promise<BridgedCallResult> {
+  await syncCredentials().catch(() => undefined);
   const provider = process.env.VOICE_PROVIDER ?? "log";
 
   // A carrier outside the deployment's residency policy is not dialled: the

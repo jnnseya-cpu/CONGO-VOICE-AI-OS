@@ -17,6 +17,7 @@ import { getDb, schema } from "@server/db/client";
 import type { LanguageCode } from "@server/db/schema";
 import { MockProvider } from "./providers/mock";
 import { permits, residencyPolicy } from "@server/core/residency";
+import { syncCredentials } from "@server/core/credentials";
 import {
   ProviderError,
   type Capability,
@@ -155,6 +156,13 @@ export class AiGateway {
   }
 
   private async register() {
+    /*
+     * Credentials stored in the console are copied into the environment before
+     * anything is registered, so a key set from the administration page is
+     * picked up by a fresh instance without a redeploy. A failure here is not
+     * fatal: the deployment's own variables still apply.
+     */
+    await syncCredentials().catch(() => undefined);
     const mock = new MockProvider();
     if (this.allowed("anthropic") && (configured(process.env.ANTHROPIC_API_KEY) || configured(process.env.ANTHROPIC_AUTH_TOKEN))) {
       const { AnthropicProvider } = await import("./providers/anthropic");
@@ -333,6 +341,17 @@ const g = globalThis as unknown as { __cvaiGateway?: AiGateway };
 export function aiGateway(): AiGateway {
   return (g.__cvaiGateway ??= new AiGateway());
 }
-export function resetGatewayForTests() {
+/**
+ * Drops the gateway so the next call rebuilds it from the current environment.
+ *
+ * Called when an administrator sets or clears a vendor credential: the registry
+ * is built once per process, so without this a key set in the console would not
+ * be used until the instance restarted.
+ */
+export function reloadGateway() {
   g.__cvaiGateway = undefined;
+}
+
+export function resetGatewayForTests() {
+  reloadGateway();
 }

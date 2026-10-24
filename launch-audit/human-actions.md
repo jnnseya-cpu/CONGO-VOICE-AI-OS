@@ -27,10 +27,17 @@ why it blocks, and what resumes the moment it arrives.
    gate table can be re-scored on the deployed build.
 
 3. **Wire one real alert channel.**
-   Needed: a configured SMS, WhatsApp or voice provider for the pilot's province.
+   Needed: an operator account and its credentials for the pilot's province.
    Why it blocks: with none, an escalation reaches nobody and the platform says
    so rather than pretending. `escalation_delivery` is one of the five failing
    health checks.
+   How, now: a platform administrator does this at **`/admin` → Clés des
+   fournisseurs**, with a second factor. Set the operator's credentials *and* the
+   driver in "Routage des canaux" — a credential without a driver leaves the
+   channel writing messages to the log, which is the half-configured state that
+   makes an escalation reach nobody while the console looks correct. The
+   readiness check clears on its own once a real driver is live; no redeploy and
+   no cloud console are needed.
 
 4. **Declare the residency policy.**
    Needed: values for `DATA_RESIDENCY` and `DEPLOYMENT_JURISDICTION`.
@@ -63,7 +70,9 @@ why it blocks, and what resumes the moment it arrives.
     drive the test distributed.
 11. **Provider keys in a sandbox project** to measure transcription accuracy,
     answer quality, latency with a real model, and cost per interaction. Every AI
-    figure in this audit is the offline provider.
+    figure in this audit is the offline provider. The keys themselves can now be
+    entered at `/admin` → Clés des fournisseurs, so this needs the accounts and
+    the billing decision rather than an engineer.
 12. **Non-Chromium browsers and real handsets** for the device matrix.
 13. **Cloud monitoring and alerting** (`scripts/alerts.sh` needs the project), then
     a controlled failure to prove each alert reaches a named person.

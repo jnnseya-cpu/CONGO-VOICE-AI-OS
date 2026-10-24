@@ -9,20 +9,15 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import type { LanguageCode } from "@server/db/schema";
+import { syncCredentials } from "@server/core/credentials";
+import { smsMode, type SmsMode } from "./modes";
 import { maskMsisdn } from "./whatsapp";
 
-export type SmsMode = "africastalking" | "twilio" | "log";
+export { smsMode, type SmsMode };
 
 /** One GSM-7 segment; concatenated parts lose 7 characters to the UDH, and we add "(n/m)". */
 const PART_LENGTH = 150;
 export const MAX_SMS_PARTS = 3;
-
-export function smsMode(): SmsMode {
-  const configured = (process.env.SMS_PROVIDER ?? "log").toLowerCase();
-  if (configured === "africastalking" && process.env.AFRICASTALKING_API_KEY && process.env.AFRICASTALKING_USERNAME) return "africastalking";
-  if (configured === "twilio" && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM) return "twilio";
-  return "log";
-}
 
 /** Splits a reply into at most three concatenated messages (FR-CH-21). */
 export function splitSms(text: string, maxParts = MAX_SMS_PARTS): string[] {
@@ -127,6 +122,10 @@ async function dispatchPart(to: string, text: string): Promise<{ ok: boolean; me
 
 /** Sends a reply as at most three SMS, recording one notification row per part. */
 export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
+  // The operator credentials may have been set from the console on another
+  // instance. Reaching a person is the whole point of this call, so it resolves
+  // the current configuration rather than the one this process booted with.
+  await syncCredentials().catch(() => undefined);
   const db = await getDb();
   const parts = splitSms(input.text);
   const notificationIds: string[] = [];

@@ -2,6 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { getDb } from "@server/db/client";
 import { unreadablePhoneCount } from "./phone";
+import { halfWiredChannels, smsMode, voiceMode, whatsappAlertMode } from "@server/channels/modes";
 
 /** Cheap liveness probe for the status badge in the top bar. Never throws. */
 export async function systemOk(): Promise<boolean> {
@@ -82,15 +83,25 @@ export function readiness(): Readiness {
   const prod = process.env.NODE_ENV === "production";
   const serving = SERVES_CITIZENS.includes(stage);
 
-  const smsReal = (process.env.SMS_PROVIDER ?? "log") !== "log";
-  const waReal = (process.env.WHATSAPP_PROVIDER ?? "log") !== "log";
-  const voiceReal = (process.env.VOICE_PROVIDER ?? "log") !== "log";
+  /*
+   * A driver on its own is not an alert channel. "SMS_PROVIDER=africastalking"
+   * with no key, or "VOICE_PROVIDER=twilio" with no account, sends every
+   * message to the log while looking configured — so this asks the same
+   * question the senders ask, from the same rule, rather than reading the
+   * driver and hoping.
+   */
+  const smsReal = smsMode() !== "log";
+  const waReal = whatsappAlertMode() !== "log";
+  const voiceReal = voiceMode() !== "log";
+  const halfWired = halfWiredChannels();
   checks.push({
     id: "escalation_delivery",
     ok: !serving || smsReal || waReal || voiceReal,
     detail: smsReal || waReal || voiceReal
       ? `Canaux d'alerte configurés : ${[smsReal && "SMS", waReal && "WhatsApp", voiceReal && "appel"].filter(Boolean).join(", ")}.`
-      : "Aucun fournisseur d'alerte configuré : une escalade vers un agent n'atteindrait personne.",
+      : halfWired.length > 0
+        ? `Opérateur nommé sans identifiants : ${halfWired.join(", ")}. Le message serait écrit dans le journal au lieu d'atteindre un agent.`
+        : "Aucun fournisseur d'alerte configuré : une escalade vers un agent n'atteindrait personne.",
   });
 
   checks.push({

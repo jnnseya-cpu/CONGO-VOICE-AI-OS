@@ -8,6 +8,8 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { LanguageCode } from "@server/db/schema";
+import { syncCredentials } from "@server/core/credentials";
+import { conversationalWhatsappMode } from "./modes";
 
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
 const GRAPH_BASE = process.env.WHATSAPP_GRAPH_BASE ?? "https://graph.facebook.com";
@@ -18,7 +20,21 @@ export const WHATSAPP_WINDOW_MS = 24 * 60 * 60 * 1000;
 export type WhatsappMode = "graph" | "log";
 
 export function whatsappMode(): WhatsappMode {
-  return process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID ? "graph" : "log";
+  return conversationalWhatsappMode();
+}
+
+/**
+ * The mode a send should actually use.
+ *
+ * `whatsappMode()` reads the environment, which is a copy; the credential an
+ * administrator set at /admin lives in the database. Every outbound send
+ * reconciles the two first — at most once a minute per instance — so a message
+ * is not written to the log by an instance that simply had not heard about the
+ * key yet.
+ */
+async function liveMode(): Promise<WhatsappMode> {
+  await syncCredentials().catch(() => undefined);
+  return whatsappMode();
 }
 
 export interface OutboxEntry {
@@ -80,7 +96,7 @@ async function graph(path: string, body: unknown): Promise<SendResult> {
 }
 
 export async function sendText(to: string, text: string, previewUrl = false): Promise<SendResult> {
-  if (whatsappMode() === "log") return record({ to, kind: "text", body: text });
+  if ((await liveMode()) === "log") return record({ to, kind: "text", body: text });
   return graph("messages", {
     messaging_product: "whatsapp",
     recipient_type: "individual",
@@ -97,7 +113,7 @@ export async function sendButtons(
   buttons: Array<{ id: string; title: string }>,
 ): Promise<SendResult> {
   const trimmed = buttons.slice(0, 3).map((b) => ({ id: b.id.slice(0, 256), title: b.title.slice(0, 20) }));
-  if (whatsappMode() === "log") return record({ to, kind: "buttons", body, buttons: trimmed });
+  if ((await liveMode()) === "log") return record({ to, kind: "buttons", body, buttons: trimmed });
   return graph("messages", {
     messaging_product: "whatsapp",
     to,
@@ -123,7 +139,7 @@ export async function sendList(
     title: r.title.slice(0, 24),
     description: r.description?.slice(0, 72),
   }));
-  if (whatsappMode() === "log") return record({ to, kind: "list", body, rows: trimmed });
+  if ((await liveMode()) === "log") return record({ to, kind: "list", body, rows: trimmed });
   return graph("messages", {
     messaging_product: "whatsapp",
     to,
@@ -138,7 +154,7 @@ export async function sendList(
 
 /** Uploads audio to the media endpoint and sends it as a voice note (FR-CH-10). */
 export async function sendVoiceNote(to: string, audio: Buffer, mimeType = "audio/ogg"): Promise<SendResult> {
-  if (whatsappMode() === "log") return record({ to, kind: "audio", bytes: audio.length });
+  if ((await liveMode()) === "log") return record({ to, kind: "audio", bytes: audio.length });
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   if (!token || !phoneId) return { ok: false, messageId: null, mode: "log", error: "not_configured" };
@@ -172,7 +188,7 @@ export async function sendTemplate(
   language: LanguageCode,
   parameters: string[] = [],
 ): Promise<SendResult> {
-  if (whatsappMode() === "log") {
+  if ((await liveMode()) === "log") {
     return record({ to, kind: "template", templateName, language, body: parameters.join(" | ") });
   }
   return graph("messages", {

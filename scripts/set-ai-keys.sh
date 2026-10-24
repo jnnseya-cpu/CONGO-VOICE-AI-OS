@@ -4,6 +4,12 @@
 #
 #   bash scripts/set-ai-keys.sh
 #
+# There is now a second way, and for a pilot it is usually the better one: a
+# platform administrator can set the same credentials at /admin, where they are
+# encrypted in the database, take effect without a redeploy, and are audited.
+# See docs/SECURITY.md §2 for what that moves. This script remains the right
+# tool for a production deployment whose keys belong in Secret Manager.
+#
 # Written so a key never has to be typed on a command line. Cloud Shell keeps
 # its shell history in $HOME, which persists, so a key pasted into a command
 # stays in ~/.bash_history for good. This reads each one with the terminal echo

@@ -6,6 +6,7 @@ import { adminStats } from "@server/ai/agents/reporting";
 import { PageHeader } from "@client/components/ui";
 import { StatusPanel } from "@client/components/admin/StatusPanel";
 import { ConfigEditor } from "@client/components/admin/ConfigEditor";
+import { ProviderKeys } from "@client/components/admin/ProviderKeys";
 import { SeedButton } from "@client/components/admin/SeedButton";
 import { AccessNotice, BarList, LANGUAGE_FR, Panel, ROLE_FR, SHARE_COLORS, ShareBar, StatTile, TableShell, Td, Th, dateTimeFr, fmt } from "@client/components/dashboard/Common";
 import { IconAlert, IconChart, IconClock, IconMic, IconShield, IconUsers } from "@client/components/icons";
@@ -149,6 +150,10 @@ export default async function AdminPage() {
           <Panel title="Comptes par rôle" action={<Link href="/admin/utilisateurs" className="link">Gérer</Link>}>
             <BarList rows={stats.usersByRole.map((u) => ({ label: ROLE_FR[u.role] ?? u.role, value: u.n }))} tone="brand" />
           </Panel>
+
+          {/* Platform administrators only: holding the vendor keys is not the
+              same job as supervising the service, and the route enforces it. */}
+          {session.role === "platform_admin" && <ProviderKeys />}
 
           {canConfig && <ConfigEditor />}
 
