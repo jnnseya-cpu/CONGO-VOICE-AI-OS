@@ -108,6 +108,13 @@ all absent, and each binds before the application does.
 | An operator the platform does not implement | 400, refused | PASS |
 | Everything withdrawn again | `escalation_delivery` fails again | PASS |
 
+The page a platform administrator sees is in
+`launch-audit/evidence/admin-provider-keys.png`, taken from the running build:
+five groups, every credential marked « absente », a password field for each
+secret and a plain field for each identifier, and the three channel drivers as
+closed lists ("log — ne pas envoyer, journaliser seulement", africastalking,
+twilio).
+
 No message left the machine: the Africa's Talking credentials used were
 fabricated, so what is demonstrated is the platform's own routing decision, not
 delivery by a carrier. Delivery still needs a real operator account, which is on
