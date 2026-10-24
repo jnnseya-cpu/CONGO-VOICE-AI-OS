@@ -20,7 +20,7 @@ export const SITE = {
    * www, not the apex: the government entity that publishes, links and prints
    * this address uses www, and an official link landing on a host nobody
    * recognises is worse than a longer address. The apex redirects here — see
-   * src/middleware.ts — so both work, but only one is written down.
+   * src/proxy.ts — so both work, but only one is written down.
    */
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.congovoicecd.com",
   operator: "Groupe Nseya Digital / JNN Global Ltd",

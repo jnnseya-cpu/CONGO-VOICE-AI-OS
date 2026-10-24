@@ -21,6 +21,9 @@
     "perf": "node scripts/perf-3g.mjs",
     "a11y": "node scripts/a11y.mjs",
     "crawl": "node scripts/crawl.mjs",
+    "pwa:offline": "node scripts/pwa-offline.mjs",
+    "requirements:extract": "node scripts/extract-requirements.mjs",
+    "requirements:matrix": "python3 scripts/build-requirements-matrix.py",
     "requirements:docx": "node scripts/requirements-docx.mjs",
     "preflight": "node scripts/preflight.mjs",
     "residency:doc": "node scripts/build-residency-doc.mjs",
@@ -47,14 +50,14 @@
     "exceljs": "^4.4.0",
     "heic-decode": "^2.1.0",
     "marked": "^18.0.12",
-    "next": "16.3.4",
+    "next": "16.4.3",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
-    "sharp": "^0.35.4",
-    "zod": "^4.5.4"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -63,18 +66,18 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "^5.0.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "axe-core": "4.13.0",
     "docx": "^9.7.2",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.3",
     "fake-indexeddb": "^6.2.5",
     "playwright-core": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.5"
   },
   "description": "Plateforme nationale d'inclusion numérique vocale en santé, agriculture et éducation — République Démocratique du Congo.",
   "engines": {
@@ -82,6 +85,15 @@
     "npm": ">=10"
   },
   "overrides": {
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "minimatch@^3": {
+      "brace-expansion": "1.1.21"
+    },
+    "minimatch@^5": {
+      "brace-expansion": "2.1.7"
+    },
+    "minimatch@^10": {
+      "brace-expansion": "5.0.12"
+    }
   }
 }

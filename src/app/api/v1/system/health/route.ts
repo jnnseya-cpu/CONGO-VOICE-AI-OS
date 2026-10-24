@@ -47,7 +47,26 @@ export async function GET() {
     const checks = [...ready.checks, ...schedulerCheck, ...residency, ...(await clinicalReadiness().catch(() => []))];
     const failing = checks.filter((c) => !c.ok);
     if (failing.length > 0) {
-      return NextResponse.json({ status: "degraded", time: new Date().toISOString(), failing }, { status: 503 });
+      /*
+       * This route is public — Cloud Run probes it, and `--allow-unauthenticated`
+       * means anybody else can too. The *fact* of degradation is what a probe and
+       * an operator need; the explanations are not theirs to read.
+       *
+       * A failing check's detail names the thing that failed, and some of those
+       * things are the vendor chain ("refusé par la politique : anthropic (US)"),
+       * the hosting jurisdiction, the environment variables that are unset, and
+       * how long the scheduler has been dead. Handing that to an anonymous caller
+       * both breaks this repository's rule that provider names never reach a
+       * client and tells an attacker which safeguards are currently not working.
+       *
+       * So in production the identifiers go out and the details stay in. The full
+       * report, with every detail, is at GET /api/v1/admin/status behind
+       * `dashboard:admin` — the same information, to someone entitled to it. This
+       * mirrors the catch below, which has always withheld the database error in
+       * production because it can carry a connection string.
+       */
+      const body = process.env.NODE_ENV === "production" ? failing.map((c) => ({ id: c.id })) : failing;
+      return NextResponse.json({ status: "degraded", time: new Date().toISOString(), failing: body }, { status: 503 });
     }
     return NextResponse.json({ status: "ok", time: new Date().toISOString() });
   } catch (err) {

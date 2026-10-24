@@ -186,7 +186,18 @@ export function contentMatchesMime(data: Buffer, mime: string): boolean {
   );
 }
 
+/**
+ * The folder half of a storage key.
+ *
+ * Every caller today passes a constant or a validated enum, so nothing
+ * user-supplied reaches it. This check is here so that stays true: a prefix is
+ * part of a path, and a path assembled from a request is how "evidence/" becomes
+ * "../../" on a filesystem driver, or an unrelated object on a bucket.
+ */
+const SAFE_PREFIX = /^[a-z0-9][a-z0-9-]{0,31}$/;
+
 export async function storeUpload(data: Buffer, mimeType: string, prefix: string): Promise<StoredFile> {
+  if (!SAFE_PREFIX.test(prefix)) throw new Error("Invalid storage prefix");
   if (data.length > env.storage.maxUploadBytes) throw new Error("File too large");
   if (data.length === 0) throw new Error("Empty file");
   if (!contentMatchesMime(data, mimeType)) throw new Error("File contents do not match the declared type");

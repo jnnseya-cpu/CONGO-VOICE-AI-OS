@@ -5,6 +5,12 @@ whether the platform may be put in front of citizens, not of whether the build
 is green. A green build says nothing about whether a promise made to a mother at
 two in the morning is kept.
 
+**Re-verified 24 October 2026** against a production build of the current
+branch, served from `.next/standalone` with the embedded database. The verdict
+below is unchanged — none of the six reasons in §2 is a code defect, and none of
+them has been resolved by writing code. The numbers in §1 are the ones measured
+on that run; three rows say plainly what was *not* re-measured.
+
 ## The verdict
 
 **No-go for an open public launch. Go for a supervised pilot,** on the
@@ -28,16 +34,17 @@ Every claim below is reproducible from this repository.
 
 | Claim | How it is proven |
 |---|---|
-| 1 144 tests pass | `npm test` |
+| 1 691 tests in 87 files pass | `npm test`, 24 October 2026 |
 | Every safety rule is individually reachable and fires | `tests/rule-coverage.test.ts` |
 | 126 adversarial cases hold their invariants through the real pipeline | `tests/red-team.test.ts`, run in CI on every change |
 | Coverage of the deterministic domain and policy code ≥ 80 % | thresholds in `vitest.config.ts`, enforced, not reported |
 | Danger signs are decided before any model call | `src/server/ai/protocols/`, `tests/health-danger-signs.test.ts` |
 | Severity is raise-only; only a clinician override lowers it | `src/server/ai/agents/risk.ts` |
-| 37 pages load with no console error and no broken link among 209 targets | `node scripts/crawl.mjs` |
-| 37/37 behavioural checks against a running production build | `node scripts/smoke.mjs` |
-| No WCAG 2.2 A/AA violation on any page | `node scripts/a11y.mjs` |
-| Page load inside the objective on a throttled 3G profile | `node scripts/perf-3g.mjs` |
+| 38 pages load with no console error, no failed request and no broken link among 249 targets | `node scripts/crawl.mjs`, 24 October 2026 |
+| 36/37 behavioural checks against a running production build | `node scripts/smoke.mjs`, 24 October 2026. The one failure is the health probe answering 503, which is this deployment reporting the unstaffed board and unwired alert channel of §2 — the check is correct and the answer is honest |
+| No WCAG 2.2 A/AA violation on any of 38 pages | `node scripts/a11y.mjs`, 24 October 2026 (axe-core, wcag2a/2aa/21a/21aa/22aa) |
+| The service worker installs, claims the page and renders it with the network down | `node scripts/pwa-offline.mjs`, 24 October 2026 |
+| Page load inside the objective on a throttled 3G profile | `node scripts/perf-3g.mjs` — **3 of 4 pages** on 24 October 2026: the home page measured 2 518 ms against a 2 500 ms objective, on a machine also running the database in-process. Not a pass, and not representative of the deployment either; it is re-measured against the real origin before launch |
 | Personal data is unreadable on disk | `tests/security.test.ts`, and by inspecting the bytes |
 | 200 events captured over 72 hours replay exactly once | `tests/offline-capacity.test.ts` |
 | Every requirement identifier in both PRDs has a row | `tests/requirements.test.ts`, `docs/REQUIREMENTS.md` |
@@ -86,6 +93,11 @@ to the public today.
 
 6. **Nothing has been restored from a backup.** Replication and backup can be
    configured; a recovery-time objective is only real once someone has restored.
+
+7. **No deployment has been made from this branch.** The container was built and
+   served locally on 24 October 2026, and every check above ran against it. The
+   cloud deployment is a separate act requiring credentials this environment does
+   not hold, so nothing here is evidence about the live service.
 
 ## 3. Conditions for a supervised pilot
 

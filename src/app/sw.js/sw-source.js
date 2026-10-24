@@ -310,4 +310,18 @@ self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type === "cvos-flush") event.waitUntil(replayQueue().catch(() => undefined));
   if (data.type === "cvos-skip-waiting") self.skipWaiting();
+  /*
+   * Signing out has to empty the data cache.
+   *
+   * API reads are cached so that a bad connection still shows the last answer.
+   * That cache is per-origin, not per-person, and this platform is used on
+   * shared handsets on purpose: clearing the cookie and leaving the cached
+   * responses behind means the next person on the phone can be served the
+   * previous person's history from the offline fallback path.
+   *
+   * The shell cache stays — it is the application's own code and markup — and
+   * the outbox stays, because a voice note recorded and not yet sent belongs to
+   * the person who recorded it and is replayed against its own session.
+   */
+  if (data.type === "cvos-signed-out") event.waitUntil(caches.delete(DATA_CACHE).catch(() => undefined));
 });

@@ -95,3 +95,36 @@ describe("a waiting worker is told to take over", () => {
     expect(registration).toContain("reloading");
   });
 });
+
+/**
+ * Signing out on a shared phone.
+ *
+ * API reads are cached so a bad connection still shows the last answer. That
+ * cache belongs to the origin, not to the person: clearing the cookie and
+ * leaving it behind lets the next user of the same handset pull the previous
+ * user's history out of the offline fallback. These assertions pin what is
+ * cleared and — just as important — what is not.
+ */
+describe("sign-out clears the data cache", () => {
+  it("handles a signed-out message", () => {
+    expect(source).toContain('data.type === "cvos-signed-out"');
+  });
+
+  it("deletes the data cache and nothing else", () => {
+    const handler = source.slice(source.indexOf('data.type === "cvos-signed-out"'));
+    const statement = handler.slice(0, handler.indexOf("\n}"));
+    expect(statement).toContain("caches.delete(DATA_CACHE)");
+    // The shell is the application's own code; deleting it would make a
+    // signed-out phone need the network to show anything at all.
+    expect(statement).not.toContain("SHELL_CACHE");
+    // The outbox holds a question somebody recorded and has not sent yet.
+    expect(statement).not.toContain("QUEUE_DB_NAME");
+  });
+
+  it("is asked to forget by the sign-out button", () => {
+    const topbar = readFileSync(new URL("../src/client/components/shell/Topbar.tsx", import.meta.url), "utf8");
+    expect(topbar).toContain('type: "cvos-signed-out"');
+    // And the page clears it itself, for the case where no worker controls it.
+    expect(topbar).toContain('n.startsWith("cvos-data-")');
+  });
+});

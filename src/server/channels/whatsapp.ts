@@ -242,6 +242,9 @@ export async function downloadMedia(mediaId: string, maxBytes = 16 * 1024 * 1024
     if (!metaRes.ok) return null;
     const meta = (await metaRes.json()) as { url?: string; mime_type?: string; file_size?: number };
     if (!meta.url) return null;
+    // The URL comes back from Graph over TLS, so it is not attacker-chosen — but
+    // the download carries the access token, so it leaves over TLS or not at all.
+    if (!meta.url.startsWith("https://")) return null;
     if (meta.file_size && meta.file_size > maxBytes) return null;
     const fileRes = await fetch(meta.url, { headers: { Authorization: `Bearer ${token}` } });
     if (!fileRes.ok) return null;
@@ -255,9 +258,17 @@ export async function downloadMedia(mediaId: string, maxBytes = 16 * 1024 * 1024
 }
 
 /** X-Hub-Signature-256 check. Returns true when no app secret is configured (offline mode). */
+/**
+ * X-Hub-Signature-256 validation.
+ *
+ * As with the telephony webhook, a missing app secret is answered differently
+ * depending on where it is missing: outside production there is no secret to
+ * have and the adapter must still run, while in production a public webhook
+ * that cannot be verified must be refused rather than trusted.
+ */
 export function verifySignature(rawBody: string, header: string | null): boolean {
   const secret = process.env.WHATSAPP_APP_SECRET;
-  if (!secret) return true;
+  if (!secret) return process.env.NODE_ENV !== "production";
   if (!header?.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
   const given = header.slice(7);

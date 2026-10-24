@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE } from "@shared/site";
 import { PageIntro, Section, Faq, Callout, Note, CtaBand, AnchorNav } from "@client/components/public/ui";
+import { jsonLdScript } from "@shared/jsonld";
 
 export const metadata: Metadata = {
   title: "Questions fréquentes",
@@ -365,7 +366,7 @@ export default function AidePage() {
         secondary={{ href: "/services", label: "Les services en détail" }}
       />
 
-      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
+      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: jsonLdScript(JSON_LD) }} />
     </>
   );
 }

@@ -11,6 +11,7 @@
 import type { LanguageCode, ModuleType } from "@server/db/schema";
 import { localise } from "@server/ai/agents/language";
 import { runInBackground } from "@server/channels/background";
+import { inboundChannelAllowed } from "@server/channels/http";
 import { menuQuestions, questionLabel } from "@server/channels/menus";
 import { sendSms } from "@server/channels/sms";
 import {
@@ -62,6 +63,13 @@ export async function POST(req: Request): Promise<Response> {
   const providerSessionId = form.get("sessionId") ?? "";
   const text = (form.get("text") ?? "").trim();
   if (!phoneNumber) return end("Numéro inconnu.");
+  // Before the session, the model call and the SMS: this endpoint is public.
+  // French only, deliberately — the language menu has not been shown yet at the
+  // first screen, and a caller hitting this limit is not a caller reading a
+  // menu. Inventing four translations nobody has reviewed would be worse.
+  if (!(await inboundChannelAllowed("ussd", phoneNumber))) {
+    return end("Trop de demandes. Réessayez dans une minute.");
+  }
 
   const { session, identity } = await startOrResume({ channel: "ussd", kind: "msisdn", identifier: phoneNumber });
   let state = readState(session);

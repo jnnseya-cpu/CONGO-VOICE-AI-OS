@@ -20,7 +20,7 @@
  * of defect is visible.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const ROOT = process.cwd();
@@ -34,8 +34,20 @@ function externalPackages() {
   return [...block[1].matchAll(/["'`]([^"'`]+)["'`]/g)].map((m) => m[1]);
 }
 
+/**
+ * Every package the entry point can reach, as the path Node will actually
+ * resolve it from.
+ *
+ * The path matters, not just the name. A package pinned by an `overrides` entry
+ * is installed beside its dependent — `readdir-glob/node_modules/brace-expansion`
+ * — and nothing is hoisted to the top of `node_modules` at all. Checking the
+ * name against the top level therefore reported a package as missing from the
+ * image while the container resolved it perfectly, which is a build that fails
+ * for the wrong reason. Checking the resolved path is strictly stricter: it is
+ * the location the runtime will look in.
+ */
 function closure(entry) {
-  const found = new Set();
+  const found = new Map();
   const locate = (name, from) => {
     let dir = from;
     for (;;) {
@@ -53,7 +65,9 @@ function closure(entry) {
     const dir = locate(name, from);
     if (!dir) return;
     if (name.startsWith("@types/")) return; // compile-time only
-    found.add(name);
+    // Relative to the top of node_modules, so it can be looked for at the same
+    // place inside the image's own node_modules.
+    found.set(name, relative(join(ROOT, "node_modules"), dir));
     try {
       const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
       // Optional as well as required: sharp's native libvips is an optional
@@ -64,7 +78,7 @@ function closure(entry) {
     }
   };
   walk(entry, ROOT);
-  return [...found];
+  return found;
 }
 
 if (!existsSync(STANDALONE)) {
@@ -84,9 +98,13 @@ console.log("Checking what the deployed image will actually contain.\n");
 
 for (const entry of externalPackages()) {
   const needed = closure(entry);
-  const missing = needed.filter((name) => !existsSync(join(STANDALONE, name, "package.json")));
+  // Present at the path Node resolves it from, or — for a package the installer
+  // hoisted differently inside the image — at the top of its node_modules.
+  const missing = [...needed].filter(
+    ([name, rel]) => !existsSync(join(STANDALONE, rel, "package.json")) && !existsSync(join(STANDALONE, "node_modules", name, "package.json")),
+  ).map(([name]) => name);
   const status = missing.length === 0 ? "ok  " : "MISS";
-  console.log(`  ${status} ${entry}  (${needed.length - missing.length}/${needed.length} packages present)`);
+  console.log(`  ${status} ${entry}  (${needed.size - missing.length}/${needed.size} packages present)`);
   if (missing.length > 0) {
     failed += 1;
     for (const name of missing.slice(0, 12)) console.log(`         missing: ${name}`);

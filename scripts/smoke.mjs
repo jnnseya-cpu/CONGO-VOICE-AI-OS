@@ -63,10 +63,16 @@ async function call(path, { method = "GET", body, token, cookie, headers = {} } 
 section("Reachability and probes");
 {
   const { res, json } = await call("/api/v1/system/health");
-  const failing = (json?.failing ?? []).map((f) => `${f.id}: ${f.detail}`).join(" | ");
+  // The route withholds each check's explanation in production, because it is
+  // public and the explanations name providers, jurisdictions and unset
+  // variables. So print what is there and say where the rest is.
+  const entries = json?.failing ?? [];
+  const failing = entries.map((f) => (f.detail ? `${f.id}: ${f.detail}` : f.id)).join(" | ");
+  const withheld = entries.length > 0 && entries.every((f) => !f.detail);
+  const note = withheld ? " — details withheld in production; read GET /api/v1/admin/status as an administrator" : "";
   // A 503 here on a production deployment usually means the escalation path is
   // not wired, which is the one failure that must never be quiet.
-  check("health probe answers ok", res.status === 200 && json?.status === "ok", `status ${res.status} ${failing || json?.error || ""}`);
+  check("health probe answers ok", res.status === 200 && json?.status === "ok", `status ${res.status} ${failing || json?.error || ""}${note}`);
 }
 {
   const { res } = await call("/");

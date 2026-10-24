@@ -69,6 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         {/* Self-hosted: no third-party request, and the font survives offline. */}
         <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        {/* eslint-disable-next-line @next/next/no-css-tags -- self-hosted font, see the preload above */}
         <link rel="stylesheet" href="/fonts/inter.css" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
       </head>

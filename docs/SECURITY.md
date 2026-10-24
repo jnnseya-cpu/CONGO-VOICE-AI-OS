@@ -82,6 +82,22 @@ a migration with both keys available, never as a config change.
 - A content security policy allows only this origin for script, style, font,
   image, connection, frame and form targets. Framing is denied. API responses
   carry `no-store` and vary on credentials.
+- **The provider webhooks under `/api/hooks` do not go through `handle()`**, and
+  cannot: they answer a telephony or messaging gateway in that gateway's own
+  format, not in the API envelope. What guards them instead:
+  - Telephony and WhatsApp verify the provider's signature, and **refuse an
+    unverifiable request in production**. Outside production, with no token
+    configured, they accept — the platform has to run with no vendor keys. A
+    deployment that has the webhook wired at the provider and the token missing
+    here is therefore refused rather than trusted.
+  - A Twilio recording is downloaded only from Twilio's own API host. The
+    download carries the account's credentials, so the host is a credential
+    boundary and is checked rather than assumed.
+  - USSD and inbound SMS cannot be signed — the operator's format has no
+    signature — so each is rate-limited per phone number, counted under a keyed
+    digest of the number. The limit is far above human speed and well below the
+    rate at which an unlimited public endpoint would spend the programme's
+    budget on model calls and outbound messages.
 
 ## 5. What is recorded
 
@@ -102,17 +118,41 @@ and each has a real cost either way.
 2. **Inline script is still allowed** by the policy. Removing the allowance
    needs a per-request nonce, which forces all 158 prerendered pages to be
    rendered on demand. That is a performance decision, not a default.
-3. **Retention periods** for raw audio are unset.
+3. **Retention periods** are set in code and swept daily — ninety days for
+   audio, a year for images, video and generated documents, each overridable by
+   the deployment — and every purge is audited, with an alert when bytes resist
+   deletion. What the programme still owns is whether those are the right
+   numbers under Congolese law and the ministry's own records policy, which is a
+   legal determination rather than a default.
 4. **Independent penetration testing** has not been done. Nothing in this
    document substitutes for it.
 
 ## 7. Known gaps, stated plainly
 
-- **Phone numbers are stored in clear text.** `core/crypto.ts` already
-  provides a blind index for exactly this, but converting the column touches
-  sign-in, the directory, notifications and the channel layer, and was not
-  attempted rather than half-done. Until then they are protected by disk
-  encryption and access control, not by the application.
+- ~~Phone numbers are stored in clear text.~~ **Closed.** `users.phone` holds
+  ciphertext and every lookup goes through the keyed blind index on
+  `phone_index` (`core/phone.ts`). The lockout counter was the last place a
+  number sat in clear — its row key was `phone:+243…`, which made
+  `auth_attempts` a readable list of who had recently used the service — and it
+  now keys on the same kind of digest. A facility's number in
+  `service_directory` is institutional contact data and stays readable on
+  purpose.
+- **A field role can read a case outside its own territory.** Case reads are
+  scoped by module — a health worker sees health, an agronomist agriculture —
+  and routing uses territory, but a read is not territory-scoped. Supervision
+  across provinces may be exactly what the programme wants; it should be a
+  decision rather than an omission, and until it is decided the exposure is
+  every case in one module rather than one territory's.
+- **A finished report can be downloaded by any holder of `report:export`**,
+  including a partner organisation downloading a report another organisation
+  asked for. The content is aggregated and small-count suppressed, and every
+  download is audited, so this is a tenancy gap rather than a disclosure of
+  personal data.
+- **The USSD and inbound-SMS webhooks are unauthenticated by the operator's
+  design.** They are now rate-limited per number (§4), which bounds abuse but
+  does not establish who is calling. The remaining mitigation is an address
+  allow-list for the operator's gateways at the load balancer, which is
+  deployment configuration rather than code.
 - **No intrusion detection.** Failed sign-ins and refused permissions are
   logged and countable, but nothing watches them in real time.
 - **No secret rotation procedure** is written down for the session secret or

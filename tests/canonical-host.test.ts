@@ -12,7 +12,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { aliasOf, middleware } from "@/middleware";
+import { aliasOf, proxy } from "@/proxy";
 
 const CANON = "congovoicecd.com";
 
@@ -38,7 +38,7 @@ describe("the two spellings of the address", () => {
 describe("with the apex canonical", () => {
   it("sends www to the apex, permanently, keeping path and query", () => {
     canonicalIs(CANON);
-    const res = middleware(req(`www.${CANON}`, "/sante?lang=ln"));
+    const res = proxy(req(`www.${CANON}`, "/sante?lang=ln"));
     expect(res.status).toBe(308);
     const to = new URL(res.headers.get("location")!);
     expect(to.host).toBe(CANON);
@@ -49,27 +49,27 @@ describe("with the apex canonical", () => {
   it("keeps a POST a POST, so a submitted question is not lost", () => {
     canonicalIs(CANON);
     // 308 preserves method and body; 301 does not.
-    const res = middleware(req(`www.${CANON}`, "/api/v1/interactions", "POST"));
+    const res = proxy(req(`www.${CANON}`, "/api/v1/interactions", "POST"));
     expect(res.status).toBe(308);
   });
 
   it("leaves the canonical host alone", () => {
     canonicalIs(CANON);
-    expect(middleware(req(CANON, "/sante")).status).toBe(200);
+    expect(proxy(req(CANON, "/sante")).status).toBe(200);
   });
 });
 
 describe("with www canonical", () => {
   it("sends the apex to www", () => {
     canonicalIs(`www.${CANON}`);
-    const res = middleware(req(CANON, "/"));
+    const res = proxy(req(CANON, "/"));
     expect(res.status).toBe(308);
     expect(new URL(res.headers.get("location")!).host).toBe(`www.${CANON}`);
   });
 
   it("leaves www alone", () => {
     canonicalIs(`www.${CANON}`);
-    expect(middleware(req(`www.${CANON}`, "/")).status).toBe(200);
+    expect(proxy(req(`www.${CANON}`, "/")).status).toBe(200);
   });
 });
 
@@ -78,26 +78,26 @@ describe("what must never be redirected", () => {
     canonicalIs(CANON);
     // Cloud Run calls this on the container's own address. A redirect here is a
     // revision that never starts.
-    expect(middleware(req(`www.${CANON}`, "/api/v1/system/ready")).status).toBe(200);
-    expect(middleware(req(`www.${CANON}`, "/api/v1/system/health")).status).toBe(200);
+    expect(proxy(req(`www.${CANON}`, "/api/v1/system/ready")).status).toBe(200);
+    expect(proxy(req(`www.${CANON}`, "/api/v1/system/health")).status).toBe(200);
   });
 
   it("does not touch telephony or messaging webhooks", () => {
     canonicalIs(CANON);
     // Their signatures are computed over the exact URL the provider was given.
     for (const p of ["/api/hooks/ivr/twilio", "/api/hooks/whatsapp", "/api/hooks/sms/dlr"]) {
-      expect(middleware(req(`www.${CANON}`, p, "POST")).status, p).toBe(200);
+      expect(proxy(req(`www.${CANON}`, p, "POST")).status, p).toBe(200);
     }
   });
 
   it("ignores any host that is not the one alias", () => {
     canonicalIs(CANON);
     for (const h of ["congovoice-pilot-abc123-ew.a.run.app", "localhost", "10.0.0.5", "evil.example.com", "api.congovoicecd.com"]) {
-      expect(middleware(req(h, "/")).status, h).toBe(200);
+      expect(proxy(req(h, "/")).status, h).toBe(200);
     }
   });
 
   it("does nothing at all when no public origin is configured", () => {
-    expect(middleware(req(`www.${CANON}`, "/")).status).toBe(200);
+    expect(proxy(req(`www.${CANON}`, "/")).status).toBe(200);
   });
 });

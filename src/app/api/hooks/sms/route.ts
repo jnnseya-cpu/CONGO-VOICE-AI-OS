@@ -8,6 +8,7 @@ import { withIdempotency, IdempotencyConflict } from "@server/core/idempotency";
 import { runTurn, settleTurn, startOrResume, continueTurn, isContinuationRequest, readState } from "@server/channels/session";
 import { sendSms } from "@server/channels/sms";
 import { safeMessage } from "@server/channels/errors";
+import { inboundChannelAllowed } from "@server/channels/http";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,16 @@ async function parseInbound(req: Request): Promise<InboundSms | null> {
 export async function POST(req: Request): Promise<Response> {
   const inbound = await parseInbound(req);
   if (!inbound) return new Response("OK", { status: 200 });
+  /*
+   * Public endpoint, real cost per message. Over the limit the message is
+   * dropped without a reply: answering a flood with an SMS per message is the
+   * amplification, not the defence. 200 rather than 429 because the operator's
+   * gateway retries a non-2xx, which would turn one refusal into several.
+   */
+  if (!(await inboundChannelAllowed("sms", inbound.from))) {
+    console.warn("[sms] inbound rate limit reached for one number; message dropped");
+    return new Response("OK", { status: 200 });
+  }
   try {
     await withIdempotency(inbound.messageId ? `sms:${inbound.messageId}` : null, null, () => handle(inbound));
   } catch (err) {

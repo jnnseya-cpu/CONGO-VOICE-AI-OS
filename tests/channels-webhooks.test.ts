@@ -428,3 +428,83 @@ describe("channel webhooks (offline providers)", () => {
     expect(await res.text()).toContain("<Response>");
   });
 });
+
+/**
+ * A webhook whose signature cannot be checked.
+ *
+ * These paths are public. The question is what the platform does when the
+ * verifying secret is absent, and the answer has to differ by environment: a
+ * developer with no vendor keys must still be able to drive the adapter, and a
+ * production deployment must not accept a call it cannot attribute.
+ */
+describe("unverifiable webhooks", () => {
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  const whatsappSecret = process.env.WHATSAPP_APP_SECRET;
+
+  afterEach(() => {
+    if (twilioToken === undefined) delete process.env.TWILIO_AUTH_TOKEN;
+    else process.env.TWILIO_AUTH_TOKEN = twilioToken;
+    if (whatsappSecret === undefined) delete process.env.WHATSAPP_APP_SECRET;
+    else process.env.WHATSAPP_APP_SECRET = whatsappSecret;
+    vi.unstubAllEnvs();
+  });
+
+  it("accepts an unsigned telephony webhook outside production, and refuses it in production", async () => {
+    const { validateTwilioSignature } = await import("@server/channels/twilio");
+    delete process.env.TWILIO_AUTH_TOKEN;
+
+    vi.stubEnv("NODE_ENV", "test");
+    expect(validateTwilioSignature("https://example.org/api/hooks/ivr/twilio", {}, null)).toBe(true);
+
+    vi.stubEnv("NODE_ENV", "production");
+    expect(validateTwilioSignature("https://example.org/api/hooks/ivr/twilio", {}, null)).toBe(false);
+  });
+
+  it("still checks a real signature when a token is configured", async () => {
+    const { validateTwilioSignature } = await import("@server/channels/twilio");
+    const { createHmac } = await import("node:crypto");
+    process.env.TWILIO_AUTH_TOKEN = "token-for-the-test";
+    vi.stubEnv("NODE_ENV", "production");
+
+    const url = "https://example.org/api/hooks/ivr/twilio/recording";
+    const params = { CallSid: "CA1", RecordingUrl: "https://api.twilio.com/r/1" };
+    const payload = url + "CallSid" + params.CallSid + "RecordingUrl" + params.RecordingUrl;
+    const good = createHmac("sha1", "token-for-the-test").update(Buffer.from(payload, "utf8")).digest("base64");
+
+    expect(validateTwilioSignature(url, params, good)).toBe(true);
+    expect(validateTwilioSignature(url, params, "not-the-signature-but-the-same-length!!")).toBe(false);
+    expect(validateTwilioSignature(url, params, null)).toBe(false);
+  });
+
+  it("accepts an unsigned WhatsApp webhook outside production, and refuses it in production", async () => {
+    const { verifySignature } = await import("@server/channels/whatsapp");
+    delete process.env.WHATSAPP_APP_SECRET;
+
+    vi.stubEnv("NODE_ENV", "test");
+    expect(verifySignature("{}", null)).toBe(true);
+
+    vi.stubEnv("NODE_ENV", "production");
+    expect(verifySignature("{}", null)).toBe(false);
+  });
+});
+
+/**
+ * `RecordingUrl` arrives in the webhook body and the download carries the
+ * account's Basic credentials, so the host it points at is a credential
+ * boundary, not a convenience.
+ */
+describe("recording download host", () => {
+  it("accepts Twilio's own API host over TLS", async () => {
+    const { isTwilioRecordingUrl } = await import("@server/channels/twilio");
+    expect(isTwilioRecordingUrl("https://api.twilio.com/2010-04-01/Accounts/AC1/Recordings/RE1")).toBe(true);
+  });
+
+  it("refuses any other host, plain HTTP, and a host that merely contains the name", async () => {
+    const { isTwilioRecordingUrl } = await import("@server/channels/twilio");
+    expect(isTwilioRecordingUrl("https://attacker.example/steal")).toBe(false);
+    expect(isTwilioRecordingUrl("http://api.twilio.com/r/1")).toBe(false);
+    expect(isTwilioRecordingUrl("https://api.twilio.com.attacker.example/r/1")).toBe(false);
+    expect(isTwilioRecordingUrl("https://169.254.169.254/latest/meta-data/")).toBe(false);
+    expect(isTwilioRecordingUrl("not a url")).toBe(false);
+  });
+});

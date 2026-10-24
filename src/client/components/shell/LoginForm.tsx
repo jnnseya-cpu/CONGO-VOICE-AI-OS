@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { safeNextPath } from "@shared/redirect";
 import { useState } from "react";
 import { LANGUAGES, PROVINCES } from "@shared/types";
 import { useLanguage } from "./LanguageProvider";
@@ -38,7 +39,9 @@ export function LoginForm({ next }: { next: string }) {
       const res = await fetch("/api/v1/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? "Erreur");
-      router.push(next);
+      // Defence in depth: the page already narrowed this, and this component
+      // must not depend on that having happened.
+      router.push(safeNextPath(next));
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");

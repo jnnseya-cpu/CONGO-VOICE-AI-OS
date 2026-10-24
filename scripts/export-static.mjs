@@ -3,10 +3,16 @@
  * scripts removed) for a shareable static preview of the design.
  * usage: node scripts/export-static.mjs http://localhost:3000/ out.html [sessionToken]
  */
+import { existsSync } from "node:fs";
 import { chromium } from "playwright-core";
 import fs from "node:fs/promises";
 const [,, url, out, cookie] = process.argv;
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome", args: ["--no-sandbox"] });
+// Use the browser this environment already has; on a runner that installed one
+// through Playwright, let Playwright find it. A hard-coded, version-pinned path
+// breaks silently the first time that directory is renamed.
+const DEFAULT_EXEC = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const EXEC = process.env.CHROMIUM_PATH ?? (existsSync(DEFAULT_EXEC) ? DEFAULT_EXEC : undefined);
+const browser = await chromium.launch({ executablePath: EXEC, args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 if (cookie) await ctx.addCookies([{ name: "cvai_session", value: cookie, domain: "localhost", path: "/" }]);
 const page = await ctx.newPage();

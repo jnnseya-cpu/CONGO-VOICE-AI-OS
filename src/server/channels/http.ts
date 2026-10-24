@@ -9,6 +9,40 @@ import type { LanguageCode, Role } from "@server/db/schema";
 import { hasPermission } from "@server/core/rbac";
 import { ChannelError, newRequestId, toChannelResponse } from "./errors";
 import { getSessionById, type ChannelSession } from "./session";
+import { getDb } from "@server/db/client";
+import { checkSharedRateLimit } from "@server/core/rate-limit";
+import { phoneLookup } from "@server/core/phone";
+
+/**
+ * How often one phone number may drive an inbound channel.
+ *
+ * The USSD and inbound-SMS webhooks are unauthenticated by design: the operator
+ * posts form fields and no signature exists to check. They also do real work —
+ * a session, a model call, an outbound SMS — so an unlimited public endpoint is
+ * not only a denial-of-service surface but a way to spend the programme's
+ * money and to send messages to a number the caller chooses.
+ *
+ * The limit is deliberately far above human speed: a USSD menu press or a text
+ * message arrives once every few seconds at most, so twenty in a minute is
+ * generous for a citizen and useless for a flood. The key is the blind index of
+ * the number rather than the number itself, because rate-limit buckets are
+ * stored and a stored bucket should not be a list of who used the service.
+ *
+ * Counted per channel: somebody using USSD and SMS at once is still a person.
+ */
+const INBOUND_PER_MINUTE = Number(process.env.INBOUND_CHANNEL_MAX_PER_MINUTE ?? 20);
+
+export async function inboundChannelAllowed(kind: "ussd" | "sms", phone: string): Promise<boolean> {
+  if (!phone) return false;
+  try {
+    const db = await getDb();
+    const result = await checkSharedRateLimit(db, `inbound:${kind}:${phoneLookup(phone)}`, INBOUND_PER_MINUTE, 60);
+    return result.allowed;
+  } catch {
+    // A counter that cannot be read must not stop a citizen from being answered.
+    return true;
+  }
+}
 
 export function requestId(req: Request): string {
   return req.headers.get("x-request-id") ?? newRequestId();

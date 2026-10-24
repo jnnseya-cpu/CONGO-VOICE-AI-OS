@@ -14,6 +14,26 @@ export function Topbar({ user, unread, onMenu, healthy = true }: { user: Session
 
   async function logout() {
     await fetch("/api/v1/auth/logout", { method: "POST" });
+    /*
+     * Clear the cached API reads as well as the cookie.
+     *
+     * On a shared phone the next person must not be able to pull the previous
+     * person's history out of the service worker's offline cache. Both paths are
+     * attempted: the worker owns the cache it created, and the page can also
+     * delete it directly when no worker is controlling this page yet. Neither is
+     * allowed to stop the sign-out.
+     */
+    try {
+      navigator.serviceWorker?.controller?.postMessage({ type: "cvos-signed-out" });
+    } catch {
+      /* no worker, nothing to tell */
+    }
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.filter((n) => n.startsWith("cvos-data-")).map((n) => caches.delete(n)));
+    } catch {
+      /* cache storage unavailable (private window, blocked site data) */
+    }
     router.push("/");
     router.refresh();
   }

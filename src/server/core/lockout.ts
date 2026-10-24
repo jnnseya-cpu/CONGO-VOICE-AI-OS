@@ -11,6 +11,7 @@ import "server-only";
 import { and, eq, lt, sql } from "drizzle-orm";
 import { schema, type Database } from "@server/db/client";
 import { env } from "./env";
+import { blindIndex } from "./crypto";
 
 export interface LockoutState {
   locked: boolean;
@@ -21,8 +22,26 @@ export interface LockoutState {
 
 const open: LockoutState = { locked: false, retryAfterSeconds: 0, failures: 0 };
 
+/**
+ * The row key a lockout is counted under.
+ *
+ * It used to be the value itself, so `auth_attempts` held a readable list of
+ * the phone numbers that had recently tried to sign in — which, for a health
+ * service, is a list of who has been using it. The number is encrypted
+ * everywhere else and looked up through a keyed digest (`core/phone.ts`); there
+ * is no reason for the lockout table to be the one place it sits in clear.
+ *
+ * So the subject is digested too. The digest is keyed, not a plain hash: the
+ * space of Congolese mobile numbers is small enough to enumerate, and an
+ * unkeyed hash of one would be reversible in seconds.
+ *
+ * Addresses are digested by the same path for uniformity. Changing the key
+ * format resets the counters that existed in the old format once, which widens
+ * an in-flight lockout window by at most its own duration — a bounded,
+ * one-time cost against a standing disclosure.
+ */
 function subjectKey(kind: "phone" | "ip", value: string): string {
-  return `${kind}:${value}`.slice(0, 160);
+  return `${kind}:${blindIndex(value, "lockout")}`.slice(0, 160);
 }
 
 /** How long a lockout lasts: the base delay, doubling for each burst beyond the first, capped at a day. */

@@ -15,6 +15,19 @@ const eslintConfig = defineConfig([
   ]),
 
   /*
+   * An argument named with a leading underscore is a declared, deliberate
+   * non-use: an interface the implementation must satisfy without needing the
+   * value. Renaming it would lose that information, so the convention is
+   * recognised instead of worked around.
+   */
+  {
+    files: ["**/*.{ts,tsx,mjs}"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
+    },
+  },
+
+  /*
    * The three-way boundary, enforced.
    *
    * src/server, src/client and src/shared were separated by directory but

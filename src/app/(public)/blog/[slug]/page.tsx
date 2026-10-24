@@ -5,6 +5,7 @@ import { allPosts, clusterNeighbours, getPost, relatedPosts, slugifyTerm } from 
 import { SITE } from "@shared/site";
 import { ArticleMeta, Breadcrumbs, FaqSection, Prose, RelatedPosts, Sources, TagList, Takeaways, Toc, Panel, formatDate } from "@client/components/blog/ui";
 import { IconArrowRight } from "@client/components/icons";
+import { jsonLdScript } from "@shared/jsonld";
 
 export async function generateStaticParams() {
   return (await allPosts()).map((p) => ({ slug: p.slug }));
@@ -88,7 +89,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   return (
     <>
-      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@graph": graph }) }} />
+      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: jsonLdScript({ "@context": "https://schema.org", "@graph": graph }) }} />
 
       <div className="mx-auto max-w-[1120px] px-5 py-10 sm:py-14">
         <Breadcrumbs

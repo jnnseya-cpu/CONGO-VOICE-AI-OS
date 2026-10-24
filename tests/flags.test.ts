@@ -72,7 +72,10 @@ describe("feature flags (DO-04)", () => {
   it("spreads subjects across the range", () => {
     const buckets = new Set(Array.from({ length: 200 }, (_, i) => bucketOf("k", `s-${i}`)));
     expect(buckets.size).toBeGreaterThan(50);
-    for (const b of buckets) expect(b).toBeGreaterThanOrEqual(0), expect(b).toBeLessThan(100);
+    for (const b of buckets) {
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThan(100);
+    }
   });
 });
 

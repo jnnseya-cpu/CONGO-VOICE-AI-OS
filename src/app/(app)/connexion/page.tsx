@@ -1,4 +1,5 @@
 import { LoginForm } from "@client/components/shell/LoginForm";
+import { safeNextPath } from "@shared/redirect";
 
 export const metadata = { title: "Connexion" };
 
@@ -6,7 +7,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { next } = await searchParams;
   return (
     <div className="mx-auto max-w-[460px] py-6">
-      <LoginForm next={next ?? "/"} />
+      <LoginForm next={safeNextPath(next)} />
     </div>
   );
 }

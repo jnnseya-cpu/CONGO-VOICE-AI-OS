@@ -8,7 +8,7 @@ import { blindIndex, decryptBytes, decryptIfEncrypted, decryptValue, encryptByte
 import { checkLockout, clearFailures, isWeakPin, lockoutDuration, recordFailure } from "@server/core/lockout";
 import { checkSharedRateLimit, resetRateLimits } from "@server/core/rate-limit";
 import { storage } from "@server/core/storage";
-import { getDb, resetDbForTests } from "@server/db/client";
+import { getDb, resetDbForTests, schema } from "@server/db/client";
 import { DEMO_PIN, SeedRefused, seedPin } from "@server/db/seed";
 import { env } from "@server/core/env";
 
@@ -219,5 +219,42 @@ describe("demonstration data", () => {
       delete (process.env as Record<string, string | undefined>).SEED_ALLOW_PRODUCTION;
       delete (process.env as Record<string, string | undefined>).SEED_PIN;
     });
+  });
+});
+
+/**
+ * The lockout table used to be the one place a citizen's phone number sat in
+ * clear: its row key was `phone:+243…`. For a health service that is a list of
+ * who has been using it, readable in any dump of the database.
+ */
+describe("the lockout counter does not store the number it counts", () => {
+  it("keys a failure by a keyed digest, not by the number", async () => {
+    resetDbForTests();
+    const db = await getDb();
+    const phone = "+243970001234";
+
+    await recordFailure(db, "phone", phone);
+    const rows = await db.select().from(schema.authAttempts);
+
+    expect(rows.length).toBe(1);
+    expect(rows[0].subject).not.toContain(phone);
+    expect(rows[0].subject).not.toContain("243970001234");
+    expect(rows[0].subject.startsWith("phone:")).toBe(true);
+    // Not a plain hash of a small space: the digest is keyed, so the same
+    // number gives the same key here and nothing outside can reproduce it.
+    expect(rows[0].subject.length).toBeGreaterThan("phone:".length + 20);
+  });
+
+  it("still finds the same subject again, so the counter accumulates", async () => {
+    resetDbForTests();
+    const db = await getDb();
+    const phone = "+243970005678";
+
+    await recordFailure(db, "phone", phone);
+    const second = await recordFailure(db, "phone", phone);
+    expect(second.failures).toBe(2);
+
+    const state = await checkLockout(db, "phone", phone);
+    expect(state.failures).toBe(2);
   });
 });

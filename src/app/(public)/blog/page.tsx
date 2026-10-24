@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { allPosts, categories, clusters, tags, slugifyTerm } from "@server/blog/index";
+import { allPosts, categories, clusters, tags } from "@server/blog/index";
 import { SITE } from "@shared/site";
 import { PageIntro, Section } from "@client/components/public/ui";
 import { PostCard } from "@client/components/blog/ui";
+import { jsonLdScript } from "@shared/jsonld";
 
 export const metadata: Metadata = {
   title: "Blog — IA vocale, langues congolaises et services publics",
@@ -43,7 +44,7 @@ export default async function BlogIndexPage() {
 
   return (
     <>
-      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
       <PageIntro
         eyebrow="Blog du programme"
         title="Ce que l'on apprend en faisant parler un service public"

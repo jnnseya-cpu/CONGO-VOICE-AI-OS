@@ -132,12 +132,25 @@ export function record(opts: RecordOptions): string {
 
 /**
  * X-Twilio-Signature validation: HMAC-SHA1 over the full URL followed by the POST
- * parameters sorted by name. Skipped (returns true) when no auth token is configured,
- * so the adapter still works in offline development.
+ * parameters sorted by name.
+ *
+ * With no auth token configured there is nothing to verify against, and the two
+ * possible answers are not equally safe:
+ *
+ *  - Outside production, accept. The whole platform is required to run with no
+ *    vendor keys, and an unsigned local request is a developer's own curl.
+ *  - In production, refuse. These webhook paths are public, and accepting an
+ *    unverifiable one lets anybody post a call into the IVR: open an
+ *    interaction, drive the menu, and hand `RecordingUrl` to the recording
+ *    route. "Twilio is configured at the provider but its token is missing
+ *    here" is exactly the half-configured state this has to survive.
+ *
+ * NODE_ENV is read at call time rather than captured at import, so a late or
+ * re-read environment cannot leave a process accepting unsigned webhooks.
  */
 export function validateTwilioSignature(url: string, params: Record<string, string>, header: string | null): boolean {
   const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!token) return true;
+  if (!token) return process.env.NODE_ENV !== "production";
   if (!header) return false;
   let payload = url;
   for (const key of Object.keys(params).sort()) payload += key + params[key];
@@ -158,12 +171,37 @@ export async function readTwilioRequest(
   return { params, url, valid: validateTwilioSignature(url, params, req.headers.get("x-twilio-signature")) };
 }
 
+/**
+ * Where a recording may be fetched from.
+ *
+ * `RecordingUrl` arrives in the webhook body, and the download carries the
+ * account's Basic credentials in a header. A URL pointing anywhere else would
+ * therefore send those credentials to whoever chose it, and would also make the
+ * server fetch an address an outsider picked. Twilio serves recordings from its
+ * own API host, so that is the whole allow-list.
+ */
+export function isTwilioRecordingUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  return host === "api.twilio.com" || host.endsWith(".api.twilio.com");
+}
+
 /** Downloads a Twilio recording (needs the account credentials; null in offline mode). */
 export async function fetchRecording(recordingUrl: string): Promise<{ data: Buffer; mimeType: string } | null> {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   if (!sid || !token) {
     console.info("[ivr:log] recording download skipped (offline mode)");
+    return null;
+  }
+  if (!isTwilioRecordingUrl(recordingUrl)) {
+    console.error("[ivr] refusing to download a recording from a host that is not Twilio");
     return null;
   }
   try {

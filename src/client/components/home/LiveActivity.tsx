@@ -1,6 +1,6 @@
 "use client";
 import { useLanguage } from "../shell/LanguageProvider";
-import { Card, CardHeader, StatRow } from "../ui";
+import { Card, StatRow } from "../ui";
 import { IconAlert, IconBriefcase, IconMic, IconUsers } from "../icons";
 import { ArrowLink } from "../ui";
 import { formatNumber } from "@shared/i18n/format";

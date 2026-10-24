@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * One address for the service.
  *
+ * This is the Next 16 `proxy` convention, which replaced `middleware`: same
+ * request hook, new file name and new export name. The name is the only thing
+ * that changed — the behaviour below is unchanged.
+ *
  * congovoicecd.com and www.congovoicecd.com are different hosts, and both were
  * serving the whole application with nothing pointing at the other. Three things
  * follow from that, none of them visible until somebody hits them:
@@ -56,7 +60,7 @@ const NEVER_REDIRECT = [
   "/api/hooks/",
 ];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const canonical = canonicalHost();
   if (!canonical) return NextResponse.next();
 

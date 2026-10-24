@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@server/db/client";
 import type { Role } from "@server/db/schema";
 

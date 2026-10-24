@@ -22,6 +22,11 @@ runConfig:
   maxInstances: 10
   concurrency: 80
 
+# Secret names are the ones scripts/go-live.sh creates: "congovoice-<environment>-<key>",
+# with the key spelled exactly as the application's variable, lower-cased. They were
+# written here in a different spelling, so an App Hosting rollout would have failed on
+# every secret reference — and DATA_ENCRYPTION_KEY missing is a container that refuses to
+# start. Deploying a different environment means changing the "pilot" segment below.
 env:
   - variable: NODE_ENV
     value: production
@@ -45,27 +50,27 @@ env:
     availability: [RUNTIME]
 
   - variable: SESSION_SECRET
-    secret: congovoice-session-secret
+    secret: congovoice-pilot-session_secret
     availability: [RUNTIME]
   # Losing this makes every stored recording and second-factor seed unreadable.
   - variable: DATA_ENCRYPTION_KEY
-    secret: congovoice-data-encryption-key
+    secret: congovoice-pilot-data_encryption_key
     availability: [RUNTIME]
   - variable: DATABASE_URL
-    secret: congovoice-database-url
+    secret: congovoice-pilot-database_url
     availability: [RUNTIME]
   - variable: CRON_SECRET
-    secret: congovoice-cron-secret
+    secret: congovoice-pilot-cron_secret
     availability: [RUNTIME]
 
   # AI providers. Omit them all and the platform still runs, on the offline
   # rules provider, with every deterministic safety rule intact.
   - variable: ANTHROPIC_API_KEY
-    secret: congovoice-anthropic-key
+    secret: congovoice-pilot-anthropic_api_key
     availability: [RUNTIME]
   - variable: GEMINI_API_KEY
-    secret: congovoice-gemini-key
+    secret: congovoice-pilot-gemini_api_key
     availability: [RUNTIME]
   - variable: OPENAI_API_KEY
-    secret: congovoice-openai-key
+    secret: congovoice-pilot-openai_api_key
     availability: [RUNTIME]
