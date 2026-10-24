@@ -54,19 +54,41 @@ describe("readiness", () => {
   });
 
   it("is satisfied by any one real alert channel", () => {
-    asProduction({ SMS_PROVIDER: "africastalking", WHATSAPP_PROVIDER: "log", VOICE_PROVIDER: "log", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://x" });
+    asProduction({ SMS_PROVIDER: "africastalking", AFRICASTALKING_USERNAME: "congovoice", AFRICASTALKING_API_KEY: "atsk_long_enough_key", WHATSAPP_PROVIDER: "log", VOICE_PROVIDER: "log", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://x" });
     expect(readiness().checks.find((c) => c.id === "escalation_delivery")?.ok).toBe(true);
   });
 
+  it("is not satisfied by the operator's name alone", () => {
+    // An operator chosen with no key behind it writes every escalation to the
+    // log. Reporting that as a working alert channel is the one lie this file
+    // exists to prevent.
+    asProduction({ SMS_PROVIDER: "africastalking", WHATSAPP_PROVIDER: "log", VOICE_PROVIDER: "log", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://x" });
+    const escalation = readiness().checks.find((c) => c.id === "escalation_delivery");
+    expect(escalation?.ok).toBe(false);
+    expect(escalation?.detail).toContain("sans identifiants");
+  });
+
   it("names a missing data key, because what is already recorded becomes unreadable without it", () => {
-    asProduction({ SMS_PROVIDER: "twilio", DATA_ENCRYPTION_KEY: undefined, SESSION_SECRET: "x", NEXT_PUBLIC_SITE_URL: "https://x" });
+    asProduction({ SMS_PROVIDER: "twilio", TWILIO_ACCOUNT_SID: "ACtest", TWILIO_AUTH_TOKEN: "token", TWILIO_FROM: "+15550000000", DATA_ENCRYPTION_KEY: undefined, SESSION_SECRET: "x", NEXT_PUBLIC_SITE_URL: "https://x" });
     const r = readiness();
     expect(r.ok).toBe(false);
     expect(r.checks.find((c) => c.id === "data_encryption_key")?.ok).toBe(false);
   });
 
   it("is ready when everything a promise depends on is present", () => {
-    asProduction({ SMS_PROVIDER: "twilio", WHATSAPP_PROVIDER: "meta", VOICE_PROVIDER: "twilio", SESSION_SECRET: "x", DATA_ENCRYPTION_KEY: "y", NEXT_PUBLIC_SITE_URL: "https://congovoicecd.com" });
+    asProduction({
+      SMS_PROVIDER: "twilio",
+      WHATSAPP_PROVIDER: "meta",
+      VOICE_PROVIDER: "twilio",
+      TWILIO_ACCOUNT_SID: "ACtest",
+      TWILIO_AUTH_TOKEN: "token",
+      TWILIO_FROM: "+15550000000",
+      WHATSAPP_ACCESS_TOKEN: "EAAtest",
+      WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+      SESSION_SECRET: "x",
+      DATA_ENCRYPTION_KEY: "y",
+      NEXT_PUBLIC_SITE_URL: "https://congovoicecd.com",
+    });
     expect(readiness().ok).toBe(true);
   });
 });

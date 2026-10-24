@@ -45,6 +45,20 @@ function freshPilot() {
   setEnv("DATA_ENCRYPTION_KEY", "b".repeat(64));
   setEnv("NEXT_PUBLIC_SITE_URL", "https://congovoicecd.com");
   for (const p of ["SMS_PROVIDER", "WHATSAPP_PROVIDER", "VOICE_PROVIDER"]) setEnv(p, undefined);
+  // "Nothing operated yet" now means the credentials too: naming an operator is
+  // half the configuration, and a leftover key from a previous case would make
+  // the next one pass for the wrong reason.
+  for (const c of [
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_FROM",
+    "AFRICASTALKING_USERNAME",
+    "AFRICASTALKING_API_KEY",
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID",
+  ]) {
+    setEnv(c, undefined);
+  }
 }
 
 const deploymentFailures = () =>
@@ -94,12 +108,28 @@ describe("a genuinely broken deployment is still refused", () => {
 });
 
 describe("configuring an escalation channel is what clears that check", () => {
-  it("passes once any one of the three providers is real", () => {
+  it("passes once any one of the three providers is real and has its credentials", () => {
+    for (const provider of ["SMS_PROVIDER", "WHATSAPP_PROVIDER", "VOICE_PROVIDER"] as const) {
+      freshPilot();
+      setEnv(provider, "twilio");
+      setEnv("TWILIO_ACCOUNT_SID", "ACtest");
+      setEnv("TWILIO_AUTH_TOKEN", "token");
+      setEnv("TWILIO_FROM", "+15550000000");
+      const check = readiness().checks.find((c) => c.id === "escalation_delivery");
+      expect(check?.ok, provider).toBe(true);
+    }
+  });
+
+  it("naming an operator without its credentials is not a channel", () => {
+    // The dangerous state is not "nothing configured" — the platform says so.
+    // It is an operator chosen with nothing behind it, which looks wired and
+    // writes every escalation to the log.
     for (const provider of ["SMS_PROVIDER", "WHATSAPP_PROVIDER", "VOICE_PROVIDER"] as const) {
       freshPilot();
       setEnv(provider, "twilio");
       const check = readiness().checks.find((c) => c.id === "escalation_delivery");
-      expect(check?.ok, provider).toBe(true);
+      expect(check?.ok, provider).toBe(false);
+      expect(check?.detail, provider).toContain("sans identifiants");
     }
   });
 
