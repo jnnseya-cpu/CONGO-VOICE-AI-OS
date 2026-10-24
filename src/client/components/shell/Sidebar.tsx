@@ -80,7 +80,8 @@ export function Sidebar({ user, unread, open, onClose }: { user: SessionUser | n
             <IconX size={18} />
           </button>
         </div>
-        <p className="px-5 pt-3 text-[12.5px] leading-snug text-white/70">{t("tagline")}</p>
+        {/* Localised: see LoginForm. */}
+        <p className="px-5 pt-3 text-[12.5px] leading-snug text-white/70">{t("hero_sub")}</p>
         <div className="mx-5 mt-4 h-px bg-white/10" />
 
         <nav className="scrollbar-thin mt-3 flex-1 space-y-0.5 overflow-y-auto px-3">

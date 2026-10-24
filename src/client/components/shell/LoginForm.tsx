@@ -54,7 +54,10 @@ export function LoginForm({ next }: { next: string }) {
     <div className="card overflow-hidden">
       <div className="bg-navy px-6 py-6">
         <Logo />
-        <p className="mt-3 text-[13px] text-white/75">{t("tagline")}</p>
+        {/* The localised promise, not the English brand line: this is the first
+            sentence a citizen reads, and four of the five audiences do not read
+            English. `tagline` stays for metadata and social cards. */}
+        <p className="mt-3 text-[13px] text-white/75">{t("hero_sub")}</p>
       </div>
       <form
         className="space-y-4 px-6 py-6"

@@ -1,7 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { handle, paging } from "@server/core/api";
-import { badRequest } from "@server/core/errors";
+import { IdempotencyConflict, requestHash, withIdempotency } from "@server/core/idempotency";
+import { ApiError, badRequest } from "@server/core/errors";
 import { hasPermission } from "@server/core/rbac";
 import { isAllowedMime, kindFromMime, storeUpload } from "@server/core/storage";
 import { IMAGE_UNREADABLE, needsJpegConversion, normaliseImage } from "@server/core/images";
@@ -20,7 +21,14 @@ const Json = z.object({
 
 /**
  * Create and process an interaction. Accepts JSON (text) or multipart/form-data with
- * `audio` (voice note), `images[]` (photos/videos) and text fields.
+ * `audio` (voice note), `images` (photos/videos, repeated) and text fields.
+ *
+ * `images[]` is accepted as well, because that is the spelling the API
+ * documentation published and an integrator may already be sending it. A
+ * photograph arriving under any *other* field name is refused rather than
+ * ignored: it was dropped silently before, and the answer then came from the
+ * text alone while naming a crop disease and a confidence — a farmer reading
+ * that has no way to know their photograph never reached the service.
  */
 export const POST = handle({ permission: "interaction:create", limit: "ai" }, async ({ req, db, user, json, traceId }) => {
   const contentType = req.headers.get("content-type") ?? "";
@@ -45,7 +53,15 @@ export const POST = handle({ permission: "interaction:create", limit: "ai" }, as
       if (a.size > env.storage.maxUploadBytes) throw badRequest("Fichier audio trop volumineux");
       audio = { data: Buffer.from(await a.arrayBuffer()), mimeType: mime };
     }
-    for (const entry of form.getAll("images")) {
+    const IMAGE_FIELDS = ["images", "images[]"];
+    const KNOWN_FIELDS = new Set([...IMAGE_FIELDS, "audio", "text", "module", "province", "wantsAudio"]);
+    for (const [name, value] of form.entries()) {
+      if (value instanceof File && value.size > 0 && !KNOWN_FIELDS.has(name)) {
+        throw badRequest(`Pièce jointe envoyée sous un nom de champ inconnu (« ${name} »). Utilisez « images » pour une photo et « audio » pour un enregistrement.`);
+      }
+    }
+    const imageEntries = IMAGE_FIELDS.flatMap((field) => form.getAll(field));
+    for (const entry of imageEntries) {
       if (!(entry instanceof File) || entry.size === 0) continue;
       const declared = entry.type.split(";")[0];
       const raw = Buffer.from(await entry.arrayBuffer());
@@ -89,17 +105,58 @@ export const POST = handle({ permission: "interaction:create", limit: "ai" }, as
   }
   if (!text?.trim() && !audio && images.length === 0) throw badRequest("Envoyez un message vocal, un texte ou une image");
 
-  const result = await runInteraction({
-    user: { userId: user.userId, role: user.role, language: user.language, province: user.province },
-    moduleHint: moduleHint ?? null,
+  const run = () =>
+    runInteraction({
+      user: { userId: user.userId, role: user.role, language: user.language, province: user.province },
+      moduleHint: moduleHint ?? null,
+      text: text ?? null,
+      audio,
+      images: images.filter((i) => i.data.length > 0 || true),
+      province: province ?? null,
+      wantsAudio,
+      traceId,
+    });
+
+  /**
+   * One tap, one turn.
+   *
+   * The channel route for a queued offline turn has always honoured
+   * `Idempotency-Key`; this one — the route the application itself posts to, and
+   * the one the API documentation gives integrators — did not. So a double tap
+   * on a slow connection, or a client retry after a timeout, produced two
+   * interactions. For an ordinary question that is noise. For a danger sign it
+   * is two critical cases and two people alerted to one child, which is how a
+   * queue stops being trusted.
+   *
+   * Same key and same request: the stored answer comes back, and the pipeline
+   * does not run twice. Same key and a different request: refused, because that
+   * is a client bug and silently answering the wrong one is worse.
+   */
+  const key = req.headers.get("idempotency-key");
+  if (!key) return run();
+  /*
+   * The hash is what makes "same key, different question" detectable. It covers
+   * what the turn is about rather than the raw bytes: a photograph can be
+   * hundreds of kilobytes, and its size and count are enough to tell two
+   * different submissions apart.
+   */
+  const fingerprint = requestHash({
     text: text ?? null,
-    audio,
-    images: images.filter((i) => i.data.length > 0 || true),
+    module: moduleHint ?? null,
     province: province ?? null,
     wantsAudio,
-    traceId,
+    audioBytes: audio?.data.length ?? 0,
+    imageBytes: images.map((i) => i.data.length),
   });
-  return result;
+  try {
+    const { result } = await withIdempotency(key, user.userId, run, { requestHash: fingerprint });
+    return result;
+  } catch (err) {
+    if (err instanceof IdempotencyConflict) {
+      throw new ApiError(409, "Cette demande a déjà été envoyée. Attendez la réponse plutôt que de réessayer.", "conflict");
+    }
+    throw err;
+  }
 });
 
 export const GET = handle({ permission: "interaction:read_own", registered: true }, async ({ req, db, user }) => {

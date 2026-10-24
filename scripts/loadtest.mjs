@@ -49,12 +49,30 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
+/**
+ * Why a write-throughput number is hard to get, and why that is good news.
+ *
+ * The platform limits sign-in to ten requests a minute per address and AI calls
+ * to thirty a minute per account. A load generator on one machine is one
+ * address, so it can hold at most ten sessions a minute and therefore about
+ * three hundred AI turns a minute — and it hits 429 long before it finds the
+ * platform's own ceiling. That is the anti-abuse posture working, not a defect,
+ * and it means a sustained write figure needs either several source addresses
+ * or a test environment with RATE_LIMIT_MAX_AUTH_REQUESTS and
+ * RATE_LIMIT_MAX_AI_REQUESTS raised deliberately.
+ *
+ * So this reports the boundary instead of crashing on it: a 429 while minting a
+ * session is recorded as "not measurable from here", which is the truth.
+ */
+class RateCeiling extends Error {}
+
 async function anonymousToken() {
   const res = await fetch(`${BASE}/api/v1/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ anonymous: true, language: "fr", consent: true }),
   });
+  if (res.status === 429) throw new RateCeiling("sign-in rate limit reached while minting a session");
   if (!res.ok) throw new Error(`anonymous login failed: ${res.status}`);
   const body = await res.json();
   return body.token ?? body.session?.token ?? body.accessToken;
@@ -92,6 +110,19 @@ async function once(kind, token, i) {
   }
 }
 
+/**
+ * One session per virtual user, not one for the whole run.
+ *
+ * The AI routes are rate-limited per account, which is correct: a single
+ * citizen cannot be allowed to spend the programme's budget. A load test that
+ * drives every virtual user through one anonymous session therefore measures
+ * that limiter and nothing else — the first run of the write profile returned
+ * 429 for 96 % of requests at one concurrent user and 100 % above it, which
+ * says nothing about how much the platform can actually serve.
+ *
+ * Fifty concurrent users are fifty sessions in reality, so they are fifty
+ * sessions here.
+ */
 async function stage(kind, concurrency, seconds, token) {
   const deadline = Date.now() + seconds * 1000;
   const samples = [];
@@ -99,10 +130,34 @@ async function stage(kind, concurrency, seconds, token) {
   let failed = 0;
   const statuses = new Map();
   let counter = 0;
+  /*
+   * And a fresh session before the per-account ceiling is reached, because a
+   * sustained write load is a stream of citizens arriving, not one citizen
+   * asking a thousand questions. RATE_LIMIT_MAX_AI_REQUESTS defaults to 30 per
+   * minute per account; 25 leaves room for the session call itself.
+   */
+  const PER_SESSION = Number(arg("per-session", "25"));
+  const isWrite = kind === "write";
+  let ceilingHit = false;
 
   const worker = async () => {
+    let mine = isWrite ? await anonymousToken().catch(() => token) : token;
+    let used = 0;
     while (Date.now() < deadline) {
-      const r = await once(kind, token, counter++);
+      if (isWrite && used >= PER_SESSION) {
+        try {
+          mine = await anonymousToken();
+        } catch (err) {
+          if (err instanceof RateCeiling) {
+            ceilingHit = true;
+            return;
+          }
+          throw err;
+        }
+        used = 0;
+      }
+      used += 1;
+      const r = await once(kind, mine, counter++);
       samples.push(r.ms);
       if (r.ok) ok += 1;
       else failed += 1;
@@ -110,12 +165,13 @@ async function stage(kind, concurrency, seconds, token) {
     }
   };
   const wallStart = performance.now();
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
   const wall = (performance.now() - wallStart) / 1000;
 
   samples.sort((a, b) => a - b);
   const total = ok + failed;
   return {
+    ceilingHit,
     concurrency,
     requests: total,
     rps: total / wall,
@@ -148,17 +204,28 @@ async function main() {
   const kinds = PROFILE === "read" ? ["read", "page"] : PROFILE === "write" ? ["write"] : ["read", "page", "write"];
   let token = null;
   if (kinds.includes("write")) {
-    token = await anonymousToken();
+    try {
+      token = await anonymousToken();
+    } catch (err) {
+      if (err instanceof RateCeiling) {
+        console.log("\nwrite throughput: NOT MEASURABLE from this address — the sign-in limit (ten a minute per address) was reached while minting sessions.");
+        console.log("Raise RATE_LIMIT_MAX_AUTH_REQUESTS and RATE_LIMIT_MAX_AI_REQUESTS in a dedicated load-test environment, or drive the test from several addresses.");
+        process.exit(3);
+      }
+      throw err;
+    }
     console.log("auth     anonymous session obtained");
   }
 
   const breaking = {};
+  const ceilings = {};
   for (const kind of kinds) {
     console.log(`\n${kind}`);
     console.log("  conc  requests      rps   errors    p50    p95    p99    max   statuses");
     for (const c of STAGES) {
       const r = await stage(kind, c, SECONDS, token);
       console.log(row(r));
+      if (r.ceilingHit) ceilings[kind] = true;
       const budget = kind === "write" ? TARGETS.writeP95Ms : TARGETS.readP95Ms;
       if (!breaking[kind] && (r.errorRate > TARGETS.maxErrorRate || r.p95 > budget)) {
         breaking[kind] = { concurrency: c, why: r.errorRate > TARGETS.maxErrorRate ? `errors ${(r.errorRate * 100).toFixed(2)}%` : `p95 ${r.p95.toFixed(0)}ms` };
@@ -168,8 +235,15 @@ async function main() {
 
   console.log("\nresult");
   for (const kind of kinds) {
-    if (breaking[kind]) console.log(`  ${kind}: first stage outside target at ${breaking[kind].concurrency} concurrent (${breaking[kind].why})`);
-    else console.log(`  ${kind}: within target at every stage up to ${STAGES.at(-1)} concurrent`);
+    if (ceilings[kind]) {
+      console.log(`  ${kind}: NOT MEASURABLE from one address — the platform's own limits (ten sign-ins a minute per address,`);
+      console.log(`         thirty AI calls a minute per account) bind first. Any 429 above is that protection, not a fault.`);
+      console.log(`         Measure this with several source addresses, or in an environment that raises both limits on purpose.`);
+    } else if (breaking[kind]) {
+      console.log(`  ${kind}: first stage outside target at ${breaking[kind].concurrency} concurrent (${breaking[kind].why})`);
+    } else {
+      console.log(`  ${kind}: within target at every stage up to ${STAGES.at(-1)} concurrent`);
+    }
   }
   if (isLocal) {
     console.log("\n  These are local figures. Cloud Run concurrency and cold starts, the Cloud SQL");

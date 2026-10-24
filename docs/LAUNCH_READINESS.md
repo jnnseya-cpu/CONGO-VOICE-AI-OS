@@ -34,9 +34,9 @@ Every claim below is reproducible from this repository.
 
 | Claim | How it is proven |
 |---|---|
-| 1 691 tests in 87 files pass | `npm test`, 24 October 2026 |
+| 1 701 tests in 89 files pass | `npm test`, 24 October 2026 |
 | Every safety rule is individually reachable and fires | `tests/rule-coverage.test.ts` |
-| 126 adversarial cases hold their invariants through the real pipeline | `tests/red-team.test.ts`, run in CI on every change |
+| 181 adversarial cases hold their invariants through the real pipeline (184 assertions; 3 modules, 5 languages, 8 attack families including prompt injection and data exfiltration) | `tests/red-team.test.ts`, run in CI on every change and re-run 24 October 2026 |
 | Coverage of the deterministic domain and policy code ≥ 80 % | thresholds in `vitest.config.ts`, enforced, not reported |
 | Danger signs are decided before any model call | `src/server/ai/protocols/`, `tests/health-danger-signs.test.ts` |
 | Severity is raise-only; only a clinician override lowers it | `src/server/ai/agents/risk.ts` |
@@ -51,6 +51,10 @@ Every claim below is reproducible from this repository.
 | The platform runs with no API keys of any kind | the offline provider, and every test above |
 | No clinical content is used to reassure without a board sign-off | `tests/review-board.test.ts` (26 cases) |
 | A deployed origin is checked before traffic reaches it | `npm run preflight -- <origin>` |
+| A restore returns exactly the snapshot state, and work done after it is genuinely gone | `launch-audit/dr-drill-local.sh`, 24 October 2026: 69 MB data directory destroyed and restored, **serving again in 3 s**, the three rows written after the snapshot absent, earlier data intact. This is the embedded database on local disk — **not** the managed one |
+| A citizen's turn is answered once however many times the button is tapped | `tests/interaction-attachments.test.ts`, and live probe `RS-08` |
+| The read path holds its latency to 25 concurrent readers | `node scripts/loadtest.mjs`, local: p95 10 / 42 / 72 / 154 ms at 1 / 5 / 10 / 25, 0 % errors |
+| A full AI turn stays well inside its budget where the platform's own limits allow it to be measured | same run: write p95 177 ms at 1 concurrent, 788 ms at 5, 0 % errors. Sustained throughput is not measurable from one address, because ten sign-ins a minute per address and thirty AI calls a minute per account bind first — that is the anti-abuse posture working |
 
 ## 2. What is not ready
 
@@ -82,7 +86,7 @@ to the public today.
    is synthesised speech in languages whose synthesis quality nobody has
    assessed.
 
-4. **The adversarial corpus is 126 cases against the 300 per module per language
+4. **The adversarial corpus is 181 cases against the 300 per module per language
    the specification requires.** Its first run found 24 real defects in the
    platform, which is the strongest available argument for finishing it before
    launch rather than after.
@@ -91,8 +95,14 @@ to the public today.
    alert a role and tell the citizen that a person will call. Whether a person
    calls is not a property of this repository.
 
-6. **Nothing has been restored from a backup.** Replication and backup can be
-   configured; a recovery-time objective is only real once someone has restored.
+6. **The managed database has never been restored.** A restore *was* performed on
+   24 October 2026 at the data layer — the embedded database's directory was
+   destroyed and recovered from a cold snapshot in three seconds, with the
+   recovery point behaving exactly as an unreplicated copy should: everything
+   written after the snapshot was gone. That proves the mechanism and the
+   discipline. It does not prove Cloud SQL point-in-time recovery, which has
+   still never been exercised, and a recovery-time objective for the deployed
+   service remains unmeasured.
 
 7. **No deployment has been made from this branch.** The container was built and
    served locally on 24 October 2026, and every check above ran against it. The

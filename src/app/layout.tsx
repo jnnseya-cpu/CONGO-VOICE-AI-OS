@@ -77,7 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#contenu" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg">
           Aller au contenu
         </a>
-        <LanguageProvider initial={lang}>
+        <LanguageProvider initial={lang} signedIn={Boolean(session)}>
           {children}
           <ServiceWorker />
         </LanguageProvider>

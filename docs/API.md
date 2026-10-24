@@ -8,7 +8,7 @@ All endpoints: HTTPS, JSON (or `multipart/form-data` for media), versioned under
 | | `POST /auth/logout` · `GET /auth/me` · `PATCH /auth/me` | session | profile, language, province, consent, preferences |
 | | `POST /auth/mfa/setup` · `POST /auth/mfa/verify` | admin/supervisor | TOTP step-up (see operations module) |
 | Users | `GET /users?role=` · `POST /users` | `user:manage` | institutional accounts (phone, PIN, role, province, organisation) |
-| Interactions | `POST /interactions` | `interaction:create` (ai limit) | JSON `{text, module?, province?, wantsAudio?}` or multipart `text, module, audio, images[]` → the full turn result (seven-part answer, localised answer, follow-ups, case id, audio URL) |
+| Interactions | `POST /interactions` | `interaction:create` (ai limit) | JSON `{text, module?, province?, wantsAudio?}` or multipart `text, module, audio, images` (repeated; `images[]` is accepted too, and a file under any other field name is refused rather than ignored) → the full turn result (seven-part answer, localised answer, follow-ups, case id, audio URL) |
 | | `GET /interactions?module=&scope=all` · `GET /interactions/{id}` | `interaction:read_own` / `interaction:read_all` | history and detail (no prompts, no provider names) |
 | | `POST /interactions/{id}/feedback` | `feedback:create` | `{rating, useful, comment, misunderstood, speechRating}` — feeds the language learning loop |
 | Sessions (channels) | `POST /sessions` · `GET /sessions/{id}` · `POST /sessions/{id}/resume` · `POST /sessions/{id}/turns` (multipart, `Idempotency-Key`) · `GET /sessions/{id}/stream` (SSE) · `GET /workflows/{id}` | `interaction:create` | channel-agnostic conversation service used by IVR, WhatsApp, USSD/SMS and the PWA |
