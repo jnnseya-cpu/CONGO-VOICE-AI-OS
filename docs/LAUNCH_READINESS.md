@@ -34,7 +34,7 @@ Every claim below is reproducible from this repository.
 
 | Claim | How it is proven |
 |---|---|
-| 1 701 tests in 89 files pass | `npm test`, 24 October 2026 |
+| 1 749 tests in 92 files pass | `npm test`, 24 October 2026, 823 s |
 | Every safety rule is individually reachable and fires | `tests/rule-coverage.test.ts` |
 | 181 adversarial cases hold their invariants through the real pipeline (184 assertions; 3 modules, 5 languages, 8 attack families including prompt injection and data exfiltration) | `tests/red-team.test.ts`, run in CI on every change and re-run 24 October 2026 |
 | Coverage of the deterministic domain and policy code ≥ 80 % | thresholds in `vitest.config.ts`, enforced, not reported |
