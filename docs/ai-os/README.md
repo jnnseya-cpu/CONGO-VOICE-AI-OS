@@ -90,3 +90,26 @@ development banks — without ever touching a citizen's money.
 
 Any figure in this set either cites a file or is marked as a target. No figure
 is an estimate presented as a measurement.
+
+## The ten rules this set binds itself to
+
+Carried from §17.7 and applying to every section above:
+
+1. Never convert BLOCKED or NOT TESTED into PASS.
+2. Never claim a deployment succeeded unless it actually succeeded.
+3. Never claim a feature works unless it has been inspected and, where
+   technically possible, tested.
+4. Never claim the platform is secure because it builds.
+5. Never describe any system as unhackable or hacker-impenetrable.
+6. Never suppress a type, lint or build error to force a deployment.
+7. Never skip, disable or quarantine a test to reach green.
+8. Never present an estimate as a measurement.
+9. Never report a GO for a scope wider than the evidence covers.
+10. A failure that is correct behaviour is reported as a pass with its reason,
+    never hidden and never silently reclassified.
+
+## Size
+
+18 documents, ~4 900 lines, ~38 500 words. The current verdict is in
+[§17](17-production-readiness.md): **GO for local development, CONDITIONAL GO
+for a pilot blocked on four human actions, NO-GO for national production.**
