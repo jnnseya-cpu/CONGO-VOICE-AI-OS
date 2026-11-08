@@ -84,6 +84,14 @@ function resolvedRoleSizes(rbac) {
   return sizes;
 }
 
+/** Page file paths as route names; a group's own page.tsx becomes "(root)". */
+function routeNames(files, prefix) {
+  return files
+    .map((f) => f.replace(prefix, "").replace(/\/?page\.tsx$/, ""))
+    .map((f) => (f === "" ? "(root)" : f))
+    .sort();
+}
+
 const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
 
 /**
@@ -209,10 +217,8 @@ export function collectInventory(root) {
       adapters: readdirSync(join(root, "src/server/channels")).filter((f) => f.endsWith(".ts")).sort(),
     },
     pages: {
-      public: walk(root, "src/app/(public)", (f) => f === "page.tsx").map((f) =>
-        f.replace("src/app/(public)/", "").replace("/page.tsx", "")),
-      app: walk(root, "src/app/(app)", (f) => f === "page.tsx").map((f) =>
-        f.replace("src/app/(app)/", "").replace("/page.tsx", "")),
+      public: routeNames(walk(root, "src/app/(public)", (f) => f === "page.tsx"), "src/app/(public)/"),
+      app: routeNames(walk(root, "src/app/(app)", (f) => f === "page.tsx"), "src/app/(app)/"),
     },
     docs: {
       // The AI-OS document set. Eighteen files that took a long time to write

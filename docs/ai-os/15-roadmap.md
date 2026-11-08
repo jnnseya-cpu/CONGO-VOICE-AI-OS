@@ -29,7 +29,7 @@ Built and in the repository today.
 | Offline PWA with outbox and background sync | `sw-source.js` |
 | Reporting: CSV/XLSX/PDF, async jobs, small-count suppression | `report-jobs`, `reporting.ts` |
 | Vendor credentials from the admin console | `core/credentials.ts`, `/admin/providers` |
-| Public site, 15 pages + 29 SEO-gated articles | `(public)/` |
+| Public site, 15 pages + 30 SEO-gated articles | `(public)/` |
 | **1 749 tests in 92 files, all offline** | `npm test` |
 
 **What Phase 0 is missing:** autonomy, retrieval, graph, prediction, self-healing,

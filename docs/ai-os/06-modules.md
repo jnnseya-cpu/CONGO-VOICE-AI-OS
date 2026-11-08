@@ -369,7 +369,7 @@ billing. Integrators are institutions, and access is granted by agreement.
 
 ## 6.15 M-21 Public Site & SEO — EXISTS
 
-15 public pages plus a 29-article blog, each article passing a build-time SEO
+15 public pages plus a 30-article blog, each article passing a build-time SEO
 gate (`PASS_MARK = 90`). Pages: accès, accessibilité, aide, blog (+ category and
 tag indexes), conditions, confidentialité, contact, financement, gouvernance,
 langues-nationales, partenaires, programme, services, urgence.

@@ -227,3 +227,60 @@ describe("floors that a regenerated lock cannot lower", () => {
     }
   });
 });
+
+/**
+ * The headline count table in docs/ai-os/README.md is a claim.
+ *
+ * Three of its figures were wrong when the extractor first ran — 27 permissions
+ * for 25, 14 scheduler steps for 15, 29 blog articles for 30 — because each was
+ * counted by hand once and never again. A table of counts that nothing checks
+ * is a table of counts that drifts, and it is the first thing a reader of the
+ * document set believes.
+ *
+ * So the table is parsed and compared against the live platform. The test names
+ * the row, so a stale figure is a one-line fix rather than a hunt.
+ */
+describe("the README's count table matches the platform", () => {
+  const readme = readFileSync(new URL("../docs/ai-os/README.md", import.meta.url), "utf8");
+
+  /** Reads "| Database tables | 64 | …" and returns 64. Spaces in 1 779 included. */
+  function stated(row: string): number {
+    const match = readme.match(new RegExp(`^\\|\\s*${row}\\s*\\|\\s*([\\d\\s]+?)\\s*(?:in\\b|\\|)`, "m"));
+    if (!match) throw new Error(`No "${row}" row in docs/ai-os/README.md`);
+    return Number(match[1].replace(/\s/g, ""));
+  }
+
+  const rows: Array<[string, number]> = [
+    ["Database tables", current.db.tableCount],
+    ["API routes", current.api.routeCount],
+    ["Provider webhooks", current.api.hooks.length],
+    ["Roles", current.rbac.roles.length],
+    ["Permissions", current.rbac.permissions.length],
+    ["Languages", current.db.enums.language_code.length],
+    ["AI agents", current.ai.agents.length],
+    ["Model capabilities", current.ai.capabilities.length],
+    ["Model providers", current.ai.providers.length],
+    ["Scheduler jobs", current.scheduler.steps.length],
+    ["Service level objectives", current.slo.objectives.length],
+    ["Public pages", current.pages.public.length],
+    ["Application pages", current.pages.app.length],
+    ["Blog articles", current.docs.blogArticles],
+  ];
+
+  for (const [row, actual] of rows) {
+    it(`states the right number of ${row.toLowerCase()}`, () => {
+      expect(
+        stated(row),
+        `docs/ai-os/README.md says a different number of ${row.toLowerCase()} than the platform has.`,
+      ).toBe(actual);
+    });
+  }
+
+  it("states the right number of test files", () => {
+    // The test count itself is a measurement from a run, not something that can
+    // be derived here, so only the file count is checked.
+    const match = readme.match(/^\|\s*Tests\s*\|\s*[\d\s]+in\s+(\d+)\s+files/m);
+    expect(match, 'No "Tests | N in M files" row in docs/ai-os/README.md').not.toBeNull();
+    expect(Number(match![1])).toBe(current.tests.fileCount);
+  });
+});
