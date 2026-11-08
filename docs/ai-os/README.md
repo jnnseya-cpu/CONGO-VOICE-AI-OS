@@ -142,6 +142,11 @@ about something else: `ai/safety.ts`, `ai/agents/risk.ts`, `ai/agents/workflow.t
 `core/rbac.ts`, `core/credentials.ts`, `core/status.ts`, `core/mfa.ts`,
 `core/residency.ts`, `channels/modes.ts`.
 
+**The count table above is checked too.** Every row is parsed and compared
+against the live platform, because a table of counts that nothing verifies is a
+table of counts that drifts — five of its figures were wrong when the check was
+first written. The test names the row, so a stale figure is a one-line fix.
+
 **Floors that a regenerated lock cannot lower.** Regenerating the lock silences
 a drift report, so the test also asserts invariants independently of it: all
 seven roles and five languages present, every citizen channel including IVR and
