@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "lock": "node scripts/lock-inventory.mjs",
+    "lock:check": "node scripts/lock-inventory.mjs --check",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -37,7 +37,7 @@ audit log is hash-chained.
 |---|---|---|
 | No implicit trust from network position | Every `/api/v1` request authenticates and authorises; there is no internal unauthenticated surface | EXISTS |
 | Verify on every request, not at session start | Session epoch checked per request; a withdrawn token dies on its next use | EXISTS |
-| Least privilege | 27 permissions; no route checks a role inline | EXISTS |
+| Least privilege | 25 permissions; no route checks a role inline | EXISTS |
 | Short-lived elevation | Step-up window of 15 minutes for high-risk actions | EXISTS |
 | Explicit, expiring break-glass | `break_glass_access` with justification and expiry | EXISTS |
 | Assume breach | Hash-chained audit; per-purpose keys; no credential readable by any route | EXISTS |

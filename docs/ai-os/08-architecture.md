@@ -48,7 +48,7 @@ file; what is added is specified to the level a senior engineer can build from.
 │  hash-chained audit · analytics warehouse (NEW)                           │
 ├───────────────────────────────────────────────────────────────────────────┤
 │ PLATFORM SERVICES                                                         │
-│  Scheduler (14 steps) · SLO · Flags & canaries · Credentials ·            │
+│  Scheduler (15 steps) · SLO · Flags & canaries · Credentials ·            │
 │  Idempotency · Rate limits · Storage · Residency · OpenTelemetry          │
 └───────────────────────────────────────────────────────────────────────────┘
 ```

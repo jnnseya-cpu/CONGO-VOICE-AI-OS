@@ -57,12 +57,12 @@ applies that definition to national public service delivery.**
 | OS concept | CONGO VOICE AI-OS equivalent | Exists today |
 |---|---|---|
 | Process | A citizen interaction, orchestrated end to end | `ai/agents/orchestrator.ts` |
-| Scheduler | 14-step sweep: reminders, SLA, retention, canaries, audit chain | `core/scheduler.ts` |
+| Scheduler | 15-step sweep: reminders, SLA, retention, canaries, audit chain | `core/scheduler.ts` |
 | Memory manager | ACU metering, caps, degraded mode | `core/metering.ts` |
 | Device driver | Channel adapters: IVR, USSD, SMS, WhatsApp, web | `channels/` |
 | Hardware abstraction | AI gateway: one interface over 5 providers | `ai/gateway.ts` |
 | File system | Encrypted object storage with retention sweeps | `core/storage.ts`, `core/privacy.ts` |
-| Permissions | 7 roles × 27 permissions, no inline role checks | `core/rbac.ts` |
+| Permissions | 7 roles × 25 permissions, no inline role checks | `core/rbac.ts` |
 | Syscall audit | Hash-chained audit log, verified daily | `core/audit.ts` |
 | Fault tolerance | Readiness checks that refuse to lie about capability | `core/status.ts` |
 | Package manager | Protocol lifecycle with clinical sign-off | `ai/protocols/lifecycle.ts` |

@@ -45,13 +45,13 @@ development banks — without ever touching a citizen's money.
 | API routes | 128 | `src/app/api/**/route.ts` |
 | Provider webhooks | 9 | `src/app/api/hooks/**` |
 | Roles | 7 | `src/server/core/rbac.ts` |
-| Permissions | 27 | `src/server/core/rbac.ts` |
+| Permissions | 25 | `src/server/core/rbac.ts` |
 | Languages | 5 | `languageEnum` — fr, ln, kg, sw, lua |
 | Service modules | 3 | health, agriculture, education |
 | AI agents | 12 | `src/server/ai/agents/` |
 | Model capabilities | 4 | llm, vision, stt, tts |
 | Model providers | 5 | Anthropic, Gemini, OpenAI, Google Speech, offline mock |
-| Scheduler jobs | 14 | `src/server/core/scheduler.ts` |
+| Scheduler jobs | 15 | `src/server/core/scheduler.ts` |
 | Service level objectives | 6 | `src/server/core/slo.ts` |
 | Citizen channels | 5 | IVR, USSD, SMS, WhatsApp, web/PWA |
 | Tests | 1 749 in 92 files | `npm test`, 823 s |
@@ -113,3 +113,39 @@ Carried from §17.7 and applying to every section above:
 18 documents, ~4 900 lines, ~38 500 words. The current verdict is in
 [§17](17-production-readiness.md): **GO for local development, CONDITIONAL GO
 for a pilot blocked on four human actions, NO-GO for national production.**
+
+## The lock
+
+`inventory.lock.json` records the platform's surface: every table, enum value,
+route, role, resolved role size, permission, agent, provider, capability,
+scheduler step, service objective, settable and never-settable credential,
+channel driver, page, document, test file and npm script — plus a content hash
+of each file in the deterministic safety layer.
+
+`tests/inventory-lock.test.ts` and the CI step `npm run lock:check` compare the
+live source against it and fail on **any** difference, in either direction.
+
+| Command | Effect |
+|---|---|
+| `npm run lock:check` | Compare. Non-zero and a named diff on any drift. Runs in CI |
+| `npm run lock` | Rewrite the lock — the deliberate act of declaring a change |
+
+Why both directions: a lock that objected only to removals would let an
+unreviewed route appear. Declaring a change puts it in the diff, where a
+reviewer sees exactly which surface moved.
+
+**The guarded files** are pinned by content because a behavioural test proves
+they work today, while a hash proves nobody altered them in a commit that was
+about something else: `ai/safety.ts`, `ai/agents/risk.ts`, `ai/agents/workflow.ts`,
+`ai/protocols/engine.ts`, `ai/language/gates.ts`, `ai/review/gate.ts`,
+`core/rbac.ts`, `core/credentials.ts`, `core/status.ts`, `core/mfa.ts`,
+`core/residency.ts`, `channels/modes.ts`.
+
+**Floors that a regenerated lock cannot lower.** Regenerating the lock silences
+a drift report, so the test also asserts invariants independently of it: all
+seven roles and five languages present, every citizen channel including IVR and
+USSD, a voice notification channel, the offline provider, all four model
+capabilities, the eight never-settable secrets, the retention/SLA/audit
+scheduler jobs, the readiness and emergency surfaces, the nine provider
+webhooks, the eighteen AI-OS documents — and **no payment-shaped route, table or
+credential may ever appear**.

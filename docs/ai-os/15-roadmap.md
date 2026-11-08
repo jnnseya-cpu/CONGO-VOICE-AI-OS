@@ -21,10 +21,10 @@ Built and in the repository today.
 | Multi-provider AI gateway + complete offline provider | `ai/gateway.ts`, `providers/mock.ts` |
 | ACU metering, caps, degraded mode | `core/metering.ts` |
 | Hash-chained audit, verified daily | `core/audit.ts` |
-| RBAC: 7 roles, 27 permissions, no inline checks | `core/rbac.ts` |
+| RBAC: 7 roles, 25 permissions, no inline checks | `core/rbac.ts` |
 | Encryption: AES-256-GCM, HKDF purposes, phone blind index | `core/crypto.ts`, `core/phone.ts` |
 | MFA with 15-minute step-up; break-glass | `core/mfa.ts` |
-| Scheduler: 14 jobs | `core/scheduler.ts` |
+| Scheduler: 15 jobs | `core/scheduler.ts` |
 | 6 SLOs with honest unmeasured reporting | `core/slo.ts` |
 | Offline PWA with outbox and background sync | `sw-source.js` |
 | Reporting: CSV/XLSX/PDF, async jobs, small-count suppression | `report-jobs`, `reporting.ts` |

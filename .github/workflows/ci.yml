@@ -38,6 +38,13 @@ jobs:
       - name: Migrations are safe to apply while the previous version serves
         run: npm run db:check
 
+      - name: Nothing changed or dropped undeclared
+        # The suite proves that what exists behaves. This proves it still
+        # exists: a route, table, permission, scheduler step, language or
+        # document removed leaves every other test green. Declare a change with
+        # `npm run lock` and commit inventory.lock.json alongside it.
+        run: npm run lock:check
+
       - name: Tests
         # Everything runs offline against the embedded database and the rules
         # provider, so no API key and no service container are needed.

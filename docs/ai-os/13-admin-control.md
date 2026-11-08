@@ -182,7 +182,7 @@ under schedule pressure could override it, it would protect nobody.
 | Panel | Content | Operator can |
 |---|---|---|
 | Connectors | Each connector's health, quota, failover, residency | Fail out, restore, test |
-| Scheduler | 14 steps: last run, duration, errors | Re-run a step |
+| Scheduler | 15 steps: last run, duration, errors | Re-run a step |
 | Releases | Canary state, percentage, hold remaining, SLO delta | Advance, hold, **roll back** |
 | Feature flags | Flags, cohorts, canary configuration | Edit (audited) |
 | Capacity | Instances, concurrency, cold starts, database connections | Adjust bands |

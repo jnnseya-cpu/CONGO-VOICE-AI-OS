@@ -84,7 +84,7 @@ they volunteer, never required to have an account.
 
 | Dimension | Specification |
 |---|---|
-| Permissions (12) | Citizen set + `case:read`, `case:write`, `case:escalate`, `case:assign`, `language:review`, `review:read`, `review:sign`, `dashboard:health` |
+| Permissions (13) | Citizen set + `case:read`, `case:write`, `case:escalate`, `case:assign`, `language:review`, `review:read`, `review:sign`, `dashboard:health` |
 | Module scope | `health` only (`ROLE_MODULE_SCOPE`) |
 | Sees | Health cases in scope, triage records, risk assessments, follow-ups, their own queue and SLA clocks |
 | **Open gap** | Reads are module-scoped but **not territory-scoped** (G-08). A CHW in Kinshasa can read a health case in Haut-Katanga. §11.3 specifies the fix and §17 records it as an open decision |
@@ -110,7 +110,7 @@ to a named human, never to an automated reply.
 
 | Dimension | Specification |
 |---|---|
-| Permissions (14) | Citizen set + `case:read`, all four dashboards, `report:export`, `language:review`, `language:export`, `review:read`, `review:sign` |
+| Permissions (15) | Citizen set + `case:read`, all four dashboards, `report:export`, `language:review`, `language:export`, `review:read`, `review:sign` |
 | Notably lacks | `case:write`, `case:escalate`, `case:assign` — a partner observes and reports; it does not act on a citizen's case |
 | Sees | Aggregates across modules, exportable reports, language corpus for review |
 | **Open gap** | Any `report:export` holder can download another organisation's finished report (G-09). Content is aggregated and small-count suppressed, so this is a tenancy gap, not personal-data disclosure. §11.3 |
@@ -120,7 +120,7 @@ to a named human, never to an automated reply.
 
 | Dimension | Specification |
 |---|---|
-| Permissions (18) | Field-officer set + `interaction:read_all`, all four dashboards, `report:export`, `audit:read`, `notification:broadcast`, `language:export`, `review:submit` |
+| Permissions (22) | Field-officer set + `interaction:read_all`, all four dashboards, `report:export`, `audit:read`, `notification:broadcast`, `language:export`, `review:submit` |
 | Notably lacks | `admin:config`, `user:manage`, `dashboard:admin` — **a minister cannot change a threshold or hold a vendor key.** This separation is deliberate and is enforced at `onlyPlatformAdmin()` in `api/v1/admin/providers/route.ts` |
 | MFA | Required (`MFA_REQUIRED_ROLES`) |
 | Sees | National and provincial picture, all interactions, audit log, SLO attainment, ACU consumption |
@@ -131,7 +131,7 @@ to a named human, never to an automated reply.
 
 | Dimension | Specification |
 |---|---|
-| Permissions (19) | Everything `gov_admin` has, plus `dashboard:admin`, `admin:config`, `user:manage` |
+| Permissions (25) | Everything `gov_admin` has, plus `dashboard:admin`, `admin:config`, `user:manage` |
 | MFA | Required, plus **step-up within 15 minutes** for high-risk actions (`core/mfa.ts`) |
 | Does | Runtime configuration, vendor credentials (`/admin` → Clés des fournisseurs), feature flags and canaries, break-glass grants, tenant and organisation management, pilot data reset |
 | Cannot do | Change protocol clinical content without the review board; set `DATA_ENCRYPTION_KEY`, `SESSION_SECRET`, `CRON_SECRET`, `BOOTSTRAP_TOKEN`, `ADMIN_RECOVERY_TOKEN`, `OIDC_CLIENT_SECRET`, `DATABASE_URL`, `DATABASE_CA_CERT` — all eight are refused by name (`core/credentials.ts` `NEVER_SETTABLE`) |
