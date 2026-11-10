@@ -809,6 +809,7 @@
       "ops-notifications.test.ts",
       "ops-reports.test.ts",
       "ops-routes.test.ts",
+      "ops-scripts.test.ts",
       "ops-workflow.test.ts",
       "photo-and-voice.test.ts",
       "pipeline.test.ts",
@@ -850,7 +851,7 @@
       "upload-hostile.test.ts",
       "zz-pilot.test.ts"
     ],
-    "fileCount": 99
+    "fileCount": 100
   },
   "scripts": {
     "files": [

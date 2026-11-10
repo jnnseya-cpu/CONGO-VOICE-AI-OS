@@ -95,12 +95,13 @@ DRILL_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
 gc sql users set-password postgres --instance="$RESTORE_INSTANCE" --password="$DRILL_PASSWORD" --quiet >/dev/null
 
 SQL_CHECKS=$(cat <<'SQL'
+\set ON_ERROR_STOP on
 \pset pager off
 \echo '--- row counts that matter'
 SELECT 'users' AS table, count(*) FROM users
 UNION ALL SELECT 'interactions', count(*) FROM interactions
 UNION ALL SELECT 'cases', count(*) FROM cases
-UNION ALL SELECT 'audit_log', count(*) FROM audit_log
+UNION ALL SELECT 'audit_logs', count(*) FROM audit_logs
 UNION ALL SELECT 'notifications', count(*) FROM notifications
 UNION ALL SELECT 'files', count(*) FROM files;
 \echo '--- schema completeness (expects the full table set)'

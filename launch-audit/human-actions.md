@@ -75,17 +75,30 @@ why it blocks, and what resumes the moment it arrives.
     the billing decision rather than an engineer.
 12. **Non-Chromium browsers and real handsets** for the device matrix.
 13. **Cloud monitoring and alerting** (`scripts/alerts.sh` needs the project), then
-    a controlled failure to prove each alert reaches a named person.
+    a controlled failure to prove each alert reaches a named person. Note that an
+    email channel Google has not verified delivers nothing silently, which is
+    worse than no channel; the script says so and the verification is a human
+    step.
+14. **The Cloud SQL restore drill and the rollback drill**
+    (`scripts/dr-drill.sh`, `scripts/rollback.sh --drill`). Both need the project;
+    neither has ever run. What has now been proven without it: the drill's
+    verification SQL runs clean against PostgreSQL 16.15 and the real migration,
+    after a fix — it had been querying a table that does not exist and, because
+    psql exits 0 on a statement error, it would have reported a passed drill with
+    its row counts missing (D-08). So the drill will now tell the truth when
+    somebody runs it; the measured RTO, the restore itself and the traffic
+    round-trip remain unrun, and the RTO figure in the launch file is still an
+    aspiration rather than a measurement.
 
 ## Decisions only the programme owner can make
 
-14. **The citizen-facing slogan.** The English brand line has been removed from
+15. **The citizen-facing slogan.** The English brand line has been removed from
     the two citizen surfaces and replaced with the localised promise sentence
     that already existed in all five languages. Whether the programme wants a
     localised slogan of its own, and in whose words, is a branding decision.
-15. **Whether a field role should read cases outside its own territory**, and
+16. **Whether a field role should read cases outside its own territory**, and
     whether a partner organisation should be able to download another
     organisation's report. Both are recorded in `docs/SECURITY.md` §7; both are
     product decisions with real operational cost either way.
-16. **Legal sign-off** on the terms, privacy notice, cookie wording and refund or
+17. **Legal sign-off** on the terms, privacy notice, cookie wording and refund or
     liability language for the target regions.

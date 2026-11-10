@@ -71,33 +71,41 @@ else
 fi
 
 step "Backend service"
-# --timeout is the whole reason a voice turn failed with "Failed to fetch".
+# No --timeout here, and that is the fix rather than an omission.
 #
-# A backend service defaults to thirty seconds. One spoken question is an audio
-# upload, a transcription, a language decision, an answer and a speech synthesis
-# — routinely more than thirty seconds, and much more on the first request to a
-# cold instance. The load balancer closed the connection mid-request and the
-# browser reported a network failure, which reaches the citizen as their own
-# signal failing rather than as our configuration.
+# The worry is real: one spoken question is an audio upload, a transcription, a
+# language decision, an answer and a speech synthesis — routinely more than
+# thirty seconds, and much more on the first request to a cold instance. A hop
+# in front of the platform that decides it has waited long enough reaches the
+# citizen as their own signal failing rather than as our configuration.
 #
-# Set to Cloud Run's own maximum so the two agree. There is no "unlimited" to
-# choose: every hop has a ceiling, and raising each to its own maximum is the
-# honest version of removing the limit. What must never end a conversation is a
-# hop in front of the platform deciding it has waited long enough.
-BACKEND_TIMEOUT="${BACKEND_TIMEOUT:-3600}"
+# But the backend service timeout is not the lever, and setting it here was the
+# error this script used to fail on. Google's documentation is explicit: the
+# backend service timeout does not apply to a backend service whose backends are
+# serverless network endpoint groups, and modifying it returns
+#
+#   Timeout sec is not supported for a backend service with Serverless
+#   network endpoint groups.
+#
+# For serverless NEG backends the timeout is fixed at 60 minutes and is not
+# configurable — which is 3600 seconds, exactly the number this script used to
+# ask for. So nothing is given up by not setting it: the value was never ours to
+# set and was already what we wanted.
+#
+# The lever that does matter is Cloud Run's own request timeout, which go-live.sh
+# sets to 3600 (REQUEST_TIMEOUT). That is the hop that can actually cut a voice
+# turn short, and it is the one to raise if a turn ever needs longer.
+#
+# Not verified against GCP from here — this follows the documented rule, and the
+# platform has never been deployed. The first real run of this script is still
+# the first real test of it.
 if exists gc compute backend-services describe "$BACKEND" --global; then
   current=$(gc compute backend-services describe "$BACKEND" --global --format='value(timeoutSec)')
-  if [[ "$current" == "$BACKEND_TIMEOUT" ]]; then
-    note "exists: $BACKEND (délai ${current}s)"
-  else
-    gc compute backend-services update "$BACKEND" --global --timeout="$BACKEND_TIMEOUT" >/dev/null
-    note "exists: $BACKEND — délai porté de ${current}s à ${BACKEND_TIMEOUT}s"
-  fi
+  note "exists: $BACKEND (délai ${current:-60 min, fixe}s — imposé par le NEG sans serveur)"
 else
   gc compute backend-services create "$BACKEND" \
-    --global --load-balancing-scheme=EXTERNAL_MANAGED \
-    --timeout="$BACKEND_TIMEOUT" >/dev/null
-  note "created: $BACKEND (délai ${BACKEND_TIMEOUT}s)"
+    --global --load-balancing-scheme=EXTERNAL_MANAGED >/dev/null
+  note "created: $BACKEND (délai fixe de 60 min, non configurable avec un NEG sans serveur)"
 fi
 if gc compute backend-services describe "$BACKEND" --global \
      --format='value(backends[].group)' | grep -q "$NEG"; then

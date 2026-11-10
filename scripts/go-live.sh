@@ -398,13 +398,15 @@ done
 # The certificate authority the application verifies the database against.
 SECRET_REFS+=",DATABASE_CA_CERT=${DB_CA_SECRET}:latest"
 
-# The request timeout is set to Cloud Run's maximum, and the load balancer in
-# front of it is set to match.
+# The request timeout is set to Cloud Run's maximum. This is the only one of the
+# two hops in front of a citizen that we can set.
 #
 # There is no "unlimited" to choose here: every hop has a ceiling, and the
-# honest thing is to raise each one to its own maximum rather than to imply a
-# limit has been removed. Cloud Run's is 3600 seconds; the load balancer's is
-# set to the same number so neither cuts the other off.
+# honest thing is to raise the one we control to its own maximum rather than to
+# imply a limit has been removed. Cloud Run's is 3600 seconds. The load
+# balancer's backend service is fixed at 60 minutes and cannot be configured
+# with a serverless NEG backend — the same 3600 seconds, as it happens, so the
+# two agree without either being set to match the other. See domain.sh.
 #
 # The point is not that a turn should take an hour. It is that when a citizen
 # describes a child's symptoms over a weak connection, the thing that ends the

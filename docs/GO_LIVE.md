@@ -70,16 +70,25 @@ wants one. It is not the supported path and this runbook does not use it.
 
 ## 0. How long a conversation may take
 
-Two hops can end a citizen's turn before the platform does, and both are set to
-their maximum so that neither ever does.
+Two hops can end a citizen's turn before the platform does. One is ours to set;
+the other turns out not to be.
 
-| Where | Variable | Default | Why |
+| Where | Variable | Value | Why |
 |---|---|---|---|
-| Cloud Run service | `REQUEST_TIMEOUT` | 3600 s | Cloud Run's own maximum. |
-| Load balancer backend | `BACKEND_TIMEOUT` | 3600 s | Defaults to **30 s**, which cut every spoken turn short and reached the browser as "Failed to fetch". |
+| Cloud Run service | `REQUEST_TIMEOUT` | 3600 s | Cloud Run's own maximum, and the only one of the two we control. |
+| Load balancer backend | — | 60 min, fixed | Not configurable with a serverless NEG backend. Setting it returns `Timeout sec is not supported for a backend service with Serverless network endpoint groups.` |
 
-There is no "unlimited" to choose: every hop has a ceiling, and raising each to
-its own maximum is the honest version of removing the limit.
+`scripts/domain.sh` used to pass `--timeout=3600` to the backend service and
+fail on exactly that error. It no longer sets it, which costs nothing: the fixed
+value for serverless NEG backends is 60 minutes — the same 3600 seconds the
+script was asking for. The number was never ours to set and was already the one
+we wanted.
+
+So the lever that matters is `REQUEST_TIMEOUT`. If a spoken turn ever needs
+longer than an hour, the load balancer is the ceiling and no flag will move it.
+
+There is no "unlimited" to choose: every hop has a ceiling, and raising the one
+we control to its maximum is the honest version of removing the limit.
 
 Raising them is only safe because the platform keeps its own, shorter deadline
 per AI provider (`AI_PROVIDER_TIMEOUT_MS`: 60 s text, 90 s audio, 45 s speech).

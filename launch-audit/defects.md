@@ -165,6 +165,74 @@ against a running build, rather than against its own tests.
 
 ---
 
+## D-08 — The disaster-recovery drill would have reported a pass while its one real check printed nothing
+
+- **Where** `scripts/dr-drill.sh`
+- **Found by** running the drill's verification SQL against a real PostgreSQL
+  16.15 and the real migration. GCP is unreachable from here (`gcloud auth list`
+  → "No credentialed accounts"), so the restore half cannot run — but the
+  verification half is the half that decides pass or fail, and it can.
+- **Symptom** the row-count block counted `audit_log`. The table has always been
+  `audit_logs`. PostgreSQL answered `ERROR: relation "audit_log" does not exist`.
+- **Impact** worse than the typo. The six row counts are one `UNION ALL`
+  statement, so one bad name kills all six — and psql without `ON_ERROR_STOP`
+  prints the error and **exits 0**, so the script's own guard ("the restore
+  completed but the copy could not be read") never fired. The drill went on to
+  print a measured RTO and an operator would have recorded a pass, with the one
+  check that proves the backup is not a backup of an empty database having
+  produced nothing but an error line. The script's own header warns about exactly
+  this: "A restore that returns an empty users table is a successful restore of
+  nothing." It would have hidden it.
+- **Fix** `audit_log` → `audit_logs`, and `\set ON_ERROR_STOP on` at the top of
+  the SQL so a future rename stops the drill instead of passing it.
+- **Retest** measured on PostgreSQL 16.15 with the real `0000_init.sql` (69
+  public tables): before, exit **0** with the counts missing; after, all six
+  counts print; with a name deliberately broken again, exit **3** and the
+  script's `die` path fires. 11 cases in `tests/ops-scripts.test.ts` now assert
+  every relation the drill queries exists in `schema.ts`; both halves of this
+  defect were re-introduced one at a time and each failed the suite.
+- **Residual risk** the restore itself — creating the instance, restoring the
+  backup, the measured RTO — has still never been run. That needs the cloud
+  project and stays on the human action list. What is now true is that when it
+  is run, a readable copy will be reported as readable and an unreadable one as
+  unreadable.
+- **Status** FIXED
+
+---
+
+## D-09 — The load balancer was configured with a flag its own backend type forbids
+
+- **Where** `scripts/domain.sh`, with the explanation repeated in
+  `scripts/go-live.sh` and `docs/GO_LIVE.md`
+- **Symptom** the script passed `--timeout=3600` to a backend service whose only
+  backend is a serverless network endpoint group, and the run failed there.
+- **Cause** Google's documentation is explicit: the backend service timeout does
+  not apply to backends that are serverless NEGs, and modifying it returns
+  `Timeout sec is not supported for a backend service with Serverless network
+  endpoint groups.` For serverless NEG backends the timeout is fixed at 60
+  minutes and is not configurable.
+- **Impact** two things, and the second is the one worth keeping. The run failed,
+  which was visible. But the script's long comment asserted that this flag "is
+  the whole reason a voice turn failed with Failed to fetch" — and that was
+  wrong. 60 minutes is 3600 seconds, exactly the number the script was asking
+  for, so the value was never ours to set and was already what we wanted. A
+  future engineer debugging a timed-out voice turn would have come here and
+  raised a number that does nothing.
+- **Fix** the flag is gone from both the create and the update path, and all
+  three files now say where the real lever is: `REQUEST_TIMEOUT` on the Cloud Run
+  service, which `go-live.sh` sets to 3600. Three cases in
+  `tests/ops-scripts.test.ts` keep `--timeout` out of the backend service and
+  keep `REQUEST_TIMEOUT` on the hop that can be set; the defect was
+  re-introduced and failed the suite.
+- **Residual risk** not verified against GCP, because this environment has no
+  credentials. This follows the documented rule and removes the call that
+  produced the error; the first real run of `domain.sh` is still its first real
+  test. If a spoken turn ever needs longer than an hour, the load balancer is the
+  ceiling and no flag will move it.
+- **Status** FIXED, pending a deployed verification
+
+---
+
 ## Observations that are not defects
 
 - `/api/v1/auth/me` answers 401 to a first-time visitor. A client discovering

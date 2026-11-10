@@ -1,0 +1,133 @@
+DR drill verification SQL — run against a real PostgreSQL server, not PGlite
+Date: 2026-11-10 21:48 UTC
+Server: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+Schema: drizzle/0000_init.sql applied clean; 69 public tables
+
+GCP is unreachable from this environment (gcloud auth list -> 'No credentialed
+accounts'), so the restore half of scripts/dr-drill.sh cannot run. The
+verification half decides pass or fail, and it can.
+
+==============================================================
+BEFORE — the SQL as the script shipped it
+==============================================================
+Pager usage is off.
+--- row counts that matter
+ERROR:  relation "audit_log" does not exist
+LINE 4: UNION ALL SELECT 'audit_log', count(*) FROM audit_log
+                                                    ^
+--- schema completeness (expects the full table set)
+ public_tables 
+---------------
+            69
+(1 row)
+
+--- migration bookkeeping survived
+ applied 
+---------
+       1
+(1 row)
+
+--- newest and oldest interaction, to show the window that was recovered
+ oldest | newest 
+--------+--------
+        | 
+(1 row)
+
+--- escalated cases are still escalated
+ status | count 
+--------+-------
+(0 rows)
+
+--- referential integrity: cases must not point at missing interactions
+ orphan_cases 
+--------------
+            0
+(1 row)
+
+--- files referenced by interactions but absent from files
+ dangling_audio 
+----------------
+              0
+(1 row)
+
+
+psql exit code: 0
+
+Note the shape of the failure: the ERROR is printed, psql still exits 0, so
+the script's guard
+
+    if ! ... | gc sql connect ...; then die "the restore completed but the
+    copy could not be read - that is a failed drill, not a passed one"
+
+does not fire. The script goes on to print a measured RTO. An operator
+records a pass, and the six row counts that prove the backup is not a backup
+of an empty database produced nothing at all.
+
+==============================================================
+AFTER — audit_log -> audit_logs, and \set ON_ERROR_STOP on
+==============================================================
+Pager usage is off.
+--- row counts that matter
+     table     | count 
+---------------+-------
+ users         |     0
+ interactions  |     0
+ cases         |     0
+ audit_logs    |     0
+ notifications |     0
+ files         |     0
+(6 rows)
+
+--- schema completeness (expects the full table set)
+ public_tables 
+---------------
+            69
+(1 row)
+
+--- migration bookkeeping survived
+ applied 
+---------
+       1
+(1 row)
+
+--- newest and oldest interaction, to show the window that was recovered
+ oldest | newest 
+--------+--------
+        | 
+(1 row)
+
+--- escalated cases are still escalated
+ status | count 
+--------+-------
+(0 rows)
+
+--- referential integrity: cases must not point at missing interactions
+ orphan_cases 
+--------------
+            0
+(1 row)
+
+--- files referenced by interactions but absent from files
+ dangling_audio 
+----------------
+              0
+(1 row)
+
+
+psql exit code: 0
+
+==============================================================
+GUARD — the same SQL with one relation name deliberately broken
+==============================================================
+Pager usage is off.
+--- row counts that matter
+ERROR:  relation "audit_log" does not exist
+LINE 4: UNION ALL SELECT 'audit_logs', count(*) FROM audit_log
+                                                     ^
+
+psql exit code: 3   -> non-zero, so the script's die path now fires.
+
+The counts are all zero because this is an empty local database, not a
+restored backup. What is proven here is that the checks run and that a
+broken one stops the drill - not that the pilot's data survives a restore.
+That remains unrun and is item 14 on the human action list.
