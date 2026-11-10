@@ -54,7 +54,7 @@ development banks — without ever touching a citizen's money.
 | Scheduler jobs | 16 | `src/server/core/scheduler.ts` |
 | Service level objectives | 6 | `src/server/core/slo.ts` |
 | Citizen channels | 5 | IVR, USSD, SMS, WhatsApp, web/PWA |
-| Tests | 1 969 in 100 files, 590 s | `npm test` |
+| Tests | 1 969 in 100 files, ≈570 s | `npm test` |
 | Public pages | 17 | `src/app/(public)/` |
 | Application pages | 27 | `src/app/(app)/` |
 | Blog articles | 30 | `content/blog/`, each ≥ 90/100 on the SEO gate |
