@@ -51,10 +51,10 @@ development banks — without ever touching a citizen's money.
 | AI agents | 12 | `src/server/ai/agents/` |
 | Model capabilities | 4 | llm, vision, stt, tts |
 | Model providers | 5 | Anthropic, Gemini, OpenAI, Google Speech, offline mock |
-| Scheduler jobs | 15 | `src/server/core/scheduler.ts` |
+| Scheduler jobs | 16 | `src/server/core/scheduler.ts` |
 | Service level objectives | 6 | `src/server/core/slo.ts` |
 | Citizen channels | 5 | IVR, USSD, SMS, WhatsApp, web/PWA |
-| Tests | 1 919 in 97 files | `npm test` |
+| Tests | 1 958 in 99 files | `npm test` |
 | Public pages | 17 | `src/app/(public)/` |
 | Application pages | 27 | `src/app/(app)/` |
 | Blog articles | 30 | `content/blog/`, each ≥ 90/100 on the SEO gate |

@@ -137,7 +137,82 @@ the brief approval API, the outbox worker and the console. §18.6 lists them.
 
 ---
 
-## 18.6 What remains
+## 18.6 It is invisible, and that is enforced
+
+The engine adds **no screen, no menu entry, no notification, no API a user
+calls, and nothing a citizen or a worker can perceive as a new feature.** It
+runs in the background and its only effect reaches the world through agents
+that already existed.
+
+That is a stronger constraint than "no UI", so it is tested rather than
+promised — `tests/trends-invisibility.test.ts`, 28 assertions.
+
+### Inert by default
+
+Three switches in `admin_config`, all shipping `false`:
+
+| Key | Off means |
+|---|---|
+| `trends.enabled` | The engine observes and scores, and changes nothing |
+| `trends.influence_agents` | No brief may reorder what an agent attends to |
+| `trends.allow_public_writes` | No approved action may ever change a published page |
+
+`allow_public_writes` cannot be enabled on its own: without the master switch
+it resolves to `false`. One key flipped in isolation must not start changing
+published pages, which every citizen would see at once — including `/urgence`.
+
+A configuration value that is not a boolean is treated as off. `"yes"` and `1`
+do not switch anything on.
+
+### Structure, not wording
+
+What a brief may change on the citizen path is *which* topic an agent attends
+to and *which* knowledge it reaches for. It may not contribute a sentence.
+
+`structuralInfluence()` reduces a resolved brief to a topic pointer and the
+topic identifier's own words. `audience`, `intent`, `prohibited_claims` and the
+approved claim text are deliberately dropped — they are real and useful to a
+human reviewing a brief, and they are prose, and prose on the citizen path is
+how a model ends up quoting the machinery.
+
+### Scrubbed on the way out
+
+Rule above can be got wrong by a future change, so there is a second layer.
+`scrubBriefTraces()` removes, from any text bound for a citizen, every brief
+identifier — brief, topic, experiment, call-to-action, evidence and claim ids —
+and the phrases a model reaches for when it decides to be transparent about its
+instructions: *« orientation en vigueur »*, *« selon le brief »*, *« score
+d'opportunité »*.
+
+It returns cleaned text rather than throwing. A danger-sign reply cannot be
+withheld because a trend identifier leaked into it: the leak is removed, the
+advice survives, and the removal is reported so it can be audited and fixed. A
+leak is a defect, not a routine event.
+
+Identifiers shorter than four characters are not matched, so ordinary French is
+untouched.
+
+### Invisible is not unaccountable
+
+Nobody can see this subsystem, so the audit trail is the only record that it
+ran. `runTrendSweep()` writes a `trends.sweep` entry whenever it decided
+anything, to the same hash-chained log as every other privileged action. An
+operator asking what the engine has been doing has exactly one place to look.
+
+### How it runs
+
+From the scheduler, beside reminders, SLA sweeps, retention and the audit
+chain. Nobody triggers it and nobody sees it. On a shipped deployment the step
+reads one configuration row, finds the switch off and returns — which is
+correct behaviour, not a degraded one.
+
+The engine never promotes a topic itself. A reviewable decision is counted and
+left for a human, which is why nothing becomes visible without a person having
+chosen to make it so.
+
+---
+
+## 18.7 What remains
 
 | Item | Spec |
 |---|---|

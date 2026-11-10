@@ -497,8 +497,10 @@
         "brief.ts",
         "channels.ts",
         "effective.ts",
+        "invisibility.ts",
         "measurement.ts",
-        "scoring.ts"
+        "scoring.ts",
+        "sweep.ts"
       ]
     },
     "core": [
@@ -553,6 +555,7 @@
       "expire_reports",
       "acu_caps",
       "data_requests",
+      "trends",
       "slo",
       "media_retention",
       "low_confidence_review",
@@ -838,14 +841,16 @@
       "transcription-artefacts.test.ts",
       "trends-contract.test.ts",
       "trends-effective.test.ts",
+      "trends-invisibility.test.ts",
       "trends-scoring.test.ts",
+      "trends-sweep.test.ts",
       "trends-write-safety.test.ts",
       "turn-latency.test.ts",
       "uncertainty-badge.test.ts",
       "upload-hostile.test.ts",
       "zz-pilot.test.ts"
     ],
-    "fileCount": 97
+    "fileCount": 99
   },
   "scripts": {
     "files": [

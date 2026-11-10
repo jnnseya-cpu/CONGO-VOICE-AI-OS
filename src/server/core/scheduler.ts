@@ -24,6 +24,7 @@ import { hasReminderConsent, notifyRole, notifyTemplate, sendDueNotifications } 
 import { checkAcuCaps } from "./metering";
 import { overdueDataRequests, sweepExpiredMedia } from "./privacy";
 import { dailyReviewSample } from "@server/ai/agents/learning";
+import { runTrendSweep } from "@server/ai/trends/sweep";
 import { downgradedLanguages } from "@server/ai/language/gates";
 import { canariesDue } from "./flags";
 import { sloReport } from "./slo";
@@ -282,6 +283,8 @@ export interface SchedulerReport {
   sloBreaches: number;
   qualityReviewSampled: number;
   languagesDowngraded: number;
+  /** Inert unless the trend engine is switched on; see ai/trends/sweep.ts. */
+  trendBriefsExpired: number;
   errors: Array<{ step: string; message: string }>;
 }
 
@@ -316,6 +319,22 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
   const expired = await step("expire_reports", errors, () => expireReports(now), 0);
   const acuAlerts = await step("acu_caps", errors, () => checkAcuCaps(now), []);
   const overdue = await step("data_requests", errors, () => overdueDataRequests(now), []);
+
+  /*
+   * The trend engine's only moving part.
+   *
+   * Inert unless `trends.enabled` is set, which it is not by default, so on a
+   * shipped deployment this step reads one configuration row and returns. It
+   * is here rather than on a request path because the engine must be invisible:
+   * nobody triggers it and nobody sees it.
+   */
+  const trends = await step("trends", errors, () => runTrendSweep(now), {
+    ran: false,
+    reasonFr: "Balayage non exécuté.",
+    scored: 0,
+    briefsExpired: 0,
+    awaitingReview: 0,
+  });
 
   /**
    * NFR-O-02. A target nobody measures is a target nobody meets. The
@@ -472,6 +491,7 @@ export async function runScheduler(now = new Date()): Promise<SchedulerReport> {
     sloBreaches: slo.breaching.length,
     qualityReviewSampled: review.items.length,
     languagesDowngraded: downgraded.length,
+    trendBriefsExpired: trends.briefsExpired,
     errors,
   };
   await emitEvent({ type: "scheduler.run.completed", aggregateType: "scheduler", aggregateId: now.toISOString().slice(0, 10), payload: { ...report, errors: errors.length } });
