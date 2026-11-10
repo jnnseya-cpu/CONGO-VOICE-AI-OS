@@ -42,6 +42,22 @@ function walk(root, dir, match) {
   return out.sort();
 }
 
+/** Directory → its .ts files, for every subdirectory of `dir`, plus its own. */
+function moduleTree(root, dir) {
+  const base = join(root, dir);
+  const out = {};
+  const own = readdirSync(base).filter((f) => f.endsWith(".ts")).sort();
+  if (own.length > 0) out["."] = own;
+  for (const entry of readdirSync(base).sort()) {
+    const full = join(base, entry);
+    if (!statSync(full).isDirectory()) continue;
+    out[entry] = walk(root, `${dir}/${entry}`, (f) => f.endsWith(".ts"))
+      .map((f) => f.replace(`${dir}/${entry}/`, ""))
+      .sort();
+  }
+  return out;
+}
+
 /** The values of a `const X = [...] as const;` driver list. */
 function driverList(source, name) {
   const block = source.match(new RegExp(`${name}\\s*=\\s*\\[([^\\]]*)\\]`));
@@ -190,6 +206,16 @@ export function collectInventory(root) {
     ai: {
       agents: readdirSync(join(root, "src/server/ai/agents")).filter((f) => f.endsWith(".ts")).sort(),
       providers: readdirSync(join(root, "src/server/ai/providers")).filter((f) => f.endsWith(".ts")).sort(),
+      /*
+       * Every module under src/server/ai and src/server/core.
+       *
+       * Added after a whole subsystem directory appeared and the lock said
+       * nothing: it tracked the files inside agents/ and providers/ but not
+       * the existence of a sibling directory beside them. A lock that can miss
+       * an entire subsystem is not locking the server.
+       */
+      modules: moduleTree(root, "src/server/ai"),
+      core: readdirSync(join(root, "src/server/core")).filter((f) => f.endsWith(".ts")).sort(),
       capabilities: (types.match(/export type Capability\s*=\s*([^;]+);/) ?? [])[1]
         ?.match(/"([a-z]+)"/g)
         ?.map((s) => s.replaceAll('"', "")) ?? [],

@@ -41,7 +41,7 @@ development banks — without ever touching a citizen's money.
 
 | Dimension | Count | Source of truth |
 |---|---:|---|
-| Database tables | 64 | `src/server/db/schema.ts` |
+| Database tables | 69 | `src/server/db/schema.ts` |
 | API routes | 128 | `src/app/api/**/route.ts` |
 | Provider webhooks | 9 | `src/app/api/hooks/**` |
 | Roles | 7 | `src/server/core/rbac.ts` |
@@ -54,7 +54,7 @@ development banks — without ever touching a citizen's money.
 | Scheduler jobs | 15 | `src/server/core/scheduler.ts` |
 | Service level objectives | 6 | `src/server/core/slo.ts` |
 | Citizen channels | 5 | IVR, USSD, SMS, WhatsApp, web/PWA |
-| Tests | 1 779 in 93 files | `npm test`, 438 s |
+| Tests | 1 919 in 97 files | `npm test` |
 | Public pages | 17 | `src/app/(public)/` |
 | Application pages | 27 | `src/app/(app)/` |
 | Blog articles | 30 | `content/blog/`, each ≥ 90/100 on the SEO gate |
@@ -80,6 +80,7 @@ development banks — without ever touching a citizen's money.
 | 15 | [Build Roadmap](15-roadmap.md) | MVP → beta → national → sovereign → continental |
 | 16 | [Competitive Advantage](16-advantage.md) | Why this is defensible |
 | 17 | [Production Readiness Review](17-production-readiness.md) | The gate, and what is still open |
+| 18 | [Trend Intelligence, embedded](18-trend-intelligence.md) | How the trend engine was mapped onto this platform |
 
 ## Conventions used throughout
 
@@ -111,7 +112,7 @@ Carried from §17.7 and applying to every section above:
 
 ## Size
 
-18 documents, ~4 900 lines, ~38 500 words. The current verdict is in
+19 documents, ~5 100 lines, ~40 000 words. The current verdict is in
 [§17](17-production-readiness.md): **GO for local development, CONDITIONAL GO
 for a pilot blocked on four human actions, NO-GO for national production.**
 

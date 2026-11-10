@@ -172,6 +172,48 @@ CREATE TABLE "break_glass_access" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "brief_actions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid,
+	"brief_uuid" uuid,
+	"brief_id" varchar(128) NOT NULL,
+	"brief_version" integer DEFAULT 1 NOT NULL,
+	"action_kind" varchar(40) NOT NULL,
+	"channel" varchar(32) NOT NULL,
+	"target_id" varchar(160),
+	"expected_target_revision" varchar(64),
+	"patch" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"previous_fields" jsonb,
+	"evidence_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"approved_claim_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"canonical_hash" varchar(64) NOT NULL,
+	"action_key" varchar(64) NOT NULL,
+	"state" varchar(32) DEFAULT 'proposed' NOT NULL,
+	"applied_revision" varchar(64),
+	"provider_receipt" varchar(120),
+	"failure_reason" text,
+	"action_expiry" timestamp with time zone NOT NULL,
+	"created_by" uuid NOT NULL,
+	"approved_by" uuid,
+	"approved_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "brief_outcomes" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid,
+	"brief_uuid" uuid,
+	"action_id" uuid,
+	"outcome_ref" varchar(120) NOT NULL,
+	"kind" varchar(24) NOT NULL,
+	"name" varchar(80) NOT NULL,
+	"revision" integer,
+	"variant" varchar(40),
+	"occurred_at" timestamp with time zone NOT NULL,
+	"ingested_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "case_events" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"case_id" uuid NOT NULL,
@@ -382,6 +424,30 @@ CREATE TABLE "glossaries" (
 	"notes" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "growth_briefs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid,
+	"brief_id" varchar(128) NOT NULL,
+	"revision" integer DEFAULT 1 NOT NULL,
+	"opportunity_id" uuid,
+	"status" varchar(24) DEFAULT 'draft' NOT NULL,
+	"document" jsonb NOT NULL,
+	"module" "module_type" DEFAULT 'general' NOT NULL,
+	"market" varchar(2) DEFAULT 'CD' NOT NULL,
+	"locale" varchar(35) NOT NULL,
+	"topic_id" varchar(128) NOT NULL,
+	"policy_version" integer DEFAULT 1 NOT NULL,
+	"hypothesis" text,
+	"primary_outcome" varchar(80),
+	"control_method" varchar(24) DEFAULT 'observational' NOT NULL,
+	"valid_from" timestamp with time zone NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"approved_by" uuid,
+	"approved_at" timestamp with time zone,
+	"created_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "health_triage_records" (
@@ -978,6 +1044,56 @@ CREATE TABLE "territories" (
 	"type" varchar(24) DEFAULT 'territoire' NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "trend_observations" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid,
+	"source_id" varchar(120) NOT NULL,
+	"source_family" varchar(80) NOT NULL,
+	"source_record_id" varchar(200) NOT NULL,
+	"source_revision" integer DEFAULT 1 NOT NULL,
+	"access_path" varchar(24) DEFAULT 'first_party' NOT NULL,
+	"observed_at" timestamp with time zone NOT NULL,
+	"window_start" timestamp with time zone NOT NULL,
+	"window_end" timestamp with time zone NOT NULL,
+	"ingested_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"province" varchar(120),
+	"territory" varchar(120),
+	"language" "language_code",
+	"module" "module_type" DEFAULT 'general' NOT NULL,
+	"metric" varchar(80) NOT NULL,
+	"value" real NOT NULL,
+	"unit" varchar(24) DEFAULT 'count' NOT NULL,
+	"coverage" real,
+	"context_only" boolean DEFAULT false NOT NULL,
+	"evidence_hash" varchar(64) NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "trend_opportunities" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tenant_id" uuid,
+	"topic_id" varchar(128) NOT NULL,
+	"module" "module_type" DEFAULT 'general' NOT NULL,
+	"market" varchar(2) DEFAULT 'CD' NOT NULL,
+	"locale" varchar(35) NOT NULL,
+	"province" varchar(120),
+	"territory" varchar(120),
+	"window_end" timestamp with time zone NOT NULL,
+	"scoring_version" varchar(24) DEFAULT '1.0' NOT NULL,
+	"input_digest" varchar(64) NOT NULL,
+	"opportunity_score" real NOT NULL,
+	"confidence" real NOT NULL,
+	"components" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"confidence_components" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"independent_families" integer DEFAULT 0 NOT NULL,
+	"decision" varchar(24) NOT NULL,
+	"vetoes" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"reasons" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"evidence_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"status" varchar(24) DEFAULT 'detected' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"phone" text,
@@ -1018,6 +1134,9 @@ CREATE TABLE "users" (
 --> statement-breakpoint
 ALTER TABLE "agriculture_reports" ADD CONSTRAINT "agriculture_reports_interaction_id_interactions_id_fk" FOREIGN KEY ("interaction_id") REFERENCES "public"."interactions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "autosave_drafts" ADD CONSTRAINT "autosave_drafts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "brief_actions" ADD CONSTRAINT "brief_actions_brief_uuid_growth_briefs_id_fk" FOREIGN KEY ("brief_uuid") REFERENCES "public"."growth_briefs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "brief_outcomes" ADD CONSTRAINT "brief_outcomes_brief_uuid_growth_briefs_id_fk" FOREIGN KEY ("brief_uuid") REFERENCES "public"."growth_briefs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "brief_outcomes" ADD CONSTRAINT "brief_outcomes_action_id_brief_actions_id_fk" FOREIGN KEY ("action_id") REFERENCES "public"."brief_actions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "case_events" ADD CONSTRAINT "case_events_case_id_cases_id_fk" FOREIGN KEY ("case_id") REFERENCES "public"."cases"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cases" ADD CONSTRAINT "cases_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cases" ADD CONSTRAINT "cases_interaction_id_interactions_id_fk" FOREIGN KEY ("interaction_id") REFERENCES "public"."interactions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -1029,6 +1148,7 @@ ALTER TABLE "feedback" ADD CONSTRAINT "feedback_interaction_id_interactions_id_f
 ALTER TABLE "feedback" ADD CONSTRAINT "feedback_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "files" ADD CONSTRAINT "files_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "follow_ups" ADD CONSTRAINT "follow_ups_case_id_cases_id_fk" FOREIGN KEY ("case_id") REFERENCES "public"."cases"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "growth_briefs" ADD CONSTRAINT "growth_briefs_opportunity_id_trend_opportunities_id_fk" FOREIGN KEY ("opportunity_id") REFERENCES "public"."trend_opportunities"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "health_triage_records" ADD CONSTRAINT "health_triage_records_interaction_id_interactions_id_fk" FOREIGN KEY ("interaction_id") REFERENCES "public"."interactions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "identifier_claims" ADD CONSTRAINT "identifier_claims_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "interactions" ADD CONSTRAINT "interactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -1052,6 +1172,10 @@ CREATE INDEX "audit_created_idx" ON "audit_logs" USING btree ("created_at");--> 
 CREATE INDEX "audit_entity_idx" ON "audit_logs" USING btree ("entity_type","entity_id");--> statement-breakpoint
 CREATE INDEX "auth_attempts_locked_idx" ON "auth_attempts" USING btree ("locked_until");--> statement-breakpoint
 CREATE INDEX "autosave_user_key_idx" ON "autosave_drafts" USING btree ("user_id","client_key");--> statement-breakpoint
+CREATE UNIQUE INDEX "brief_actions_key_idx" ON "brief_actions" USING btree ("tenant_id","action_key");--> statement-breakpoint
+CREATE INDEX "brief_actions_state_idx" ON "brief_actions" USING btree ("tenant_id","state");--> statement-breakpoint
+CREATE UNIQUE INDEX "brief_outcomes_dedupe_idx" ON "brief_outcomes" USING btree ("tenant_id","outcome_ref");--> statement-breakpoint
+CREATE INDEX "brief_outcomes_reporting_idx" ON "brief_outcomes" USING btree ("tenant_id","brief_uuid","kind","occurred_at");--> statement-breakpoint
 CREATE INDEX "cases_queue_idx" ON "cases" USING btree ("queue");--> statement-breakpoint
 CREATE INDEX "cases_sla_idx" ON "cases" USING btree ("sla_due_at");--> statement-breakpoint
 CREATE INDEX "cases_status_idx" ON "cases" USING btree ("status");--> statement-breakpoint
@@ -1065,6 +1189,8 @@ CREATE INDEX "feature_flags_enabled_idx" ON "feature_flags" USING btree ("enable
 CREATE INDEX "files_kind_created_idx" ON "files" USING btree ("kind","created_at");--> statement-breakpoint
 CREATE INDEX "glossaries_module_term_idx" ON "glossaries" USING btree ("module","term_fr");--> statement-breakpoint
 CREATE INDEX "glossaries_status_idx" ON "glossaries" USING btree ("status");--> statement-breakpoint
+CREATE UNIQUE INDEX "growth_briefs_revision_idx" ON "growth_briefs" USING btree ("tenant_id","brief_id","revision");--> statement-breakpoint
+CREATE INDEX "growth_briefs_effective_idx" ON "growth_briefs" USING btree ("tenant_id","market","locale","topic_id","status");--> statement-breakpoint
 CREATE INDEX "identifier_claims_user_idx" ON "identifier_claims" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "identifier_claims_expiry_idx" ON "identifier_claims" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "interactions_session_idx" ON "interactions" USING btree ("session_id");--> statement-breakpoint
@@ -1099,6 +1225,9 @@ CREATE INDEX "sync_events_device_idx" ON "sync_events" USING btree ("device_id",
 CREATE INDEX "tasks_case_idx" ON "tasks" USING btree ("case_id");--> statement-breakpoint
 CREATE INDEX "tasks_owner_idx" ON "tasks" USING btree ("owner_user_id","status");--> statement-breakpoint
 CREATE INDEX "territories_province_idx" ON "territories" USING btree ("province_code");--> statement-breakpoint
+CREATE UNIQUE INDEX "trend_observations_version_idx" ON "trend_observations" USING btree ("tenant_id","source_id","source_record_id","source_revision");--> statement-breakpoint
+CREATE INDEX "trend_observations_scoring_idx" ON "trend_observations" USING btree ("tenant_id","source_family","window_end");--> statement-breakpoint
+CREATE UNIQUE INDEX "trend_opportunities_frozen_idx" ON "trend_opportunities" USING btree ("tenant_id","topic_id","market","locale","window_end","scoring_version","input_digest");--> statement-breakpoint
 CREATE INDEX "users_role_idx" ON "users" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "users_province_idx" ON "users" USING btree ("province");--> statement-breakpoint
 CREATE INDEX "users_org_idx" ON "users" USING btree ("organisation_id");

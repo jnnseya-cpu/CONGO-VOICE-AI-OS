@@ -12,6 +12,8 @@
       "auth_attempts",
       "autosave_drafts",
       "break_glass_access",
+      "brief_actions",
+      "brief_outcomes",
       "case_events",
       "cases",
       "citizen_identifiers",
@@ -25,6 +27,7 @@
       "files",
       "follow_ups",
       "glossaries",
+      "growth_briefs",
       "health_triage_records",
       "idempotency_keys",
       "identifier_claims",
@@ -64,9 +67,11 @@
       "tasks",
       "tenants",
       "territories",
+      "trend_observations",
+      "trend_opportunities",
       "users"
     ],
-    "tableCount": 64,
+    "tableCount": 69,
     "enums": {
       "user_role": [
         "citizen",
@@ -402,6 +407,135 @@
       "mock.ts",
       "openai.ts"
     ],
+    "modules": {
+      ".": [
+        "gateway.ts",
+        "safety.ts",
+        "schemas.ts",
+        "types.ts"
+      ],
+      "agents": [
+        "agriculture.ts",
+        "clusters.ts",
+        "courtesy.ts",
+        "education.ts",
+        "health.ts",
+        "language.ts",
+        "learning.ts",
+        "orchestrator.ts",
+        "personalisation.ts",
+        "reporting.ts",
+        "risk.ts",
+        "workflow.ts"
+      ],
+      "education": [
+        "child-safety.ts",
+        "curriculum.ts",
+        "evidence.ts",
+        "profile.ts",
+        "quiz.ts",
+        "spaced-repetition.ts"
+      ],
+      "knowledge": [
+        "index.ts"
+      ],
+      "language": [
+        "confidence.ts",
+        "detect.ts",
+        "gates.ts",
+        "glossary.ts",
+        "scripted.ts",
+        "scripts.ts",
+        "voice.ts"
+      ],
+      "os": [
+        "brief.ts"
+      ],
+      "prompts": [
+        "index.ts"
+      ],
+      "protocols": [
+        "aggregation.ts",
+        "definitions/diarrhoea.ts",
+        "definitions/fever.ts",
+        "definitions/general-intake.ts",
+        "definitions/index.ts",
+        "definitions/injury.ts",
+        "definitions/maternal.ts",
+        "definitions/nutrition.ts",
+        "definitions/respiratory.ts",
+        "definitions/shared.ts",
+        "definitions/vaccination.ts",
+        "engine.ts",
+        "extraction.ts",
+        "index.ts",
+        "lifecycle.ts",
+        "registry.ts",
+        "types.ts",
+        "vaccination.ts"
+      ],
+      "providers": [
+        "anthropic.ts",
+        "gemini.ts",
+        "google-speech.ts",
+        "mock.ts",
+        "openai.ts"
+      ],
+      "review": [
+        "artefacts.ts",
+        "board.ts",
+        "gate.ts"
+      ],
+      "tools": [
+        "image-quality.ts",
+        "input-registry.ts",
+        "market.ts",
+        "weather.ts"
+      ],
+      "trends": [
+        "actions.ts",
+        "brief.ts",
+        "channels.ts",
+        "effective.ts",
+        "measurement.ts",
+        "scoring.ts"
+      ]
+    },
+    "core": [
+      "api.ts",
+      "audit.ts",
+      "auth.ts",
+      "credentials.ts",
+      "crypto.ts",
+      "env.ts",
+      "errors.ts",
+      "events.ts",
+      "flags.ts",
+      "idempotency.ts",
+      "identifiers.ts",
+      "images.ts",
+      "lockout.ts",
+      "memo.ts",
+      "metering.ts",
+      "mfa.ts",
+      "notification-scope.ts",
+      "notifications.ts",
+      "oidc.ts",
+      "phone.ts",
+      "privacy.ts",
+      "rate-limit.ts",
+      "rbac.ts",
+      "redact.ts",
+      "reset.ts",
+      "residency.ts",
+      "scheduler.ts",
+      "service-identity.ts",
+      "slo.ts",
+      "status.ts",
+      "storage.ts",
+      "unread.ts",
+      "users.ts"
+    ],
     "capabilities": [
       "llm",
       "vision",
@@ -583,6 +717,7 @@
       "15-roadmap.md",
       "16-advantage.md",
       "17-production-readiness.md",
+      "18-trend-intelligence.md",
       "README.md"
     ],
     "core": [
@@ -701,12 +836,16 @@
       "temperature.test.ts",
       "tracing.test.ts",
       "transcription-artefacts.test.ts",
+      "trends-contract.test.ts",
+      "trends-effective.test.ts",
+      "trends-scoring.test.ts",
+      "trends-write-safety.test.ts",
       "turn-latency.test.ts",
       "uncertainty-badge.test.ts",
       "upload-hostile.test.ts",
       "zz-pilot.test.ts"
     ],
-    "fileCount": 93
+    "fileCount": 97
   },
   "scripts": {
     "files": [

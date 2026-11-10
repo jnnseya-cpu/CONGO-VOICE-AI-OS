@@ -31,6 +31,9 @@ export interface Inventory {
   ai: {
     agents: string[];
     providers: string[];
+    /** Subdirectory of src/server/ai → its .ts files; "." is the directory itself. */
+    modules: Record<string, string[]>;
+    core: string[];
     capabilities: string[];
   };
   scheduler: { steps: string[] };

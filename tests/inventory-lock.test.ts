@@ -201,7 +201,10 @@ describe("floors that a regenerated lock cannot lower", () => {
   });
 
   it("keeps the AI-OS document set whole", () => {
-    expect(current.docs.aiOs.length).toBe(18);
+    // A floor, not an equality. The set is allowed to grow -- it did, when the
+    // trend engine was embedded -- but it must never shrink, and the two
+    // documents the rest of the set hangs from must always be present.
+    expect(current.docs.aiOs.length).toBeGreaterThanOrEqual(18);
     expect(current.docs.aiOs).toContain("README.md");
     expect(current.docs.aiOs).toContain("17-production-readiness.md");
   });

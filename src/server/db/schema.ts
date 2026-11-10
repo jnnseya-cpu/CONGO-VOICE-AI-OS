@@ -16,6 +16,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("user_role", [
@@ -1497,5 +1498,218 @@ export const rateLimitCounters = pgTable(
   },
   (t) => [index("rate_limit_window_idx").on(t.windowStart)],
 );
+
+/* ── Veille et briefs d'orientation (Trend Intelligence §5, §6, §15, §18) ──
+ *
+ * A trend reader spots a change in what citizens are asking about; a strategist
+ * checks whether the platform can serve it; if it can, one versioned,
+ * time-limited brief changes what the existing agents prioritise. The brief
+ * never widens what an agent may say — approved protocol text, danger signs,
+ * severity and escalation stay exactly where they are.
+ */
+
+/**
+ * One normalised signal. §5's observation schema, with raw event time, the
+ * window it covers and the ingestion time kept apart, because conflating them
+ * is how a late feed becomes an apparent collapse in demand.
+ */
+export const trendObservations = pgTable(
+  "trend_observations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id"),
+    sourceId: varchar("source_id", { length: 120 }).notNull(),
+    sourceFamily: varchar("source_family", { length: 80 }).notNull(),
+    sourceRecordId: varchar("source_record_id", { length: 200 }).notNull(),
+    sourceRevision: integer("source_revision").default(1).notNull(),
+    /** §3: "a feed gap is unknown data, never zero interest". */
+    accessPath: varchar("access_path", { length: 24 }).default("first_party").notNull(), // first_party | public_keyless | file_import
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).defaultNow().notNull(),
+    province: varchar("province", { length: 120 }),
+    territory: varchar("territory", { length: 120 }),
+    language: languageEnum("language"),
+    module: moduleEnum("module").default("general").notNull(),
+    metric: varchar("metric", { length: 80 }).notNull(),
+    value: real("value").notNull(),
+    unit: varchar("unit", { length: 24 }).default("count").notNull(),
+    coverage: real("coverage"),
+    /** Context cannot corroborate (§17); staleness cannot support a fresh action (§3). */
+    contextOnly: boolean("context_only").default(false).notNull(),
+    evidenceHash: varchar("evidence_hash", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    /*
+     * §15: the same source version may be replayed and must not be counted
+     * twice; the same key with a different hash is a conflict, not an
+     * overwrite. The unique key gives the first half, the stored hash the
+     * second.
+     */
+    uniqueIndex("trend_observations_version_idx").on(
+      t.tenantId,
+      t.sourceId,
+      t.sourceRecordId,
+      t.sourceRevision,
+    ),
+    index("trend_observations_scoring_idx").on(t.tenantId, t.sourceFamily, t.windowEnd),
+  ],
+);
+
+/**
+ * A scored opportunity, frozen. §15: "Opportunity score frozen by
+ * (installation, topic, window end, scoring version, input digest)" — so a
+ * score shown to a reviewer can always be recomputed from the inputs it was
+ * actually given, even after the thresholds are recalibrated.
+ */
+export const trendOpportunities = pgTable(
+  "trend_opportunities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id"),
+    topicId: varchar("topic_id", { length: 128 }).notNull(),
+    module: moduleEnum("module").default("general").notNull(),
+    market: varchar("market", { length: 2 }).default("CD").notNull(),
+    locale: varchar("locale", { length: 35 }).notNull(),
+    province: varchar("province", { length: 120 }),
+    territory: varchar("territory", { length: 120 }),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    scoringVersion: varchar("scoring_version", { length: 24 }).default("1.0").notNull(),
+    inputDigest: varchar("input_digest", { length: 64 }).notNull(),
+    opportunityScore: real("opportunity_score").notNull(),
+    confidence: real("confidence").notNull(),
+    components: jsonb("components").$type<Record<string, number>>().default({}).notNull(),
+    confidenceComponents: jsonb("confidence_components").$type<Record<string, number>>().default({}).notNull(),
+    independentFamilies: integer("independent_families").default(0).notNull(),
+    decision: varchar("decision", { length: 24 }).notNull(), // archive | watch | reviewable_brief | auto_eligible
+    vetoes: jsonb("vetoes").$type<string[]>().default([]).notNull(),
+    reasons: jsonb("reasons").$type<string[]>().default([]).notNull(),
+    evidenceIds: jsonb("evidence_ids").$type<string[]>().default([]).notNull(),
+    status: varchar("status", { length: 24 }).default("detected").notNull(), // detected | watching | eligible | dismissed | briefed | expired
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("trend_opportunities_frozen_idx").on(
+      t.tenantId,
+      t.topicId,
+      t.market,
+      t.locale,
+      t.windowEnd,
+      t.scoringVersion,
+      t.inputDigest,
+    ),
+  ],
+);
+
+/**
+ * The brief itself. §6's contract, stored as the exact document the agents
+ * receive, so what was approved and what is served can never diverge.
+ */
+export const growthBriefs = pgTable(
+  "growth_briefs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id"),
+    briefId: varchar("brief_id", { length: 128 }).notNull(),
+    revision: integer("revision").default(1).notNull(),
+    opportunityId: uuid("opportunity_id").references(() => trendOpportunities.id),
+    status: varchar("status", { length: 24 }).default("draft").notNull(), // draft | approved | superseded | expired | withdrawn
+    document: jsonb("document").$type<Record<string, unknown>>().notNull(),
+    module: moduleEnum("module").default("general").notNull(),
+    market: varchar("market", { length: 2 }).default("CD").notNull(),
+    locale: varchar("locale", { length: 35 }).notNull(),
+    topicId: varchar("topic_id", { length: 128 }).notNull(),
+    policyVersion: integer("policy_version").default(1).notNull(),
+    /** §10: the hypothesis is frozen at approval, not written afterwards. */
+    hypothesis: text("hypothesis"),
+    primaryOutcome: varchar("primary_outcome", { length: 80 }),
+    controlMethod: varchar("control_method", { length: 24 }).default("observational").notNull(),
+    validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    approvedBy: uuid("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("growth_briefs_revision_idx").on(t.tenantId, t.briefId, t.revision),
+    index("growth_briefs_effective_idx").on(t.tenantId, t.market, t.locale, t.topicId, t.status),
+  ],
+);
+
+/**
+ * A proposed or applied change. §18's state machine, with the two things that
+ * make recovery possible stored next to each other: the deterministic action
+ * key, and the revision the surface reported after it applied.
+ */
+export const briefActions = pgTable(
+  "brief_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id"),
+    briefUuid: uuid("brief_uuid").references(() => growthBriefs.id),
+    briefId: varchar("brief_id", { length: 128 }).notNull(),
+    briefVersion: integer("brief_version").default(1).notNull(),
+    actionKind: varchar("action_kind", { length: 40 }).notNull(), // seo_metadata_patch | owned_content_patch | seo_page_draft | organic_social_draft
+    channel: varchar("channel", { length: 32 }).notNull(),
+    targetId: varchar("target_id", { length: 160 }),
+    expectedTargetRevision: varchar("expected_target_revision", { length: 64 }),
+    patch: jsonb("patch").$type<Record<string, string>>().default({}).notNull(),
+    previousFields: jsonb("previous_fields").$type<Record<string, string>>(),
+    evidenceIds: jsonb("evidence_ids").$type<string[]>().default([]).notNull(),
+    approvedClaimIds: jsonb("approved_claim_ids").$type<string[]>().default([]).notNull(),
+    /** §18: approval binds to this exact hash; editing invalidates it. */
+    canonicalHash: varchar("canonical_hash", { length: 64 }).notNull(),
+    actionKey: varchar("action_key", { length: 64 }).notNull(),
+    state: varchar("state", { length: 32 }).default("proposed").notNull(),
+    appliedRevision: varchar("applied_revision", { length: 64 }),
+    providerReceipt: varchar("provider_receipt", { length: 120 }),
+    failureReason: text("failure_reason"),
+    actionExpiry: timestamp("action_expiry", { withTimezone: true }).notNull(),
+    /** Author and approver must differ (§16). Both recorded, never inferred. */
+    createdBy: uuid("created_by").notNull(),
+    approvedBy: uuid("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("brief_actions_key_idx").on(t.tenantId, t.actionKey),
+    index("brief_actions_state_idx").on(t.tenantId, t.state),
+  ],
+);
+
+/**
+ * First-party outcomes. §18's native measurement, deduplicated on a
+ * pseudonymous reference so a retried client cannot inflate a denominator.
+ */
+export const briefOutcomes = pgTable(
+  "brief_outcomes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id"),
+    briefUuid: uuid("brief_uuid").references(() => growthBriefs.id),
+    actionId: uuid("action_id").references(() => briefActions.id),
+    outcomeRef: varchar("outcome_ref", { length: 120 }).notNull(),
+    kind: varchar("kind", { length: 24 }).notNull(), // eligible | conversion | guardrail
+    name: varchar("name", { length: 80 }).notNull(),
+    revision: integer("revision"),
+    variant: varchar("variant", { length: 40 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("brief_outcomes_dedupe_idx").on(t.tenantId, t.outcomeRef),
+    index("brief_outcomes_reporting_idx").on(t.tenantId, t.briefUuid, t.kind, t.occurredAt),
+  ],
+);
+
+export type TrendObservation = typeof trendObservations.$inferSelect;
+export type TrendOpportunity = typeof trendOpportunities.$inferSelect;
+export type GrowthBriefRow = typeof growthBriefs.$inferSelect;
+export type BriefAction = typeof briefActions.$inferSelect;
+export type BriefOutcome = typeof briefOutcomes.$inferSelect;
 
 export type AuthAttempt = typeof authAttempts.$inferSelect;
